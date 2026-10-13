@@ -11,14 +11,6 @@ import {
   CalendarRange,
 } from 'lucide-react';
 
-export const mockUser = {
-  name: 'Dr. Ramesh K',
-  role: 'HOD / HR Administrator',
-  department: 'Computer Science & Engineering',
-  initials: 'RK',
-  email: 'hod.cse@jcethbl.edu.in',
-};
-
 export const metrics = [
   {
     id: 'employees',

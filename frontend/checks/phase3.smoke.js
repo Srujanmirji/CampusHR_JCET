@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { checkPassword, checkUser, mockAuthApi } from './mock-api.js';
 
 const require = createRequire(import.meta.url);
 const bundled = join(
@@ -24,13 +25,15 @@ const page = await browser.newPage({
 const base = process.env.PREVIEW_URL || 'http://localhost:5173';
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
+await mockAuthApi(page, base);
 
 try {
   console.log('Starting Phase 3 presentation verification...');
 
   // 1. Login flow
   await page.goto(`${base}/login`);
-  await page.getByLabel('Faculty / Employee ID or Email').fill('HR001');
+  await page.getByLabel('College email').fill(checkUser.email);
+  await page.getByLabel('Password', { exact: true }).fill(checkPassword);
   await page.getByRole('button', { name: 'Login', exact: true }).click();
   await page.waitForURL('**/dashboard');
   await page.waitForSelector('.metric-value');
@@ -42,12 +45,15 @@ try {
     'Prototype/demo labels must not appear',
   );
   assert.ok(
-    await page.getByText('Dr. Ramesh K').first().isVisible(),
-    'HOD Dr. Ramesh K must be displayed',
+    await page.getByText(checkUser.email).first().isVisible(),
+    'Signed-in account must be displayed',
   );
   assert.ok(
-    await page.getByText('HOD / HR Administrator').first().isVisible(),
-    'HOD / HR Administrator role context must be displayed',
+    await page
+      .locator('.profile-copy')
+      .getByText('HOD', { exact: true })
+      .isVisible(),
+    'Signed-in role must be displayed',
   );
 
   // 3. Dashboard -> Recent Leave Requests with Review -> link
@@ -94,7 +100,9 @@ try {
   );
 
   // 5. Approve & Find Substitute
-  await drawer.getByRole('button', { name: 'Approve Leave', exact: true }).click();
+  await drawer
+    .getByRole('button', { name: 'Approve Leave', exact: true })
+    .click();
   await page
     .getByRole('button', { name: 'Approve & Find Substitute', exact: true })
     .click();
@@ -234,7 +242,10 @@ try {
   if (await notifButton.isVisible()) {
     await notifButton.click();
     assert.ok(
-      await page.getByText(/Prof\. Asha Patil/i).first().isVisible(),
+      await page
+        .getByText(/Prof\. Asha Patil/i)
+        .first()
+        .isVisible(),
       'Notification stream should mention Prof. Asha Patil',
     );
     await page.keyboard.press('Escape');
@@ -257,7 +268,9 @@ try {
   // Return to Dashboard and check that requests are back to Pending
   await page.goto(`${base}/dashboard`);
   await page.waitForSelector('.metric-value');
-  const firstLeaveStatus = page.locator('.leave-card tbody tr .status-badge').first();
+  const firstLeaveStatus = page
+    .locator('.leave-card tbody tr .status-badge')
+    .first();
   assert.equal(
     await firstLeaveStatus.textContent(),
     'Pending',
@@ -276,9 +289,7 @@ try {
   }
 
   assert.deepEqual(errors, []);
-  console.log(
-    'Phase 3 smoke check PASSED! All acceptance criteria verified.',
-  );
+  console.log('Phase 3 smoke check PASSED! All acceptance criteria verified.');
 } finally {
   await browser.close();
 }

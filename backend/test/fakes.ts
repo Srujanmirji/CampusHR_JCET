@@ -27,12 +27,13 @@ export function createMemoryAuthRepository(users: StoredUser[] = []) {
         : null;
     },
     async recordLogin() {},
-    async createSession({ userId, tokenHash, expiresAt }) {
+    async createSession({ userId, tokenHash, expiresAt, persistent }) {
       sessions.push({
         id: randomUUID(),
         userId,
         tokenHash,
         expiresAt,
+        persistent,
         revokedAt: null,
       });
     },

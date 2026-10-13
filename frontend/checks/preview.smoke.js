@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { apiUrl, checkPassword, checkUser, mockAuthApi } from './mock-api.js';
 
 const require = createRequire(import.meta.url);
 const bundled = join(
@@ -26,9 +27,12 @@ const errors = [];
 const externalRequests = [];
 page.on('pageerror', (error) => errors.push(error.message));
 page.on('request', (request) => {
-  if (!request.url().startsWith(base) && !request.url().startsWith('data:'))
-    externalRequests.push(request.url());
+  const url = request.url();
+  if (![base, apiUrl, 'data:'].some((prefix) => url.startsWith(prefix)))
+    externalRequests.push(url);
 });
+const api = await mockAuthApi(page, base);
+const profileMenu = { name: `Open profile menu for ${checkUser.email}` };
 async function dashboard() {
   await page.goto(`${base}/dashboard`);
   await page.waitForSelector('.metric-value');
@@ -36,10 +40,13 @@ async function dashboard() {
 try {
   await page.goto(`${base}/dashboard`);
   await page.waitForURL('**/login');
-  await page.getByLabel('Faculty / Employee ID or Email').fill('');
   await page.getByRole('button', { name: 'Login', exact: true }).click();
-  await page.getByText('Enter your employee ID or email.').waitFor();
-  await page.getByLabel('Faculty / Employee ID or Email').fill('HR001');
+  await page.getByText('Enter your college email address.').waitFor();
+  await page.getByLabel('College email').fill(checkUser.email);
+  await page.getByLabel('Password', { exact: true }).fill('wrong password');
+  await page.getByRole('button', { name: 'Login', exact: true }).click();
+  await page.getByText('Incorrect email or password.').waitFor();
+  await page.getByLabel('Password', { exact: true }).fill(checkPassword);
   await page.getByRole('button', { name: 'Forgot password?' }).click();
   await page.getByRole('dialog').waitFor();
   await page.keyboard.press('Escape');
@@ -89,9 +96,7 @@ try {
   await page.getByText('No requests in this status', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Reset filter', exact: true }).click();
   assert.equal(await page.locator('.leave-card tbody tr').count(), 3);
-  const profileButton = page.getByRole('button', {
-    name: 'Open Dr. Ramesh K profile menu',
-  });
+  const profileButton = page.getByRole('button', profileMenu);
   await profileButton.click();
   await page.getByRole('menuitem', { name: 'My profile' }).click();
   await page.getByRole('dialog').waitFor();
@@ -381,27 +386,21 @@ try {
     ['8', '2', '1', '1'],
   );
   await dashboard();
-  await page
-    .getByRole('button', { name: 'Open Dr. Ramesh K profile menu' })
-    .click();
+  await page.getByRole('button', profileMenu).click();
   await page.getByRole('menuitem', { name: 'Logout' }).click();
   await page.waitForURL('**/login');
-  assert.deepEqual(
-    await page.evaluate(() => [
-      localStorage.getItem('campushr-ui-preview'),
-      sessionStorage.getItem('campushr-ui-preview'),
-    ]),
-    [null, null],
-  );
+  assert.equal(api.signedIn, false, 'logout must reach the API');
+  await page.goto(`${base}/leave`);
+  await page.waitForURL('**/login');
+  await page.getByLabel('College email').fill(checkUser.email);
+  await page.getByLabel('Password', { exact: true }).fill(checkPassword);
   await page.getByLabel('Remember me').check();
   await page.getByRole('button', { name: 'Login', exact: true }).click();
-  await page.waitForURL('**/dashboard');
-  assert.equal(
-    await page.evaluate(() => localStorage.getItem('campushr-ui-preview')),
-    'active',
-  );
+  await page.waitForURL('**/leave');
+  assert.equal(api.lastLogin.remember, true);
   await page.reload();
-  await page.waitForSelector('.metric-value');
+  await page.locator('main h1').waitFor();
+  assert.ok(page.url().endsWith('/leave'), 'session restored after reload');
   assert.deepEqual(errors, []);
   assert.deepEqual(externalRequests, []);
   console.log(

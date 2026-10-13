@@ -31,14 +31,14 @@ Verification and launch steps: `frontend/README.md`.
 - [x] Sidebar
 - [x] Topbar
 - [x] Responsive layout
-- [x] Signed-in route redirects (UI only; real protection needs the auth API)
+- [x] Signed-in route guard backed by the auth API
 
 ## FE-004 Login UI
 
-- [x] Login with prefilled demo credentials
+- [x] Login
 - [x] Forgot password help dialog (no recovery service yet)
 - [x] Remember me and logout
-- [ ] Sign-in against the auth API
+- [x] Sign-in against the auth API (session restore, return to requested page)
 
 ## FE-005 Dashboard
 

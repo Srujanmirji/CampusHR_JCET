@@ -52,8 +52,8 @@ npm run dev:web      # http://localhost:5173
 npm run dev:mobile   # Expo Go or a simulator/emulator
 ```
 
-- **Web:** sign in with the prefilled demo credentials. The web app is not yet
-  connected to the API; all screens use the sample data in
+- **Web:** sign in with the account created by `npm run db:seed` (the API must be
+  running). Module screens still use the sample data in
   `frontend/src/data/mock/`.
 - **API:** sign-in endpoints are under `/api/v1/auth` (see
   `backend/API_ENDPOINTS.md`). The health endpoint reports process liveness,

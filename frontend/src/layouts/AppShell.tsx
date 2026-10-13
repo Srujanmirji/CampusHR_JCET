@@ -8,19 +8,27 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { usePreviewSession } from '@/features/auth/hooks/usePreviewSession';
+import { FullPageLoader } from '@/components/shared/FullPageLoader';
+import { useSession } from '@/features/auth/hooks/useSession';
 
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { signedIn } = usePreviewSession();
-  const { pathname } = useLocation();
+  const session = useSession();
+  const location = useLocation();
+  const { pathname } = location;
   const main = useRef<HTMLElement>(null);
   useEffect(() => {
     main.current?.focus({ preventScroll: true });
     window.scrollTo(0, 0);
   }, [pathname]);
-  if (!signedIn) return <Navigate to="/login" replace />;
+  if (session.status === 'loading') {
+    return <FullPageLoader label="Checking your sign-in…" />;
+  }
+  if (session.status === 'signedOut') {
+    // Return here after signing in.
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
   return (
     <div className="app-shell" data-collapsed={collapsed}>
       <a href="#main-content" className="skip-link">
@@ -33,7 +41,10 @@ export default function AppShell() {
         />
       </aside>
       <div className="app-workspace">
-        <Topbar onOpenNavigation={() => setMobileOpen(true)} />
+        <Topbar
+          user={session.user}
+          onOpenNavigation={() => setMobileOpen(true)}
+        />
         <main
           id="main-content"
           ref={main}

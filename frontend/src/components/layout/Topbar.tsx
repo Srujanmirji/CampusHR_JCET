@@ -29,15 +29,32 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { navigation } from '@/data/navigation';
-import { mockUser } from '@/data/mock/dashboard';
-import { usePreviewSession } from '@/features/auth/hooks/usePreviewSession';
+import type { SessionUser } from '@/features/auth/api/auth';
+import { useSession } from '@/features/auth/hooks/useSession';
 import { useAcademicWorkflow } from '@/features/leave/useAcademicWorkflow';
 import { GlobalSearch } from './GlobalSearch';
 
-export function Topbar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
+// "hod.cse@…" → "HC"; "admin@…" → "AD".
+function initialsOf(email: string) {
+  const parts = email
+    .split('@')[0]!
+    .split(/[._-]+/)
+    .filter(Boolean);
+  const initials =
+    parts.length > 1 ? parts.map((part) => part[0]).join('') : (parts[0] ?? '');
+  return initials.slice(0, 2).toUpperCase();
+}
+
+export function Topbar({
+  user,
+  onOpenNavigation,
+}: {
+  user: SessionUser;
+  onOpenNavigation: () => void;
+}) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const session = usePreviewSession();
+  const session = useSession();
   const workflow = useAcademicWorkflow();
   const profileMenuTrigger = useRef<HTMLButtonElement>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -128,22 +145,20 @@ export function Topbar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
                 variant="ghost"
                 className="profile-trigger"
                 ref={profileMenuTrigger}
-                aria-label="Open Dr. Ramesh K profile menu"
+                aria-label={`Open profile menu for ${user.email}`}
               >
                 <Avatar>
-                  <AvatarFallback>{mockUser.initials}</AvatarFallback>
+                  <AvatarFallback>{initialsOf(user.email)}</AvatarFallback>
                 </Avatar>
                 <span className="profile-copy">
-                  <strong>{mockUser.name}</strong>
-                  <span>{mockUser.role}</span>
+                  <strong>{user.email}</strong>
+                  <span>{user.role}</span>
                 </span>
                 <ChevronDown />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>
-                HOD / Decision-Maker Account
-              </DropdownMenuLabel>
+              <DropdownMenuLabel>{user.role} account</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuItem
@@ -165,8 +180,8 @@ export function Topbar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
               <DropdownMenuGroup>
                 <DropdownMenuItem
                   variant="destructive"
-                  onSelect={() => {
-                    session.logout();
+                  onSelect={async () => {
+                    await session.logout();
                     navigate('/login', { replace: true });
                     toast.success('Signed out.');
                   }}
@@ -194,20 +209,12 @@ export function Topbar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
           </DialogHeader>
           <dl className="profile-details">
             <div>
-              <dt>Name</dt>
-              <dd>{mockUser.name}</dd>
+              <dt>Email</dt>
+              <dd>{user.email}</dd>
             </div>
             <div>
               <dt>Role</dt>
-              <dd>{mockUser.role}</dd>
-            </div>
-            <div>
-              <dt>Department</dt>
-              <dd>{mockUser.department}</dd>
-            </div>
-            <div>
-              <dt>Email</dt>
-              <dd>{mockUser.email}</dd>
+              <dd>{user.role}</dd>
             </div>
           </dl>
         </DialogContent>

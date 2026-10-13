@@ -1,18 +1,25 @@
 # CampusHR · Web app
 
-The CampusHR web interface for JCET Hubballi, approved by the HOD. It runs on
-built-in sample data with demo sign-in until the API serves real data.
+The CampusHR web interface for JCET Hubballi, approved by the HOD. Sign-in uses
+the API; the module screens still use built-in sample data until their API
+endpoints exist.
 
 ```sh
 npm install
 npm run dev:web
 ```
 
-Open [the login screen](http://localhost:5173/login). The demo credentials are
-prefilled; click **Login**. Sign-in is not yet checked against a server: any
-nonempty ID and password work, and the route guard is a UI convenience, not
-security. **Remember me** keeps the session flag in local storage; otherwise it
-lives in session storage. Logout clears both.
+Start the API too (`npm run dev:api`, see `SETUP.md`), then open
+[the login screen](http://localhost:5173/login) and sign in with an account
+created by `npm run db:seed`.
+
+- The session lives in an HttpOnly cookie set by the API; nothing is stored in
+  browser storage. On load the app restores it with `POST /auth/refresh`.
+- **Remember me** keeps you signed in for 7 days; unticked, closing the browser
+  ends the session (useful on shared office and lab PCs).
+- Visiting a page while signed out returns you to it after signing in.
+- `src/services/api.ts` is the shared API client (`VITE_API_URL`, credentials,
+  error messages); `src/features/auth/` holds the session provider and calls.
 
 ## Modules
 
@@ -62,7 +69,8 @@ npm run check:preview --workspace @campushr/web
 npm run check:phase3 --workspace @campushr/web
 ```
 
-The two checks need the running dev server and Playwright. Set
+The two checks need the running dev server and Playwright. They replace the
+auth API with a fake one (`checks/mock-api.js`), so the backend need not run. Set
 `PLAYWRIGHT_MODULE` to an installed Playwright module, and optionally
 `CHROME_EXECUTABLE` and `PREVIEW_URL`. They cover form validation, keyboard login,
 session persistence and logout, metrics, charts, search, every module route,

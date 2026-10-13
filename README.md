@@ -6,13 +6,13 @@ from its approved interface toward a production system.
 
 ## Current status
 
-| Part                   | State                                                                                                                                               |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web app (`frontend/`)  | Full interface for every sidebar module, running on built-in sample data with demo sign-in. The leave → substitution workflow is fully interactive. |
-| API (`backend/`)       | Sign-in: login, token refresh with rotation, logout and `/auth/me`, backed by PostgreSQL. Other domain endpoints are not built yet.                 |
-| Mobile app (`mobile/`) | Foundation screen with local notifications. Remote push needs an EAS project ID.                                                                    |
+| Part                   | State                                                                                                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web app (`frontend/`)  | Full interface for every sidebar module. Sign-in uses the API; module screens use built-in sample data. The leave → substitution workflow is fully interactive. |
+| API (`backend/`)       | Sign-in: login, token refresh with rotation, logout and `/auth/me`, backed by PostgreSQL. Other domain endpoints are not built yet.                             |
+| Mobile app (`mobile/`) | Foundation screen with local notifications. Remote push needs an EAS project ID.                                                                                |
 
-Sample data and the demo credentials stay in place until the API serves real data.
+Module sample data stays in place until each module's API endpoints exist.
 Payroll is out of scope and is not part of this product.
 
 ## Product surfaces
@@ -31,7 +31,7 @@ Requires Node 24 and npm 11.
 ```sh
 nvm use
 npm ci
-npm run dev:web     # http://localhost:5173 — demo sign-in is prefilled
+npm run dev:web     # http://localhost:5173 — needs the API for sign-in
 ```
 
 Full setup, environment files, the API, the database and the mobile app:

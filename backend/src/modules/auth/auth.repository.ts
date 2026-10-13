@@ -11,6 +11,7 @@ export interface AuthSession {
   id: string;
   userId: string;
   expiresAt: Date;
+  persistent: boolean;
   revokedAt: Date | null;
 }
 
@@ -18,6 +19,7 @@ export interface NewSession {
   userId: string;
   tokenHash: string;
   expiresAt: Date;
+  persistent: boolean;
   userAgent?: string;
   ip?: string;
 }
@@ -76,7 +78,13 @@ export function createPrismaAuthRepository(
     findSessionByHash(tokenHash) {
       return prisma.refreshSession.findUnique({
         where: { tokenHash },
-        select: { id: true, userId: true, expiresAt: true, revokedAt: true },
+        select: {
+          id: true,
+          userId: true,
+          expiresAt: true,
+          persistent: true,
+          revokedAt: true,
+        },
       });
     },
     async revokeSession(id, at) {

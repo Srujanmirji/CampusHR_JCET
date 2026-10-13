@@ -106,6 +106,28 @@ describe('auth API', () => {
     assert.match(header, /Path=\/api\/v1\/auth/);
   });
 
+  test('Remember me decides whether the cookie outlives the browser', async () => {
+    const browserOnly = refreshCookie(await login('hod@jcet.test'));
+    assert.doesNotMatch(browserOnly.header, /Max-Age/);
+    const rotated = refreshCookie(
+      await post('/refresh', undefined, browserOnly.pair),
+    );
+    assert.doesNotMatch(rotated.header, /Max-Age/, 'kept across rotation');
+
+    const remembered = refreshCookie(
+      await post('/login', {
+        email: 'hod@jcet.test',
+        password,
+        remember: true,
+      }),
+    );
+    assert.match(remembered.header, /Max-Age=604800/);
+    const rotatedRemembered = refreshCookie(
+      await post('/refresh', undefined, remembered.pair),
+    );
+    assert.match(rotatedRemembered.header, /Max-Age=604800/);
+  });
+
   test('wrong password, unknown email and deactivated account look the same', async () => {
     for (const response of [
       await login('hod@jcet.test', 'wrong password'),

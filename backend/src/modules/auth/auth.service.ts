@@ -30,6 +30,8 @@ export interface AuthResult {
   accessToken: string;
   expiresIn: number;
   refreshToken: string;
+  /** Whether the refresh cookie should outlive the browser session. */
+  persistent: boolean;
   user: PublicUser;
 }
 
@@ -61,12 +63,17 @@ export function createAuthService(
   accessSecret: string,
   now: () => Date = () => new Date(),
 ) {
-  async function issue(user: AuthUser, meta: ClientMeta): Promise<AuthResult> {
+  async function issue(
+    user: AuthUser,
+    meta: ClientMeta,
+    persistent: boolean,
+  ): Promise<AuthResult> {
     const refreshToken = randomBytes(32).toString('base64url');
     await repo.createSession({
       userId: user.id,
       tokenHash: hashToken(refreshToken),
       expiresAt: new Date(now().getTime() + REFRESH_TOKEN_TTL_MS),
+      persistent,
       userAgent: meta.userAgent?.slice(0, 512),
       ip: meta.ip,
     });
@@ -80,12 +87,18 @@ export function createAuthService(
       accessToken,
       expiresIn: ACCESS_TOKEN_TTL_SECONDS,
       refreshToken,
+      persistent,
       user: toPublic(user),
     };
   }
 
   return {
-    async login(email: string, password: string, meta: ClientMeta) {
+    async login(
+      email: string,
+      password: string,
+      meta: ClientMeta,
+      remember = false,
+    ) {
       const user = await repo.findUserByEmail(email);
       timingGuardHash ??= bcrypt.hash('campushr-timing-guard', BCRYPT_COST);
       const matches = await bcrypt.compare(
@@ -97,7 +110,7 @@ export function createAuthService(
         throw invalidCredentials();
       }
       await repo.recordLogin(user.id, now());
-      return issue(user, meta);
+      return issue(user, meta, remember);
     },
 
     async refresh(refreshToken: string | undefined, meta: ClientMeta) {
@@ -121,7 +134,7 @@ export function createAuthService(
       }
       const user = await repo.findUserById(session.userId);
       if (!user || user.status !== 'ACTIVE') throw invalidSession();
-      return issue(user, meta);
+      return issue(user, meta, session.persistent);
     },
 
     async logout(refreshToken: string | undefined) {

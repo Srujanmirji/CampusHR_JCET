@@ -6,6 +6,7 @@ export const loginSchema = z.object({
     .max(254)
     .transform((email) => email.toLowerCase()),
   password: z.string().min(1).max(256),
+  remember: z.boolean().default(false),
 });
 
 // bcrypt only uses the first 72 bytes of a password.

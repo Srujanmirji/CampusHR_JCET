@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
   Eye,
@@ -34,36 +34,52 @@ import {
   DialogDescription,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { usePreviewSession } from '../hooks/usePreviewSession';
+import { FullPageLoader } from '@/components/shared/FullPageLoader';
+import { ApiError } from '@/services/api';
+import { useSession } from '../hooks/useSession';
 
 const loginSchema = z.object({
-  identity: z.string().trim().min(1, 'Enter your employee ID or email.'),
+  email: z.email('Enter your college email address.'),
   password: z.string().min(1, 'Enter your password.'),
   remember: z.boolean(),
 });
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const session = usePreviewSession();
+  const session = useSession();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from
+    ?.pathname;
+  const destination = from && from !== '/login' ? from : '/dashboard';
   const [showPassword, setShowPassword] = useState(false);
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      identity: 'HR001',
-      password: 'campushr-demo',
-      remember: false,
-    },
+    defaultValues: { email: '', password: '', remember: false },
   });
-  if (session.signedIn) return <Navigate to="/dashboard" replace />;
-  const submit = handleSubmit(async ({ remember }) => {
-    await new Promise((resolve) => setTimeout(resolve, 650));
-    session.login(remember);
-    navigate('/dashboard', { replace: true });
+  if (session.status === 'loading') {
+    return <FullPageLoader label="Checking your sign-in…" />;
+  }
+  if (session.status === 'signedIn') {
+    return <Navigate to={destination} replace />;
+  }
+  const submit = handleSubmit(async (values) => {
+    try {
+      await session.login(values);
+      navigate(destination, { replace: true });
+    } catch (error) {
+      setError('root', {
+        message:
+          error instanceof ApiError
+            ? error.message
+            : 'Something went wrong. Try again.',
+      });
+    }
   });
   return (
     <main className="login-page">
@@ -146,23 +162,21 @@ export default function LoginPage() {
           </header>
           <form onSubmit={submit} noValidate className="flex flex-col gap-5">
             <FieldGroup>
-              <Field data-invalid={Boolean(errors.identity)}>
-                <FieldLabel htmlFor="identity">
-                  Faculty / Employee ID or Email
-                </FieldLabel>
+              <Field data-invalid={Boolean(errors.email)}>
+                <FieldLabel htmlFor="email">College email</FieldLabel>
                 <Input
-                  id="identity"
+                  id="email"
+                  type="email"
+                  inputMode="email"
                   autoComplete="username"
-                  placeholder="e.g. HR001 or name@jcethbl.edu.in"
-                  aria-invalid={Boolean(errors.identity)}
-                  aria-describedby={
-                    errors.identity ? 'identity-error' : undefined
-                  }
-                  {...register('identity')}
+                  placeholder="name@jcethbl.edu.in"
+                  aria-invalid={Boolean(errors.email)}
+                  aria-describedby={errors.email ? 'email-error' : undefined}
+                  {...register('email')}
                 />
-                {errors.identity && (
-                  <FieldError id="identity-error">
-                    {errors.identity.message}
+                {errors.email && (
+                  <FieldError id="email-error">
+                    {errors.email.message}
                   </FieldError>
                 )}
               </Field>
@@ -225,6 +239,9 @@ export default function LoginPage() {
                 </DialogContent>
               </Dialog>
             </div>
+            {errors.root && (
+              <FieldError id="login-error">{errors.root.message}</FieldError>
+            )}
             <Button
               type="submit"
               variant="accent"

@@ -63,11 +63,15 @@ export function createAuthController(
     }
   }
 
-  function send(res: Response, { refreshToken, ...body }: AuthResult) {
+  function send(
+    res: Response,
+    { refreshToken, persistent, ...body }: AuthResult,
+  ) {
     res
       .cookie(REFRESH_COOKIE, refreshToken, {
         ...cookieOptions,
-        maxAge: REFRESH_TOKEN_TTL_MS,
+        // Without maxAge the browser drops the cookie when it closes.
+        ...(persistent ? { maxAge: REFRESH_TOKEN_TTL_MS } : {}),
       })
       .set('Cache-Control', 'no-store')
       .json(body);
@@ -82,7 +86,7 @@ export function createAuthController(
         'Enter a valid email address and password.',
       );
     }
-    const { email, password } = parsed.data;
+    const { email, password, remember } = parsed.data;
     const ip = req.ip ?? 'unknown';
     const accountKey = `${ip}|${email}`;
     if (perAccount.isBlocked(accountKey) || perIp.isBlocked(ip)) {
@@ -97,7 +101,12 @@ export function createAuthController(
     perAccount.hit(accountKey);
     perIp.hit(ip);
     try {
-      const result = await auth.login(email, password, clientMeta(req));
+      const result = await auth.login(
+        email,
+        password,
+        clientMeta(req),
+        remember,
+      );
       perAccount.reset(accountKey);
       perIp.forgive(ip);
       send(res, result);

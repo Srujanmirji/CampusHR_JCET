@@ -70,6 +70,8 @@ model RefreshSession {
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokenHash  String    @unique @map("token_hash")
   expiresAt  DateTime  @map("expires_at")
+  // false = "Remember me" unticked: the cookie ends with the browser session.
+  persistent Boolean   @default(true)
   revokedAt  DateTime? @map("revoked_at")
   userAgent  String?   @map("user_agent")
   ip         String?
