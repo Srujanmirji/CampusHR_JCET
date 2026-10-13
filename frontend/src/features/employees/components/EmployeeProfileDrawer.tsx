@@ -1,510 +1,319 @@
+import { useState, type ReactNode } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Archive, LoaderCircle, Pencil, Phone } from 'lucide-react';
+import { toast } from 'sonner';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
 } from '@/components/ui/sheet';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { toast } from 'sonner';
-import type { Employee } from '@/types/academic';
-import { departmentNames } from '@/data/mock/employees';
-import { facultyWorkloads } from '@/data/mock/workload';
-import { mockDailyAttendance } from '@/data/mock/attendance';
+import { useScope } from '@/features/auth/hooks/useCan';
+import { useSession } from '@/features/auth/hooks/useSession';
+import { ApiError } from '@/services/api';
 import {
-  Mail,
-  Phone,
-  Calendar,
-  GraduationCap,
-  Briefcase,
-  BookOpen,
-  Clock,
-  FileText,
-  Download,
-  Building,
-} from 'lucide-react';
+  archiveEmployee,
+  EMPLOYMENT_TYPES,
+  STAFF_CATEGORIES,
+  updateEmployee,
+  type Employee,
+} from '../api/employees';
+import { initialsOf } from '../utils/initials';
 
-interface EmployeeProfileDrawerProps {
-  employee: Employee | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  isEffectiveOnLeave?: boolean;
+const dateFormat = new Intl.DateTimeFormat('en-IN', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
+function Detail({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="text-sm text-foreground">{children || '—'}</dd>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3 border-t pt-4">
+      <h3 className="text-sm font-semibold text-primary">{title}</h3>
+      <dl className="grid gap-4 sm:grid-cols-2">{children}</dl>
+    </section>
+  );
 }
 
 export function EmployeeProfileDrawer({
   employee,
   open,
   onOpenChange,
-  isEffectiveOnLeave,
-}: EmployeeProfileDrawerProps) {
+  onEdit,
+}: {
+  employee: Employee | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onEdit: () => void;
+}) {
+  const scopeOf = useScope();
+  const session = useSession();
+  const queryClient = useQueryClient();
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [phone, setPhone] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState('');
+
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ['employees'] });
+    void queryClient.invalidateQueries({ queryKey: ['departments'] });
+  };
+  const archive = useMutation({
+    mutationFn: (id: string) => archiveEmployee(id),
+    onSuccess: (archived) => {
+      refresh();
+      setConfirmArchive(false);
+      onOpenChange(false);
+      toast.success(
+        `Archived ${archived.firstName} ${archived.lastName}. Their CampusHR login is disabled.`,
+      );
+    },
+    onError: (error) =>
+      toast.error(
+        error instanceof ApiError ? error.message : 'Could not archive.',
+      ),
+  });
+  const savePhone = useMutation({
+    mutationFn: ({ id, value }: { id: string; value: string }) =>
+      updateEmployee(id, { phone: value.trim() || null }),
+    onSuccess: () => {
+      refresh();
+      setPhone(null);
+      toast.success('Phone number updated.');
+    },
+    onError: (error) =>
+      setPhoneError(
+        error instanceof ApiError
+          ? error.message
+          : 'Could not save. Try again.',
+      ),
+  });
+
   if (!employee) return null;
-
-  const workload = facultyWorkloads.find((w) => w.facultyId === employee.id);
-  const attendance = mockDailyAttendance.find(
-    (a) => a.employeeId === employee.id,
-  );
-
-  const displayStatus = isEffectiveOnLeave ? 'On Leave' : employee.status;
-
-  const dummyDocs = [
-    {
-      name: 'Appointment_Order_JCET.pdf',
-      size: '1.2 MB',
-      date: employee.joiningDate,
-    },
-    { name: 'VTU_Faculty_Endorsement.pdf', size: '850 KB', date: '2021-11-10' },
-    {
-      name: 'Educational_Credentials_Consolidated.pdf',
-      size: '3.4 MB',
-      date: employee.joiningDate,
-    },
-    {
-      name: 'AICTE_Faculty_Registration_Proof.pdf',
-      size: '520 KB',
-      date: '2023-04-12',
-    },
-  ];
+  const active = employee.status === 'ACTIVE';
+  const isSelf =
+    session.status === 'signedIn' && session.user.employeeId === employee.id;
+  const canEditAll = active && scopeOf('employee.update') === 'all';
+  const canEditPhone =
+    active && !canEditAll && isSelf && scopeOf('employee.update') === 'own';
+  const canArchive = active && scopeOf('employee.archive') === 'all';
+  const name = `${employee.firstName} ${employee.lastName}`;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="w-full max-w-xl overflow-y-auto sm:max-w-2xl"
-        showCloseButton={true}
+    <>
+      <Sheet
+        open={open}
+        onOpenChange={(next) => {
+          setPhone(null);
+          onOpenChange(next);
+        }}
       >
-        <SheetHeader className="border-b pb-4">
-          <div className="flex items-start gap-4">
-            <Avatar className="h-16 w-16 border-2 border-primary/20">
-              {employee.photo && (
-                <AvatarImage src={employee.photo} alt={employee.name} />
-              )}
-              <AvatarFallback className="bg-primary/10 font-bold text-lg text-primary">
-                {employee.initials}
-              </AvatarFallback>
-            </Avatar>
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <SheetTitle className="text-xl font-bold">
-                  {employee.name}
-                </SheetTitle>
-                <StatusBadge
-                  status={
-                    displayStatus === 'On Leave'
-                      ? 'Approved'
-                      : displayStatus === 'Active'
-                        ? 'Approved'
-                        : 'Pending'
-                  }
-                  label={displayStatus}
-                />
-              </div>
-              <p className="text-sm font-medium text-muted-foreground">
-                {employee.designation} · {departmentNames[employee.department]}
-              </p>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                <span className="font-mono font-semibold text-foreground">
-                  {employee.id}
-                </span>
-                <span>•</span>
-                <span>{employee.employmentType} Staff</span>
-                <span>•</span>
-                <span>Joined {employee.joiningDate}</span>
+        <SheetContent
+          side="right"
+          className="w-full overflow-y-auto sm:max-w-xl"
+        >
+          <SheetHeader>
+            <div className="flex items-center gap-4">
+              <Avatar className="size-14 border">
+                <AvatarFallback className="bg-primary/10 text-base font-semibold text-primary">
+                  {initialsOf(employee)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col gap-1">
+                <SheetTitle className="text-xl">{name}</SheetTitle>
+                <SheetDescription>
+                  {employee.designation.name} · {employee.department.name}
+                </SheetDescription>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {employee.employeeCode}
+                  </span>
+                  <StatusBadge
+                    status={active ? 'Active' : 'Inactive'}
+                    label={active ? 'Active' : 'Archived'}
+                  />
+                  {employee.isHod && <Badge variant="outline">HOD</Badge>}
+                </div>
               </div>
             </div>
-          </div>
-          <SheetDescription className="sr-only">
-            Faculty profile details, workload, attendance, and credentials for{' '}
-            {employee.name}.
-          </SheetDescription>
-        </SheetHeader>
+          </SheetHeader>
 
-        <div className="mt-4">
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="attendance">Attendance</TabsTrigger>
-              <TabsTrigger value="leave">Leave</TabsTrigger>
-              <TabsTrigger value="workload">Workload</TabsTrigger>
-              <TabsTrigger value="documents">Documents</TabsTrigger>
-            </TabsList>
-
-            {/* OVERVIEW TAB */}
-            <TabsContent value="overview" className="mt-4 space-y-5">
-              {employee.bio && (
-                <div className="rounded-lg border bg-muted/30 p-3.5 text-sm text-foreground/90">
-                  <p className="leading-relaxed">{employee.bio}</p>
-                </div>
-              )}
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-lg border p-3.5">
-                  <h4 className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    <GraduationCap className="h-4 w-4 text-primary" />
-                    Academic Profile
-                  </h4>
-                  <div className="space-y-2 text-xs">
-                    <div>
-                      <span className="text-muted-foreground">
-                        Qualification:
-                      </span>
-                      <p className="font-medium text-foreground">
-                        {employee.qualification}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">
-                        Specialization:
-                      </span>
-                      <p className="font-medium text-foreground">
-                        {employee.specialization}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">
-                        Total Experience:
-                      </span>
-                      <p className="font-medium text-foreground">
-                        {employee.experience}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border p-3.5">
-                  <h4 className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    <Briefcase className="h-4 w-4 text-primary" />
-                    Contact & Service
-                  </h4>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="font-mono text-foreground">
-                        {employee.email}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="font-mono text-foreground">
-                        {employee.phone}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Building className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span>{departmentNames[employee.department]}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span>Joined: {employee.joiningDate}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-lg border p-4">
-                <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  <BookOpen className="h-4 w-4 text-primary" />
-                  Subjects Handled & Labs
-                </h4>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {employee.subjectsHandled.map((subj, idx) => (
-                    <Badge
-                      key={idx}
-                      variant="secondary"
-                      className="px-2.5 py-1 text-xs"
-                    >
-                      {subj}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* ATTENDANCE TAB */}
-            <TabsContent value="attendance" className="mt-4 space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-lg border p-3 text-center">
-                  <span className="text-xs text-muted-foreground">
-                    Monthly Rate
-                  </span>
-                  <div className="text-xl font-bold text-emerald-600">
-                    96.4%
-                  </div>
-                </div>
-                <div className="rounded-lg border p-3 text-center">
-                  <span className="text-xs text-muted-foreground">
-                    Days Present
-                  </span>
-                  <div className="text-xl font-bold">21 / 22</div>
-                </div>
-                <div className="rounded-lg border p-3 text-center">
-                  <span className="text-xs text-muted-foreground">
-                    Avg Hours
-                  </span>
-                  <div className="text-xl font-bold">8h 05m</div>
-                </div>
-              </div>
-
-              <div className="rounded-lg border p-4">
-                <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Today's Biometric Log (2026-10-12)
-                </h4>
-                {attendance ? (
-                  <div className="space-y-2.5 text-sm">
-                    <div className="flex justify-between border-b pb-2">
-                      <span className="text-muted-foreground">Check-in:</span>
-                      <span className="font-mono font-medium">
-                        {attendance.checkIn}
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-b pb-2">
-                      <span className="text-muted-foreground">Check-out:</span>
-                      <span className="font-mono font-medium">
-                        {attendance.checkOut}
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-b pb-2">
-                      <span className="text-muted-foreground">
-                        Working Hours:
-                      </span>
-                      <span className="font-mono font-medium">
-                        {attendance.workingHours}
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-b pb-2">
-                      <span className="text-muted-foreground">
-                        Daily Status:
-                      </span>
-                      <Badge variant="outline">
-                        {displayStatus === 'On Leave'
-                          ? 'On Leave'
-                          : attendance.status}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between pt-1 text-xs text-muted-foreground">
-                      <span>Gate Terminal:</span>
-                      <span>
-                        {displayStatus === 'On Leave'
-                          ? 'Leave Sanctioned'
-                          : attendance.biometricTerminal}
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No biometric punch logged today.
-                  </p>
+          <div className="flex flex-col gap-5 px-4 pb-6">
+            {(canEditAll || canArchive || canEditPhone) && (
+              <div className="flex flex-wrap gap-2">
+                {canEditAll && (
+                  <Button onClick={onEdit}>
+                    <Pencil />
+                    Edit
+                  </Button>
+                )}
+                {canEditPhone && phone === null && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setPhoneError('');
+                      setPhone(employee.phone ?? '');
+                    }}
+                  >
+                    <Phone />
+                    Update phone
+                  </Button>
+                )}
+                {canArchive && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setConfirmArchive(true)}
+                  >
+                    <Archive />
+                    Archive
+                  </Button>
                 )}
               </div>
-            </TabsContent>
+            )}
 
-            {/* LEAVE TAB */}
-            <TabsContent value="leave" className="mt-4 space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-lg border p-3 text-center">
-                  <span className="text-xs text-muted-foreground">
-                    Casual Leave
-                  </span>
-                  <div className="text-lg font-bold">8 / 12</div>
-                  <span className="text-[10px] text-muted-foreground">
-                    Remaining
-                  </span>
+            {phone !== null && (
+              <form
+                className="flex flex-col gap-3 rounded-lg border p-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (
+                    phone.trim() &&
+                    !/^\+?[0-9 ()-]{7,20}$/.test(phone.trim())
+                  ) {
+                    setPhoneError('Enter a valid phone number.');
+                    return;
+                  }
+                  savePhone.mutate({ id: employee.id, value: phone });
+                }}
+              >
+                <Field data-invalid={Boolean(phoneError)}>
+                  <FieldLabel htmlFor="own-phone">Phone number</FieldLabel>
+                  <Input
+                    id="own-phone"
+                    type="tel"
+                    autoFocus
+                    value={phone}
+                    aria-invalid={Boolean(phoneError)}
+                    aria-describedby={
+                      phoneError ? 'own-phone-error' : undefined
+                    }
+                    onChange={(event) => setPhone(event.target.value)}
+                  />
+                  {phoneError && (
+                    <FieldError id="own-phone-error">{phoneError}</FieldError>
+                  )}
+                </Field>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setPhone(null)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={savePhone.isPending}>
+                    {savePhone.isPending && (
+                      <LoaderCircle className="animate-spin" />
+                    )}
+                    Save phone
+                  </Button>
                 </div>
-                <div className="rounded-lg border p-3 text-center">
-                  <span className="text-xs text-muted-foreground">
-                    Medical Leave
-                  </span>
-                  <div className="text-lg font-bold">10 / 10</div>
-                  <span className="text-[10px] text-muted-foreground">
-                    Remaining
-                  </span>
-                </div>
-                <div className="rounded-lg border p-3 text-center">
-                  <span className="text-xs text-muted-foreground">
-                    Earned Leave
-                  </span>
-                  <div className="text-lg font-bold">18 / 20</div>
-                  <span className="text-[10px] text-muted-foreground">
-                    Remaining
-                  </span>
-                </div>
-              </div>
+              </form>
+            )}
 
-              <div className="rounded-lg border p-4">
-                <h4 className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Recent Leave Applications
-                </h4>
-                <div className="space-y-2 text-xs">
-                  <div className="flex items-center justify-between rounded border bg-muted/20 p-2.5">
-                    <div>
-                      <div className="font-medium text-foreground">
-                        Casual Leave (1 day)
-                      </div>
-                      <span className="text-muted-foreground">
-                        2026-10-12 · Personal family obligation
-                      </span>
-                    </div>
-                    <Badge
-                      variant={
-                        displayStatus === 'On Leave' ? 'default' : 'secondary'
-                      }
-                    >
-                      {displayStatus === 'On Leave' ? 'Approved' : 'Pending'}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between rounded border bg-muted/20 p-2.5">
-                    <div>
-                      <div className="font-medium text-foreground">
-                        Casual Leave (1 day)
-                      </div>
-                      <span className="text-muted-foreground">
-                        2026-08-21 · Personal work
-                      </span>
-                    </div>
-                    <Badge variant="outline">Sanctioned</Badge>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
+            <Section title="Employment">
+              <Detail label="Employee ID">
+                <span className="font-mono">{employee.employeeCode}</span>
+              </Detail>
+              <Detail label="Department">{employee.department.name}</Detail>
+              <Detail label="Designation">{employee.designation.name}</Detail>
+              <Detail label="Staff category">
+                {STAFF_CATEGORIES[employee.designation.category]}
+              </Detail>
+              <Detail label="Employment type">
+                {EMPLOYMENT_TYPES[employee.employmentType]}
+              </Detail>
+              <Detail label="Joined">
+                {dateFormat.format(
+                  new Date(`${employee.joiningDate}T00:00:00Z`),
+                )}
+              </Detail>
+            </Section>
+            <Section title="Contact">
+              <Detail label="College email">
+                <a
+                  className="underline-offset-4 hover:underline"
+                  href={`mailto:${employee.email}`}
+                >
+                  {employee.email}
+                </a>
+              </Detail>
+              <Detail label="Phone">{employee.phone}</Detail>
+            </Section>
+            <Section title="Academic">
+              <Detail label="Highest qualification">
+                {employee.qualification}
+              </Detail>
+              <Detail label="Specialization">{employee.specialization}</Detail>
+              <Detail label="Experience">
+                {employee.experienceYears == null
+                  ? null
+                  : `${employee.experienceYears} ${employee.experienceYears === 1 ? 'year' : 'years'}`}
+              </Detail>
+            </Section>
+          </div>
+        </SheetContent>
+      </Sheet>
 
-            {/* WORKLOAD TAB */}
-            <TabsContent value="workload" className="mt-4 space-y-4">
-              {workload ? (
-                <>
-                  <div className="rounded-lg border p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs text-muted-foreground">
-                          Weekly Workload Allocation
-                        </span>
-                        <div className="text-2xl font-bold">
-                          {workload.total} / {workload.capacity}{' '}
-                          <span className="text-sm font-normal text-muted-foreground">
-                            hours/week
-                          </span>
-                        </div>
-                      </div>
-                      <Badge
-                        variant={
-                          workload.status === 'At Capacity'
-                            ? 'destructive'
-                            : 'default'
-                        }
-                      >
-                        {workload.status}
-                      </Badge>
-                    </div>
-
-                    <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full bg-primary transition-all"
-                        style={{
-                          width: `${Math.min(100, (workload.total / workload.capacity) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border p-4">
-                    <h4 className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Teaching Hours Breakdown
-                    </h4>
-                    <div className="space-y-2 text-xs">
-                      {workload.breakdown.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="flex justify-between border-b pb-1.5 last:border-0 last:pb-0"
-                        >
-                          <span className="text-muted-foreground">
-                            {item.label}
-                          </span>
-                          <span className="font-mono font-semibold">
-                            {item.hours}h
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border p-4">
-                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Free Timetable Slots (Available for Substitution)
-                    </h4>
-                    <div className="space-y-1.5 text-xs">
-                      {workload.freeSlots.map((slot, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-2 rounded bg-muted/40 p-2"
-                        >
-                          <Clock className="h-3.5 w-3.5 text-primary" />
-                          <span className="font-medium text-foreground">
-                            {slot.day}:
-                          </span>
-                          <span className="text-muted-foreground">
-                            {slot.time}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
-                  Workload tracking applies to teaching faculty.
-                </div>
-              )}
-            </TabsContent>
-
-            {/* DOCUMENTS TAB */}
-            <TabsContent value="documents" className="mt-4 space-y-3">
-              <div className="rounded-lg border p-4">
-                <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Institutional Records & Certificates
-                </h4>
-                <div className="space-y-2">
-                  {dummyDocs.map((doc, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between rounded border p-2.5 text-xs"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <FileText className="h-4 w-4 text-primary" />
-                        <div>
-                          <div className="font-medium text-foreground">
-                            {doc.name}
-                          </div>
-                          <span className="text-[10px] text-muted-foreground">
-                            {doc.size} · Uploaded {doc.date}
-                          </span>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() =>
-                          toast.info(
-                            `Viewing ${doc.name} requires document store integration.`,
-                            {
-                              id: `doc-${idx}`,
-                            },
-                          )
-                        }
-                      >
-                        <Download className="mr-1 h-3 w-3" />
-                        Preview
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </SheetContent>
-    </Sheet>
+      <Dialog open={confirmArchive} onOpenChange={setConfirmArchive}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Archive {name}?</DialogTitle>
+            <DialogDescription>
+              They leave the active directory, their CampusHR login is disabled,
+              and any HOD post they hold is cleared. The record and its history
+              are kept.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmArchive(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={archive.isPending}
+              onClick={() => archive.mutate(employee.id)}
+            >
+              {archive.isPending && <LoaderCircle className="animate-spin" />}
+              Archive employee
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

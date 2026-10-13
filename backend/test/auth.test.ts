@@ -10,7 +10,7 @@ import {
   REFRESH_TOKEN_TTL_MS,
 } from '../src/modules/auth/auth.service.js';
 import { defaultGrants } from '../src/modules/auth/permissions.js';
-import { createMemoryAuthRepository } from './fakes.js';
+import { createMemoryAuthRepository, unusedPrisma } from './fakes.js';
 
 const password = 'correct horse battery';
 const env = envSchema.parse({
@@ -54,10 +54,10 @@ describe('auth API', () => {
       },
     ]);
     sessions = memory.sessions;
-    server = createApp(env, { authRepository: memory.repo }).listen(
-      0,
-      '127.0.0.1',
-    );
+    server = createApp(env, {
+      authRepository: memory.repo,
+      prisma: unusedPrisma,
+    }).listen(0, '127.0.0.1');
     await once(server, 'listening');
     const address = server.address();
     assert.ok(address && typeof address === 'object');
@@ -75,8 +75,8 @@ describe('auth API', () => {
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-  const login = (email: string, pass = password) =>
-    post('/login', { email, password: pass });
+  const login = (identifier: string, pass = password) =>
+    post('/login', { identifier, password: pass });
   const refreshCookie = (response: Response) => {
     const header = response.headers
       .getSetCookie()
@@ -104,6 +104,7 @@ describe('auth API', () => {
       email: 'hod@jcet.test',
       role: 'HOD',
       permissions: defaultGrants('HOD'),
+      employeeId: null,
     });
     const { header } = refreshCookie(response);
     assert.match(header, /HttpOnly/);
@@ -121,7 +122,7 @@ describe('auth API', () => {
 
     const remembered = refreshCookie(
       await post('/login', {
-        email: 'hod@jcet.test',
+        identifier: 'hod@jcet.test',
         password,
         remember: true,
       }),
@@ -145,7 +146,7 @@ describe('auth API', () => {
   });
 
   test('invalid input is rejected', async () => {
-    const response = await post('/login', { email: 'not-an-email' });
+    const response = await post('/login', { identifier: 'hod@jcet.test' });
     assert.equal(response.status, 400);
     assert.equal(await errorCode(response), 'VALIDATION_ERROR');
   });

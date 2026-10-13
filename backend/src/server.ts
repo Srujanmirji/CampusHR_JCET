@@ -16,6 +16,7 @@ if (!parsed.success) {
 const prisma = createPrismaClient(parsed.data.DATABASE_URL);
 const server = createApp(parsed.data, {
   authRepository: createPrismaAuthRepository(prisma),
+  prisma,
 }).listen(parsed.data.PORT, () => {
   console.log(`CampusHR API listening on port ${parsed.data.PORT}`);
 });

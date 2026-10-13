@@ -1,13 +1,28 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
+import {
+  Briefcase,
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  FilterX,
+  GraduationCap,
+  Search,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { EmployeeProfileDrawer } from '../components/EmployeeProfileDrawer';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -15,411 +30,406 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useCan } from '@/features/auth/hooks/useCan';
+import { listDepartments } from '@/features/departments/api/departments';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { toast } from 'sonner';
-import { useAcademicWorkflow } from '@/features/leave/useAcademicWorkflow';
-import { employees } from '@/data/mock/employees';
-import type { Employee } from '@/types/academic';
-import {
-  Users,
-  GraduationCap,
-  Briefcase,
-  Building2,
-  Search,
-  FilterX,
-  MoreVertical,
-  Eye,
-  Edit,
-  UserCheck,
-} from 'lucide-react';
+  EMPLOYMENT_TYPES,
+  listEmployees,
+  type Employee,
+  type EmployeeFilters,
+} from '../api/employees';
+import { EmployeeFormSheet } from '../components/EmployeeFormSheet';
+import { EmployeeProfileDrawer } from '../components/EmployeeProfileDrawer';
+import { initialsOf } from '../utils/initials';
+
+const PAGE_SIZE = 25;
+const SEARCH_DELAY_MS = 300;
+const ALL = 'ALL';
 
 export default function EmployeesPage() {
-  const workflow = useAcademicWorkflow();
+  const can = useCan();
+  const location = useLocation();
   const [search, setSearch] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
-  const [designationFilter, setDesignationFilter] = useState<string>('ALL');
-  const [typeFilter, setTypeFilter] = useState<string>('ALL');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
-    null,
-  );
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [departmentId, setDepartmentId] = useState(ALL);
+  const [category, setCategory] = useState(ALL);
+  const [status, setStatus] = useState<EmployeeFilters['status']>('ACTIVE');
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Employee | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // The dashboard's "Add Employee" quick action opens the form directly.
+  const [form, setForm] = useState<{ open: boolean; employee?: Employee }>({
+    open: Boolean(
+      (location.state as { addEmployee?: boolean } | null)?.addEmployee &&
+      can('employee.create'),
+    ),
+  });
 
-  // Cross-module consistency: If Prof. Asha Patil's leave is approved, show On Leave
-  const ashaLeaveStatus = workflow.status('LR001');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const filteredEmployees = useMemo(() => {
-    return employees.filter((emp) => {
-      // Dynamic effective status for Prof. Asha Patil
-      const effectiveStatus =
-        emp.id === 'JCET-CSE-021' && ashaLeaveStatus === 'Approved'
-          ? 'On Leave'
-          : emp.status;
+  const filters: EmployeeFilters = {
+    search: debouncedSearch || undefined,
+    departmentId: departmentId === ALL ? undefined : Number(departmentId),
+    category:
+      category === ALL ? undefined : (category as EmployeeFilters['category']),
+    status,
+    page,
+    pageSize: PAGE_SIZE,
+  };
+  const employees = useQuery({
+    queryKey: ['employees', filters],
+    queryFn: () => listEmployees(filters),
+    placeholderData: keepPreviousData,
+  });
+  const departments = useQuery({
+    queryKey: ['departments'],
+    queryFn: listDepartments,
+  });
 
-      // Search match
-      if (search.trim()) {
-        const query = search.toLowerCase();
-        const matchesName = emp.name.toLowerCase().includes(query);
-        const matchesId = emp.id.toLowerCase().includes(query);
-        const matchesSpec = emp.specialization.toLowerCase().includes(query);
-        const matchesEmail = emp.email.toLowerCase().includes(query);
-        if (!matchesName && !matchesId && !matchesSpec && !matchesEmail) {
-          return false;
-        }
-      }
+  // Keep the open drawer in step with the latest data.
+  const current =
+    (selected && employees.data?.data.find((row) => row.id === selected.id)) ??
+    selected;
+  const meta = employees.data?.meta;
+  const pages = meta ? Math.max(1, Math.ceil(meta.total / meta.pageSize)) : 1;
+  const filtered =
+    Boolean(search) ||
+    departmentId !== ALL ||
+    category !== ALL ||
+    status !== 'ACTIVE';
 
-      // Department filter
-      if (departmentFilter !== 'ALL' && emp.department !== departmentFilter) {
-        return false;
-      }
-
-      // Designation filter
-      if (
-        designationFilter !== 'ALL' &&
-        !emp.designation.includes(designationFilter)
-      ) {
-        return false;
-      }
-
-      // Type filter
-      if (typeFilter !== 'ALL' && emp.employmentType !== typeFilter) {
-        return false;
-      }
-
-      // Status filter
-      if (statusFilter !== 'ALL' && effectiveStatus !== statusFilter) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [
-    search,
-    departmentFilter,
-    designationFilter,
-    typeFilter,
-    statusFilter,
-    ashaLeaveStatus,
-  ]);
-
-  function handleViewProfile(emp: Employee) {
-    setSelectedEmployee(emp);
+  function open(employee: Employee) {
+    setSelected(employee);
     setDrawerOpen(true);
   }
-
-  function handleResetFilters() {
+  function resetFilters() {
     setSearch('');
-    setDepartmentFilter('ALL');
-    setDesignationFilter('ALL');
-    setTypeFilter('ALL');
-    setStatusFilter('ALL');
+    setDepartmentId(ALL);
+    setCategory(ALL);
+    setStatus('ACTIVE');
+    setPage(1);
   }
+  const change = (setter: (value: string) => void) => (value: string) => {
+    setter(value);
+    setPage(1);
+  };
 
   return (
     <PageTransition>
       <PageHeader
         title="Employee Directory"
-        description="Comprehensive faculty registry and staff records across JCET departments."
+        description="Faculty and staff records across JCET departments."
         action={
-          <Button
-            onClick={() =>
-              toast.info('Adding employees isn’t available yet.', {
-                id: 'add-emp',
-              })
-            }
-          >
-            <Users className="mr-2 h-4 w-4" />
-            Add Employee
-          </Button>
+          can('employee.create') ? (
+            <Button onClick={() => setForm({ open: true })}>
+              <UserPlus />
+              Add employee
+            </Button>
+          ) : undefined
         }
       />
 
-      {/* Summary Cards */}
       <section
-        aria-label="Employee summary statistics"
+        aria-label="Employee summary"
         className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
       >
         <MetricCard
-          label="Total Employees"
-          value={186}
-          detail="132 teaching · 54 non-teaching"
+          label={status === 'ACTIVE' ? 'Employees' : 'Archived'}
+          value={meta?.total ?? '—'}
+          detail={filtered ? 'Matching your filters' : 'In your directory'}
           icon={Users}
           index={0}
         />
         <MetricCard
-          label="Teaching Staff"
-          value={132}
-          detail="Professors, Assoc & Asst Professors"
+          label="Teaching"
+          value={meta?.teaching ?? '—'}
+          detail="Professors and lecturers"
           icon={GraduationCap}
           index={1}
         />
         <MetricCard
-          label="Non-Teaching Staff"
-          value={54}
-          detail="Technical instructors & administration"
+          label="Non-teaching"
+          value={meta?.nonTeaching ?? '—'}
+          detail="Technical and administrative"
           icon={Briefcase}
           index={2}
         />
         <MetricCard
           label="Departments"
-          value={6}
-          detail="Active academic wings"
+          value={departments.data?.length ?? '—'}
+          detail="Including Administration"
           icon={Building2}
           index={3}
         />
       </section>
 
-      {/* Filter and Search Bar */}
       <div className="mb-4 rounded-xl border bg-card p-4 shadow-xs">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search faculty by name, ID (e.g. JCET-CSE-021), or specialization..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <div className="flex flex-1 flex-col gap-1.5">
+            <Label htmlFor="employee-search">Search</Label>
+            <div className="relative">
+              <Search
+                aria-hidden="true"
+                className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                id="employee-search"
+                type="search"
+                placeholder="Name, email or employee ID"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:flex">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="filter-department">Department</Label>
+              <Select
+                value={departmentId}
+                onValueChange={change(setDepartmentId)}
+              >
+                <SelectTrigger id="filter-department" className="lg:w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>All departments</SelectItem>
+                  {departments.data?.map((department) => (
+                    <SelectItem
+                      key={department.id}
+                      value={String(department.id)}
+                    >
+                      {department.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="filter-category">Staff</Label>
+              <Select value={category} onValueChange={change(setCategory)}>
+                <SelectTrigger id="filter-category" className="lg:w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>All staff</SelectItem>
+                  <SelectItem value="TEACHING">Teaching</SelectItem>
+                  <SelectItem value="NON_TEACHING">Non-teaching</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="filter-status">Status</Label>
+              <Select
+                value={status}
+                onValueChange={change((value) =>
+                  setStatus(value as EmployeeFilters['status']),
+                )}
+              >
+                <SelectTrigger id="filter-status" className="lg:w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="ARCHIVED">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {filtered && (
+            <Button
+              variant="ghost"
+              onClick={resetFilters}
+              className="self-start lg:self-end"
+            >
+              <FilterX />
+              Reset
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
+        {employees.isPending ? (
+          <div
+            role="status"
+            aria-label="Loading employees"
+            className="flex flex-col gap-3 p-4"
+          >
+            {Array.from({ length: 6 }, (_, index) => (
+              <Skeleton key={index} className="h-11 w-full" />
+            ))}
+          </div>
+        ) : employees.isError ? (
+          <div className="p-8">
+            <EmptyState
+              title="Couldn’t load employees"
+              description={employees.error.message}
+              actionLabel="Try again"
+              onAction={() => void employees.refetch()}
             />
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              value={departmentFilter}
-              onValueChange={setDepartmentFilter}
-            >
-              <SelectTrigger className="w-[140px] text-xs">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Depts</SelectItem>
-                <SelectItem value="CSE">CSE</SelectItem>
-                <SelectItem value="ECE">ECE</SelectItem>
-                <SelectItem value="ME">Mechanical</SelectItem>
-                <SelectItem value="CE">Civil</SelectItem>
-                <SelectItem value="AI & ML">AI & ML</SelectItem>
-                <SelectItem value="MBA">MBA</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={designationFilter}
-              onValueChange={setDesignationFilter}
-            >
-              <SelectTrigger className="w-[150px] text-xs">
-                <SelectValue placeholder="Designation" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Ranks</SelectItem>
-                <SelectItem value="HOD">Prof & HOD</SelectItem>
-                <SelectItem value="Associate">Associate Prof</SelectItem>
-                <SelectItem value="Assistant">Assistant Prof</SelectItem>
-                <SelectItem value="Instructor">Lab Instructor</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[125px] text-xs">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Status</SelectItem>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="On Leave">On Leave</SelectItem>
-                <SelectItem value="Available">Available</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {(search ||
-              departmentFilter !== 'ALL' ||
-              designationFilter !== 'ALL' ||
-              statusFilter !== 'ALL') && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleResetFilters}
-                className="h-9 px-2 text-xs"
-              >
-                <FilterX className="mr-1 h-3.5 w-3.5" />
-                Reset
-              </Button>
+        ) : employees.data.data.length === 0 ? (
+          <div className="p-8">
+            <EmptyState
+              title={filtered ? 'No employees match' : 'No employees yet'}
+              description={
+                filtered
+                  ? 'Try another name, department or status.'
+                  : can('employee.create')
+                    ? 'Add the first employee to start the directory.'
+                    : 'Employees appear here once HR adds them.'
+              }
+              actionLabel={filtered ? 'Reset filters' : undefined}
+              onAction={filtered ? resetFilters : undefined}
+            />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">Employees</caption>
+              <thead className="border-b bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th scope="col" className="px-4 py-3">
+                    Employee
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Employee ID
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Department
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Designation
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Type
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {employees.data.data.map((employee) => (
+                  <tr
+                    key={employee.id}
+                    className="cursor-pointer transition-colors hover:bg-muted/40"
+                    onClick={() => open(employee)}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="size-9 border">
+                          <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                            {initialsOf(employee)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col">
+                          <button
+                            type="button"
+                            className="min-h-11 text-left font-semibold text-foreground underline-offset-4 hover:underline"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              open(employee);
+                            }}
+                          >
+                            {employee.firstName} {employee.lastName}
+                            {employee.isHod && (
+                              <Badge
+                                variant="outline"
+                                className="ml-2 align-middle"
+                              >
+                                HOD
+                              </Badge>
+                            )}
+                          </button>
+                          <span className="text-xs text-muted-foreground">
+                            {employee.email}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs">
+                      {employee.employeeCode}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant="outline">
+                        {employee.department.code}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {employee.designation.name}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      {EMPLOYMENT_TYPES[employee.employmentType]}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge
+                        status={
+                          employee.status === 'ACTIVE' ? 'Active' : 'Inactive'
+                        }
+                        label={
+                          employee.status === 'ACTIVE' ? 'Active' : 'Archived'
+                        }
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {meta && meta.total > 0 && (
+          <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-muted-foreground">
+            <span role="status">
+              {meta.total} {meta.total === 1 ? 'employee' : 'employees'}
+              {pages > 1 && ` · page ${page} of ${pages}`}
+            </span>
+            {pages > 1 && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Previous page"
+                  disabled={page <= 1}
+                  onClick={() => setPage(page - 1)}
+                >
+                  <ChevronLeft />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Next page"
+                  disabled={page >= pages}
+                  onClick={() => setPage(page + 1)}
+                >
+                  <ChevronRight />
+                </Button>
+              </div>
             )}
           </div>
-        </div>
-
-        <div className="mt-3 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
-          <span>
-            Showing <b>{filteredEmployees.length}</b> records
-          </span>
-          <span className="italic">
-            Click any row or 'View Profile' to inspect full academic credentials
-          </span>
-        </div>
+        )}
       </div>
 
-      {/* Employees Table */}
-      <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3">Employee</th>
-                <th className="px-4 py-3">Employee ID</th>
-                <th className="px-4 py-3">Department</th>
-                <th className="px-4 py-3">Designation</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Experience</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredEmployees.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="py-8 text-center text-muted-foreground"
-                  >
-                    No employees matching the selected criteria.
-                  </td>
-                </tr>
-              ) : (
-                filteredEmployees.map((emp) => {
-                  const isEffectiveOnLeave =
-                    emp.id === 'JCET-CSE-021' && ashaLeaveStatus === 'Approved';
-                  const effectiveStatus = isEffectiveOnLeave
-                    ? 'On Leave'
-                    : emp.status;
-
-                  return (
-                    <tr
-                      key={emp.id}
-                      className="cursor-pointer transition-colors hover:bg-muted/40"
-                      onClick={() => handleViewProfile(emp)}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9 border border-border">
-                            {emp.photo && (
-                              <AvatarImage src={emp.photo} alt={emp.name} />
-                            )}
-                            <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                              {emp.initials}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-semibold text-foreground">
-                              {emp.name}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {emp.email}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs font-medium text-foreground">
-                        {emp.id}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge
-                          variant="outline"
-                          className="font-medium text-xs"
-                        >
-                          {emp.department}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-foreground/90">
-                        {emp.designation}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
-                        {emp.employmentType}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
-                        {emp.experience}
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge
-                          status={
-                            effectiveStatus === 'On Leave'
-                              ? 'Approved'
-                              : effectiveStatus === 'Active'
-                                ? 'Approved'
-                                : 'Pending'
-                          }
-                          label={effectiveStatus}
-                        />
-                      </td>
-                      <td
-                        className="px-4 py-3 text-right"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 gap-1 px-2 text-xs"
-                            onClick={() => handleViewProfile(emp)}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            View Profile
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                              >
-                                <MoreVertical className="h-3.5 w-3.5" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  toast.info(
-                                    'Editing employees isn’t available yet.',
-                                    {
-                                      id: 'edit-emp',
-                                    },
-                                  )
-                                }
-                              >
-                                <Edit className="mr-2 h-3.5 w-3.5" />
-                                Edit Record
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleViewProfile(emp)}
-                              >
-                                <UserCheck className="mr-2 h-3.5 w-3.5" />
-                                Workload & Timetable
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Drawer */}
       <EmployeeProfileDrawer
-        employee={selectedEmployee}
+        employee={current}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-        isEffectiveOnLeave={
-          selectedEmployee?.id === 'JCET-CSE-021' &&
-          ashaLeaveStatus === 'Approved'
-        }
+        onEdit={() => {
+          setDrawerOpen(false);
+          setForm({ open: true, employee: current ?? undefined });
+        }}
+      />
+      <EmployeeFormSheet
+        open={form.open}
+        employee={form.employee}
+        onOpenChange={(next) => setForm((state) => ({ ...state, open: next }))}
       />
     </PageTransition>
   );

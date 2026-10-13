@@ -8,7 +8,6 @@ datasource db {
 }
 
 // Authentication & RBAC (features/AUTH.md, backend/DATABASE_SCHEMA.md).
-// Other domain models follow database finalization in Phase 0.
 
 model Role {
   id          Int              @id @default(autoincrement())
@@ -52,8 +51,10 @@ model User {
   passwordHash String           @map("password_hash")
   roleId       Int              @map("role_id")
   role         Role             @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  // Links to employees once that table exists (Sprint 2).
+  // Staff accounts link to their employee record; the Super Admin system
+  // account has none.
   employeeId   String?          @unique @map("employee_id") @db.Uuid
+  employee     Employee?        @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   status       UserStatus       @default(ACTIVE)
   lastLoginAt  DateTime?        @map("last_login_at")
   createdAt    DateTime         @default(now()) @map("created_at")
@@ -80,4 +81,99 @@ model RefreshSession {
 
   @@index([userId])
   @@map("refresh_sessions")
+}
+
+// Employees & departments (features/EMPLOYEE_MANAGEMENT.md, DEPARTMENTS.md).
+
+enum StaffCategory {
+  TEACHING
+  NON_TEACHING
+
+  @@map("staff_category")
+}
+
+enum EmploymentType {
+  PERMANENT
+  CONTRACT
+  PROBATIONARY
+  VISITING
+
+  @@map("employment_type")
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ARCHIVED
+
+  @@map("employee_status")
+}
+
+model Department {
+  id            Int        @id @default(autoincrement())
+  // Short code used in employee IDs, e.g. CSE in JCET-CSE-021.
+  code          String     @unique
+  name          String     @unique
+  hodEmployeeId String?    @unique @map("hod_employee_id") @db.Uuid
+  hod           Employee?  @relation("DepartmentHod", fields: [hodEmployeeId], references: [id], onDelete: SetNull)
+  employees     Employee[] @relation("DepartmentEmployees")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  @@map("departments")
+}
+
+model Designation {
+  id        Int           @id @default(autoincrement())
+  name      String        @unique
+  // Lower is more senior.
+  level     Int
+  category  StaffCategory
+  employees Employee[]
+
+  @@map("designations")
+}
+
+model Employee {
+  id              String         @id @default(uuid()) @db.Uuid
+  // College employee ID, stored uppercase, e.g. JCET-CSE-021.
+  employeeCode    String         @unique @map("employee_code")
+  firstName       String         @map("first_name")
+  lastName        String         @map("last_name")
+  // Stored lowercase.
+  email           String         @unique
+  phone           String?
+  departmentId    Int            @map("department_id")
+  department      Department     @relation("DepartmentEmployees", fields: [departmentId], references: [id], onDelete: Restrict)
+  designationId   Int            @map("designation_id")
+  designation     Designation    @relation(fields: [designationId], references: [id], onDelete: Restrict)
+  employmentType  EmploymentType @map("employment_type")
+  joiningDate     DateTime       @map("joining_date") @db.Date
+  status          EmployeeStatus @default(ACTIVE)
+  qualification   String?
+  specialization  String?
+  experienceYears Int?           @map("experience_years")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  user            User?
+  headOf          Department?    @relation("DepartmentHod")
+
+  @@index([departmentId])
+  @@index([status])
+  @@map("employees")
+}
+
+// Mandatory for employee and department changes (backend/SECURITY.md).
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  action      String
+  resource    String
+  resourceId  String   @map("resource_id")
+  beforeJson  Json?    @map("before_json")
+  afterJson   Json?    @map("after_json")
+  ip          String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([resource, resourceId])
+  @@map("audit_logs")
 }

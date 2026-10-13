@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import test from 'node:test';
 import { createApp } from '../src/app.js';
 import { envSchema } from '../src/config/env.js';
-import { createMemoryAuthRepository } from './fakes.js';
+import { createMemoryAuthRepository, unusedPrisma } from './fakes.js';
 
 test('foundation validates configuration and handles HTTP requests safely', async () => {
   const input = {
@@ -29,6 +29,7 @@ test('foundation validates configuration and handles HTTP requests safely', asyn
 
   const server = createApp(envSchema.parse(input), {
     authRepository: createMemoryAuthRepository().repo,
+    prisma: unusedPrisma,
   }).listen(0, '127.0.0.1');
   try {
     await once(server, 'listening');
@@ -49,7 +50,12 @@ test('foundation validates configuration and handles HTTP requests safely', asyn
     );
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
     assert.equal(response.headers.get('x-powered-by'), null);
-    const missing = await fetch(`${url}/employees`);
+    assert.equal(
+      (await fetch(`${url}/employees`)).status,
+      401,
+      'domain routes require sign-in',
+    );
+    const missing = await fetch(`${url}/no-such-route`);
     assert.equal(missing.status, 404);
     const invalid = await fetch(`${url}/health`, {
       method: 'POST',

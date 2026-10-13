@@ -11,8 +11,8 @@ const queryClient = new QueryClient();
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <SessionProvider>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <SessionProvider>
         <MotionConfig
           reducedMotion="user"
           transition={{ duration: motionTiming.duration, ease: 'easeOut' }}
@@ -22,7 +22,7 @@ export function Providers({ children }: { children: ReactNode }) {
           </TooltipProvider>
           <Toaster position="bottom-right" closeButton />
         </MotionConfig>
-      </QueryClientProvider>
-    </SessionProvider>
+      </SessionProvider>
+    </QueryClientProvider>
   );
 }

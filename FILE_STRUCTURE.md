@@ -24,9 +24,10 @@ CampusHR_JCET/
 │       ├── app/            Entry, providers, lazy-loaded router
 │       ├── layouts/        AppShell (sidebar + topbar)
 │       ├── components/     ui/ (shadcn), layout/, shared/
-│       ├── features/       auth, dashboard, employees, attendance, leave,
+│       ├── features/       auth, dashboard, employees, departments, attendance, leave,
 │       │                   timetable, workload, substitution, reports,
 │       │                   notifications, settings, documents (empty)
+│       ├── services/       API client (token, refresh, errors)
 │       ├── data/mock/      Sample data used until the API is connected
 │       ├── lib/            Substitution ranking, motion, utilities
 │       └── types/
@@ -39,11 +40,13 @@ CampusHR_JCET/
 │   │   ├── app.ts          Helmet, CORS, JSON limit, health route, 404
 │   │   ├── config/env.ts   Zod environment schema
 │   │   ├── middleware/     Error handler, requireAuth, login rate limiter
-│   │   ├── common/         HttpError
-│   │   ├── database/       schema.prisma, migrations/, prisma.ts, seed.ts
-│   │   ├── modules/auth/   routes, controller, service, repository, schema
+│   │   ├── common/         HttpError, audit log writer, input validation
+│   │   ├── database/       schema.prisma, migrations/, prisma.ts, seed.ts,
+│   │   │                   reference-data.ts (roles, departments, designations)
+│   │   ├── modules/        auth/, employees/, departments/ (routes, controller,
+│   │   │                   service, repository, schema)
 │   │   └── jobs/ events/ sockets/   Reserved
-│   └── test/               Foundation and auth API tests
+│   └── test/               Unit and API tests; db/ = PostgreSQL tests (test:db)
 │
 └── mobile/                 Mobile app — React Native + Expo + Expo Router
     ├── MOBILE_APP.md       Spec

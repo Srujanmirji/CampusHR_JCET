@@ -1,5 +1,5 @@
-// Central API client: base URL, credentials and error normalization
-// (frontend/STATE_AND_API.md).
+// Central API client: base URL, credentials, access token, refresh handling
+// and error normalization (frontend/STATE_AND_API.md).
 const baseUrl: string | undefined = import.meta.env.VITE_API_URL;
 if (!baseUrl) {
   throw new Error(
@@ -17,18 +17,32 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiRequest(
+// The access token lives in memory only, never in browser storage.
+let accessToken: string | undefined;
+// Renews the token from the refresh cookie; resolves false if signed out.
+let renewSession: (() => Promise<boolean>) | undefined;
+
+export function setAccessToken(token: string | undefined) {
+  accessToken = token;
+}
+export function onSessionExpired(renew: () => Promise<boolean>) {
+  renewSession = renew;
+}
+
+async function send(
   path: string,
-  { method = 'GET', body }: { method?: string; body?: unknown } = {},
-): Promise<unknown> {
-  let response: Response;
+  method: string,
+  body: unknown,
+): Promise<Response> {
   try {
-    response = await fetch(`${baseUrl}${path}`, {
+    return await fetch(`${baseUrl}${path}`, {
       method,
       // Sends the HttpOnly refresh cookie on /auth routes.
       credentials: 'include',
-      headers:
-        body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers: {
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -37,6 +51,22 @@ export async function apiRequest(
       'NETWORK_ERROR',
       'Can’t reach the CampusHR server. Check your connection and try again.',
     );
+  }
+}
+
+export async function apiRequest(
+  path: string,
+  { method = 'GET', body }: { method?: string; body?: unknown } = {},
+): Promise<unknown> {
+  let response = await send(path, method, body);
+  // An expired access token: renew once from the refresh cookie and retry.
+  if (
+    response.status === 401 &&
+    accessToken &&
+    !path.startsWith('/auth/') &&
+    (await renewSession?.())
+  ) {
+    response = await send(path, method, body);
   }
   if (response.status === 204) return undefined;
   const data: unknown = await response.json().catch(() => undefined);

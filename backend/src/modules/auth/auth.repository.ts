@@ -7,6 +7,9 @@ export interface AuthUser {
   role: string;
   /** Granted permission keys, e.g. `leave.approve.department`. */
   permissions: string[];
+  /** Linked employee record and its department; null for system accounts. */
+  employeeId: string | null;
+  departmentId: number | null;
 }
 
 export interface AuthSession {
@@ -28,8 +31,9 @@ export interface NewSession {
 
 // The service depends on this shape; tests supply an in-memory version.
 export interface AuthRepository {
-  findUserByEmail(
-    email: string,
+  /** Finds by email (contains "@") or by employee ID. */
+  findUserByIdentifier(
+    identifier: string,
   ): Promise<(AuthUser & { passwordHash: string }) | null>;
   findUserById(id: string): Promise<AuthUser | null>;
   recordLogin(userId: string, at: Date): Promise<void>;
@@ -53,34 +57,47 @@ const userSelect = {
       permissions: { select: { permission: { select: { key: true } } } },
     },
   },
+  employee: { select: { id: true, departmentId: true } },
 } as const;
 
-type SelectedRole = {
-  name: string;
-  permissions: { permission: { key: string } }[];
+type SelectedUser = {
+  id: string;
+  email: string;
+  status: AuthUser['status'];
+  role: { name: string; permissions: { permission: { key: string } }[] };
+  employee: { id: string; departmentId: number } | null;
 };
-const flattenRole = ({ name, permissions }: SelectedRole) => ({
-  role: name,
-  permissions: permissions.map(({ permission }) => permission.key),
+const toAuthUser = <T extends SelectedUser>({
+  role,
+  employee,
+  ...rest
+}: T) => ({
+  ...rest,
+  role: role.name,
+  permissions: role.permissions.map(({ permission }) => permission.key),
+  employeeId: employee?.id ?? null,
+  departmentId: employee?.departmentId ?? null,
 });
 
 export function createPrismaAuthRepository(
   prisma: PrismaClient,
 ): AuthRepository {
   return {
-    async findUserByEmail(email) {
-      const user = await prisma.user.findUnique({
-        where: { email },
+    async findUserByIdentifier(identifier) {
+      const user = await prisma.user.findFirst({
+        where: identifier.includes('@')
+          ? { email: identifier.toLowerCase() }
+          : { employee: { employeeCode: identifier.toUpperCase() } },
         select: { ...userSelect, passwordHash: true },
       });
-      return user && { ...user, ...flattenRole(user.role) };
+      return user && toAuthUser(user);
     },
     async findUserById(id) {
       const user = await prisma.user.findUnique({
         where: { id },
         select: userSelect,
       });
-      return user && { ...user, ...flattenRole(user.role) };
+      return user && toAuthUser(user);
     },
     async recordLogin(userId, at) {
       await prisma.user.update({

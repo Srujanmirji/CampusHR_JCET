@@ -44,32 +44,40 @@
 
 ### employees
 
-- id
-- employee_code
+Implemented (`backend/src/database/schema.prisma`).
+
+- id (uuid)
+- employee_code (unique, uppercase, e.g. JCET-CSE-021)
 - first_name
 - last_name
-- email
-- phone
-- department_id
-- designation_id
-- joining_date
-- employment_type
-- status
+- email (unique, lowercase)
+- phone (optional)
+- department_id → departments (restrict delete)
+- designation_id → designations (restrict delete)
+- joining_date (date)
+- employment_type (PERMANENT, CONTRACT, PROBATIONARY, VISITING)
+- status (ACTIVE, ARCHIVED; archived records are kept)
+- qualification, specialization, experience_years (optional)
 - created_at
 - updated_at
+
+Aadhaar and PAN are not stored here; they belong to the Documents module.
 
 ### departments
 
 - id
-- name
-- code
-- hod_employee_id
+- code (unique, fixed after creation; part of employee IDs)
+- name (unique)
+- hod_employee_id → employees (unique, cleared when the HOD is archived)
+- created_at
+- updated_at
 
 ### designations
 
 - id
-- name
-- level
+- name (unique)
+- level (lower is more senior)
+- category (TEACHING, NON_TEACHING)
 
 ### attendance
 
@@ -156,6 +164,9 @@
 - read_at
 
 ### audit_logs
+
+Implemented; written in the same transaction as each employee or department
+change.
 
 - id
 - actor_user_id

@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   UsersRound,
+  Building2,
   CalendarCheck2,
   CalendarDays,
   CalendarRange,
@@ -31,6 +32,13 @@ export const navigation: {
     permission: 'employee.read',
     label: 'Employees',
     icon: UsersRound,
+    group: 'People & academics',
+  },
+  {
+    path: '/departments',
+    permission: 'department.read',
+    label: 'Departments',
+    icon: Building2,
     group: 'People & academics',
   },
   {

@@ -20,11 +20,13 @@
 
 ## BE-003 Employees
 
-- [ ] Employee schema
-- [ ] CRUD
-- [ ] Search
-- [ ] Filters
-- [ ] Department assignment
+- [x] Employee schema
+- [x] CRUD (archive instead of delete)
+- [x] Search
+- [x] Filters
+- [x] Department assignment
+- [x] Departments, designations and HOD assignment
+- [x] Audit log for employee and department changes
 
 ## BE-004 Attendance
 

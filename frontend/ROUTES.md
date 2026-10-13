@@ -12,10 +12,11 @@
 
 ## Employees
 
-- /employees
-- /employees/new
-- /employees/:id
-- /employees/:id/edit
+- /employees (add, edit and profile open as panels on this page)
+
+## Departments
+
+- /departments
 
 ## Attendance
 

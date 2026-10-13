@@ -1,10 +1,13 @@
 import { z } from 'zod';
 
 export const loginSchema = z.object({
-  email: z
-    .email()
+  // College email or employee ID (e.g. JCET-CSE-021); matching ignores case.
+  identifier: z
+    .string()
+    .trim()
+    .min(1)
     .max(254)
-    .transform((email) => email.toLowerCase()),
+    .transform((identifier) => identifier.toLowerCase()),
   password: z.string().min(1).max(256),
   remember: z.boolean().default(false),
 });

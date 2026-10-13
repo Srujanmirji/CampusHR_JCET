@@ -32,7 +32,7 @@ try {
 
   // 1. Login flow
   await page.goto(`${base}/login`);
-  await page.getByLabel('College email').fill(checkUser.email);
+  await page.getByLabel('Employee ID or college email').fill(checkUser.email);
   await page.getByLabel('Password', { exact: true }).fill(checkPassword);
   await page.getByRole('button', { name: 'Login', exact: true }).click();
   await page.waitForURL('**/dashboard');

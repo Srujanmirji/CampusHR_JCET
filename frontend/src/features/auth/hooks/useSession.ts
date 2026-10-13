@@ -10,7 +10,7 @@ export type Session =
 export const SessionContext = createContext<
   | (Session & {
       login: (input: {
-        email: string;
+        identifier: string;
         password: string;
         remember: boolean;
       }) => Promise<void>;

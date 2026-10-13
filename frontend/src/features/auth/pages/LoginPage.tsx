@@ -39,7 +39,10 @@ import { ApiError } from '@/services/api';
 import { useSession } from '../hooks/useSession';
 
 const loginSchema = z.object({
-  email: z.email('Enter your college email address.'),
+  identifier: z
+    .string()
+    .trim()
+    .min(1, 'Enter your employee ID or college email.'),
   password: z.string().min(1, 'Enter your password.'),
   remember: z.boolean(),
 });
@@ -60,7 +63,7 @@ export default function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '', remember: false },
+    defaultValues: { identifier: '', password: '', remember: false },
   });
   if (session.status === 'loading') {
     return <FullPageLoader label="Checking your sign-in…" />;
@@ -162,21 +165,25 @@ export default function LoginPage() {
           </header>
           <form onSubmit={submit} noValidate className="flex flex-col gap-5">
             <FieldGroup>
-              <Field data-invalid={Boolean(errors.email)}>
-                <FieldLabel htmlFor="email">College email</FieldLabel>
+              <Field data-invalid={Boolean(errors.identifier)}>
+                <FieldLabel htmlFor="identifier">
+                  Employee ID or college email
+                </FieldLabel>
                 <Input
-                  id="email"
-                  type="email"
-                  inputMode="email"
+                  id="identifier"
                   autoComplete="username"
-                  placeholder="name@jcethbl.edu.in"
-                  aria-invalid={Boolean(errors.email)}
-                  aria-describedby={errors.email ? 'email-error' : undefined}
-                  {...register('email')}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder="JCET-CSE-021 or name@jcethbl.edu.in"
+                  aria-invalid={Boolean(errors.identifier)}
+                  aria-describedby={
+                    errors.identifier ? 'identifier-error' : undefined
+                  }
+                  {...register('identifier')}
                 />
-                {errors.email && (
-                  <FieldError id="email-error">
-                    {errors.email.message}
+                {errors.identifier && (
+                  <FieldError id="identifier-error">
+                    {errors.identifier.message}
                   </FieldError>
                 )}
               </Field>

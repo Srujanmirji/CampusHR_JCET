@@ -26,7 +26,8 @@ created by `npm run db:seed`.
 | Module             | What works today                                                                                                     |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------- |
 | Dashboard          | Key metrics, charts, recent leave requests, quick actions, campus updates                                            |
-| Employees          | Directory with search and filters, profile drawer                                                                    |
+| Employees          | **Live data.** Search, filters, pagination, profile; HR adds, edits and archives; staff update their own phone       |
+| Departments        | **Live data.** Staff strength per department; HR adds departments and assigns HODs                                   |
 | Attendance         | Daily metrics, monthly trend, department view, filterable log                                                        |
 | Leave              | Searchable/filterable request table; review drawer with balance, history, academic impact; approve, reject with note |
 | Smart Substitution | Ranked candidates per affected class, assignment, manual coverage, updated timetable                                 |
@@ -37,7 +38,8 @@ created by `npm run db:seed`.
 | Settings           | Institutional rules (saved for the session); reset workflow data                                                     |
 
 Create, edit, export and print actions show "isn't available yet" until the API
-supports them. Departments, Documents and Helpdesk pages are not built yet.
+supports them. Documents and Helpdesk pages are not built yet. Other modules
+still show sample people until their APIs exist.
 
 ## Leave → substitution workflow
 

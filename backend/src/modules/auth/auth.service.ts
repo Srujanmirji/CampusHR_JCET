@@ -26,6 +26,15 @@ export interface PublicUser {
   email: string;
   role: string;
   permissions: string[];
+  employeeId: string | null;
+}
+
+/** Who is acting and how far their permission reaches. */
+export interface Access {
+  scope: Scope;
+  userId: string;
+  employeeId: string | null;
+  departmentId: number | null;
 }
 
 export interface AuthResult {
@@ -43,7 +52,11 @@ export interface AccessClaims {
 }
 
 const invalidCredentials = () =>
-  new HttpError(401, 'INVALID_CREDENTIALS', 'Incorrect email or password.');
+  new HttpError(
+    401,
+    'INVALID_CREDENTIALS',
+    'Incorrect employee ID, email or password.',
+  );
 const invalidSession = () =>
   new HttpError(
     401,
@@ -54,12 +67,13 @@ const invalidSession = () =>
 const hashToken = (token: string) =>
   createHash('sha256').update(token).digest('hex');
 
-const toPublic = ({ id, email, role, permissions }: AuthUser): PublicUser => ({
+const toPublic = ({
   id,
   email,
   role,
   permissions,
-});
+  employeeId,
+}: AuthUser): PublicUser => ({ id, email, role, permissions, employeeId });
 
 export function createAuthService(
   repo: AuthRepository,
@@ -97,12 +111,12 @@ export function createAuthService(
 
   return {
     async login(
-      email: string,
+      identifier: string,
       password: string,
       meta: ClientMeta,
       remember = false,
     ) {
-      const user = await repo.findUserByEmail(email);
+      const user = await repo.findUserByIdentifier(identifier);
       timingGuardHash ??= bcrypt.hash('campushr-timing-guard', BCRYPT_COST);
       const matches = await bcrypt.compare(
         password,
@@ -149,9 +163,9 @@ export function createAuthService(
     /**
      * Checks `permission` (`resource.action`) against the database, so a
      * deactivated user or a changed role takes effect immediately.
-     * Returns the widest granted scope.
+     * Returns the widest granted scope and the user's employee context.
      */
-    async authorize(userId: string, permission: string): Promise<Scope> {
+    async authorize(userId: string, permission: string): Promise<Access> {
       const user = await repo.findUserById(userId);
       if (!user || user.status !== 'ACTIVE') throw invalidSession();
       const scope = widestScope(user.permissions, permission);
@@ -162,7 +176,12 @@ export function createAuthService(
           'You don’t have permission to do this.',
         );
       }
-      return scope;
+      return {
+        scope,
+        userId,
+        employeeId: user.employeeId,
+        departmentId: user.departmentId,
+      };
     },
 
     async me(userId: string) {

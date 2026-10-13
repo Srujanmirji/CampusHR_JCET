@@ -1,15 +1,24 @@
 import { useSession } from './useSession';
 
-const SCOPES = ['all', 'department', 'own'];
+export type Scope = 'all' | 'department' | 'own';
+const SCOPES: Scope[] = ['all', 'department', 'own'];
 
-// Whether the signed-in user holds `permission` (`resource.action`) at any scope.
 // UI only: the server enforces every permission itself.
-export function useCan() {
+
+/** The widest scope at which the user holds `permission` (`resource.action`). */
+export function useScope() {
   const session = useSession();
+  return (permission: string): Scope | undefined =>
+    session.status === 'signedIn'
+      ? SCOPES.find((scope) =>
+          session.user.permissions.includes(`${permission}.${scope}`),
+        )
+      : undefined;
+}
+
+/** Whether the user holds `permission` at any scope. */
+export function useCan() {
+  const scopeOf = useScope();
   return (permission?: string) =>
-    !permission ||
-    (session.status === 'signedIn' &&
-      SCOPES.some((scope) =>
-        session.user.permissions.includes(`${permission}.${scope}`),
-      ));
+    !permission || scopeOf(permission) !== undefined;
 }

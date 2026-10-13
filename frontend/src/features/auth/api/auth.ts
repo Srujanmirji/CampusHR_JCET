@@ -6,6 +6,7 @@ const sessionUserSchema = z.object({
   email: z.string(),
   role: z.string(),
   permissions: z.array(z.string()),
+  employeeId: z.string().nullable(),
 });
 const sessionSchema = z.object({
   accessToken: z.string(),
@@ -17,7 +18,7 @@ export type SessionUser = z.infer<typeof sessionUserSchema>;
 export type SessionResponse = z.infer<typeof sessionSchema>;
 
 export async function login(input: {
-  email: string;
+  identifier: string;
   password: string;
   remember: boolean;
 }) {

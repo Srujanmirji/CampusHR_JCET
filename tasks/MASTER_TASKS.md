@@ -10,10 +10,10 @@
 
 ## Phase 1 — Auth & Core
 
-- [ ] Authentication
-- [ ] RBAC
-- [ ] Employee management
-- [ ] Department management
+- [ ] Authentication (done except password reset, which needs SMTP)
+- [x] RBAC
+- [x] Employee management
+- [x] Department management
 
 ## Phase 2 — Daily HR
 

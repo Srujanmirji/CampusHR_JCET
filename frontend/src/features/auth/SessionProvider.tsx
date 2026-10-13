@@ -1,14 +1,17 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ApiError } from '@/services/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { ApiError, onSessionExpired, setAccessToken } from '@/services/api';
 import * as authApi from './api/auth';
 import { SessionContext, type Session } from './hooks/useSession';
 
 const CONCURRENT_REFRESH_RETRY_MS = 1_000;
 
-// Restores the session from the HttpOnly refresh cookie on load.
+// Gets a fresh session from the HttpOnly refresh cookie.
 async function restore(retried = false): Promise<Session> {
   try {
-    return { status: 'signedIn', user: (await authApi.refresh()).user };
+    const { accessToken, user } = await authApi.refresh();
+    setAccessToken(accessToken);
+    return { status: 'signedIn', user };
   } catch (error) {
     // Another tab is refreshing the same cookie; its new cookie arrives shortly.
     if (
@@ -21,17 +24,25 @@ async function restore(retried = false): Promise<Session> {
       );
       return restore(true);
     }
+    setAccessToken(undefined);
     return { status: 'signedOut' };
   }
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session>({ status: 'loading' });
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let active = true;
     void restore().then((restored) => {
       if (active) setSession(restored);
+    });
+    // An API call found the access token expired (or the account disabled).
+    onSessionExpired(async () => {
+      const renewed = await restore();
+      setSession(renewed);
+      return renewed.status === 'signedIn';
     });
     return () => {
       active = false;
@@ -39,11 +50,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function login(input: {
-    email: string;
+    identifier: string;
     password: string;
     remember: boolean;
   }) {
-    const { user } = await authApi.login(input);
+    const { accessToken, user } = await authApi.login(input);
+    setAccessToken(accessToken);
     setSession({ status: 'signedIn', user });
   }
 
@@ -51,7 +63,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.logout();
     } finally {
-      // Sign out locally even if the server is unreachable.
+      // Sign out locally even if the server is unreachable, and drop cached
+      // data so the next person does not see it.
+      setAccessToken(undefined);
+      queryClient.clear();
       setSession({ status: 'signedOut', loggedOut: true });
     }
   }

@@ -79,7 +79,7 @@ test('requirePermission allows, forbids, and sees deactivation at once', async (
   );
   const app = express()
     .get('/reports', ...requirePermission(auth, 'report.read'), (_req, res) => {
-      res.json({ scope: res.locals.scope });
+      res.json({ scope: res.locals.access.scope });
     })
     .use(errorHandler);
   const server = app.listen(0, '127.0.0.1');

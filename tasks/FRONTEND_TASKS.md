@@ -52,11 +52,12 @@ Verification and launch steps: `frontend/README.md`.
 
 ## FE-006 Employees
 
-- [x] Employee list
+- [x] Employee list (API data, paginated)
 - [x] Filters
-- [ ] Create employee
+- [x] Create employee (suggested employee ID)
 - [x] Profile
-- [ ] Edit employee
+- [x] Edit employee; own phone update; archive
+- [x] Departments page: staff strength, add, rename, assign HOD
 
 ## FE-007 Attendance
 

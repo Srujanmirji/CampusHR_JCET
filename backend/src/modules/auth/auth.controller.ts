@@ -83,12 +83,12 @@ export function createAuthController(
       throw new HttpError(
         400,
         'VALIDATION_ERROR',
-        'Enter a valid email address and password.',
+        'Enter your employee ID or email, and your password.',
       );
     }
-    const { email, password, remember } = parsed.data;
+    const { identifier, password, remember } = parsed.data;
     const ip = req.ip ?? 'unknown';
-    const accountKey = `${ip}|${email}`;
+    const accountKey = `${ip}|${identifier}`;
     if (perAccount.isBlocked(accountKey) || perIp.isBlocked(ip)) {
       res.set('Retry-After', String(LIMIT_WINDOW_MS / 1000));
       throw new HttpError(
@@ -102,7 +102,7 @@ export function createAuthController(
     perIp.hit(ip);
     try {
       const result = await auth.login(
-        email,
+        identifier,
         password,
         clientMeta(req),
         remember,

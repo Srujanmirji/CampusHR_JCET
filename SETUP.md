@@ -91,6 +91,21 @@ npm run check:preview --workspace @campushr/web   # login, leave → substitutio
 npm run check:phase3 --workspace @campushr/web    # dashboard, module pages, reset
 ```
 
+Database tests (employees, departments, access limits) run against real
+PostgreSQL and **wipe it first**:
+
+```sh
+TEST_DATABASE_URL=postgresql://user:pass@localhost:5433/campushr_test \
+  npm run test:db --workspace @campushr/api
+```
+
+The test database must be on a **separate PostgreSQL server** (different
+host or port) from `DATABASE_URL`; the runner refuses otherwise. A different
+database name on the same server is not enough: `prisma dev` serves a single
+database whatever name you ask for, so a "test" database there is your
+development data. With Docker, run a second container on another port, e.g.
+`docker run -d -p 5433:5432 -e POSTGRES_PASSWORD=test postgres:17-alpine`.
+
 Mobile bundles:
 
 ```sh
@@ -115,8 +130,8 @@ npx expo export --platform ios --platform android
   policies. Timetable references subjects and rooms without defining those tables.
   Academic profiles, recruitment, helpdesk and attachment records also need
   models.
-- **Routes:** Departments, Documents and Helpdesk are in the web sidebar spec but
-  have no pages or routes yet.
+- **Routes:** Documents and Helpdesk are in the web sidebar spec but have no
+  pages or routes yet.
 - **Policies:** leave policies and approval chains, attendance policy and workload
   thresholds must be finalized before their services are built.
 - **Storage:** choose Supabase Storage or Cloudinary before document uploads.

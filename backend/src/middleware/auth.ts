@@ -15,8 +15,8 @@ export function requireAuth(auth: AuthService): RequestHandler {
 }
 
 // Requires `permission` (`resource.action`, e.g. 'leave.approve') and exposes
-// the widest granted scope as res.locals.scope ('all' | 'department' | 'own').
-// Handlers must still limit records to that scope.
+// the user's Access (widest scope, employee and department) as
+// res.locals.access. Handlers must still limit records to that scope.
 export function requirePermission(
   auth: AuthService,
   permission: string,
@@ -24,7 +24,7 @@ export function requirePermission(
   return [
     requireAuth(auth),
     async (_req, res, next) => {
-      res.locals.scope = await auth.authorize(
+      res.locals.access = await auth.authorize(
         res.locals.auth.userId,
         permission,
       );

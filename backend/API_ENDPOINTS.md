@@ -6,7 +6,8 @@ Base path: `/api/v1`
 
 Implemented: login, refresh, logout, me. Forgot/reset password wait for SMTP.
 
-- `POST /auth/login` `{ email, password }` → `{ accessToken, expiresIn, user }`;
+- `POST /auth/login` `{ identifier, password, remember? }` — identifier is the
+  college email or employee ID (case-insensitive) → `{ accessToken, expiresIn, user }`;
   sets the HttpOnly `campushr_refresh` cookie (path `/api/v1/auth`, 7 days).
   Errors: 400 `VALIDATION_ERROR`, 401 `INVALID_CREDENTIALS`, 429
   `TOO_MANY_ATTEMPTS` (5 attempts per account and client, 100 per IP, per 15
@@ -43,18 +44,38 @@ records to it. Grants: `product/USER_ROLES.md`.
 
 ## Employees
 
-- GET /employees
-- POST /employees
-- GET /employees/:id
-- PATCH /employees/:id
-- DELETE /employees/:id
+Implemented. Every route requires sign-in; results are limited to the caller's
+scope (all, own department, or own record). Records outside it answer 404.
+
+- `GET /employees?search&departmentId&category&status&page&pageSize` (`employee.read`)
+  → `{ data, meta: { page, pageSize, total, teaching, nonTeaching } }`.
+  `status` defaults to `ACTIVE`; `pageSize` is at most 100.
+- `GET /employees/next-code?departmentId=` (`employee.create`) → next free
+  `JCET-<DEPT>-<NNN>` ID. HR may use another (the college's existing ID).
+- `POST /employees` (`employee.create`) → 201. 409 `ALREADY_EXISTS` for a
+  taken employee ID or email.
+- `GET /employees/:id` (`employee.read`)
+- `PATCH /employees/:id` (`employee.update`). Own scope may change `phone`
+  only; anything else answers 403.
+- `DELETE /employees/:id` (`employee.archive`) archives: status `ARCHIVED`,
+  their login is disabled at once, and any HOD post is cleared. Nothing is
+  deleted.
+
+Employee changes are written to `audit_logs` with before and after values.
 
 ## Departments
 
-- GET /departments
-- POST /departments
-- GET /departments/:id
-- PATCH /departments/:id
+Implemented.
+
+- `GET /departments` (`department.read`) → departments with `hod` and
+  `staff: { total, teaching, nonTeaching }` (active employees).
+- `POST /departments` (`department.manage`) `{ code, name }` → 201. The code
+  (2–10 letters or digits) is fixed after creation; it is part of employee IDs.
+- `GET /departments/:id` (`department.read`)
+- `PATCH /departments/:id` (`department.manage`) `{ name?, hodEmployeeId? }`.
+  The HOD must be an active employee of that department. Audit-logged.
+- `GET /designations` (`department.read`) → reference list with
+  `category` (`TEACHING` / `NON_TEACHING`).
 
 ## Attendance
 

@@ -47,11 +47,11 @@ try {
   await page.goto(`${base}/dashboard`);
   await page.waitForURL('**/login');
   await page.getByRole('button', { name: 'Login', exact: true }).click();
-  await page.getByText('Enter your college email address.').waitFor();
-  await page.getByLabel('College email').fill(checkUser.email);
+  await page.getByText('Enter your employee ID or college email.').waitFor();
+  await page.getByLabel('Employee ID or college email').fill(checkUser.email);
   await page.getByLabel('Password', { exact: true }).fill('wrong password');
   await page.getByRole('button', { name: 'Login', exact: true }).click();
-  await page.getByText('Incorrect email or password.').waitFor();
+  await page.getByText('Incorrect employee ID, email or password.').waitFor();
   await page.getByLabel('Password', { exact: true }).fill(checkPassword);
   await page.getByRole('button', { name: 'Forgot password?' }).click();
   await page.getByRole('dialog').waitFor();
@@ -69,7 +69,7 @@ try {
     '6',
   ]);
   assert.equal(await page.locator('.leave-card tbody tr').count(), 3);
-  assert.equal(await page.locator('nav a.sidebar-link').count(), 10);
+  assert.equal(await page.locator('nav a.sidebar-link').count(), 11);
   assert.equal(await page.locator('nav a.sidebar-link-active').count(), 1);
   assert.equal(
     await page.locator('.chart-canvas svg.recharts-surface').count(),
@@ -94,9 +94,11 @@ try {
       );
   }
   await page.getByRole('button', { name: 'Add Employee', exact: true }).click();
-  await page
-    .getByText('This feature isn’t available yet.', { exact: true })
-    .waitFor();
+  await page.waitForURL('**/employees');
+  await page.getByRole('heading', { name: 'Add employee' }).waitFor();
+  await page.keyboard.press('Escape');
+  await page.getByText('JCET-CSE-001').waitFor();
+  await dashboard();
   await page.getByLabel('Filter leave requests by status').click();
   await page.getByRole('option', { name: 'Rejected', exact: true }).click();
   await page.getByText('No requests in this status', { exact: true }).waitFor();
@@ -406,7 +408,7 @@ try {
   assert.equal(api.user, undefined, 'logout must reach the API');
   await page.goto(`${base}/leave`);
   await page.waitForURL('**/login');
-  await page.getByLabel('College email').fill(checkUser.email);
+  await page.getByLabel('Employee ID or college email').fill(checkUser.email);
   await page.getByLabel('Password', { exact: true }).fill(checkPassword);
   await page.getByLabel('Remember me').check();
   await page.getByRole('button', { name: 'Login', exact: true }).click();
@@ -420,15 +422,26 @@ try {
   await page.getByRole('button', profileMenu).click();
   await page.getByRole('menuitem', { name: 'Logout' }).click();
   await page.waitForURL('**/login');
-  await page.getByLabel('College email').fill(facultyUser.email);
+  await page.getByLabel('Employee ID or college email').fill(facultyUser.email);
   await page.getByLabel('Password', { exact: true }).fill(checkPassword);
   await page.getByRole('button', { name: 'Login', exact: true }).click();
   await page.waitForURL('**/dashboard');
   const facultyNav = await page.locator('nav a.sidebar-link').allTextContents();
-  assert.equal(facultyNav.length, 8, `Faculty sidebar: ${facultyNav}`);
+  assert.equal(facultyNav.length, 9, `Faculty sidebar: ${facultyNav}`);
   assert.ok(!facultyNav.some((label) => /Reports|Settings/.test(label)));
   await page.goto(`${base}/reports`);
   await page.getByText('You don’t have access to this page').waitFor();
+  await page.goto(`${base}/employees`);
+  await page.getByText('JCET-CSE-021').waitFor();
+  assert.equal(
+    await page.locator('tbody tr').count(),
+    1,
+    'Faculty see only their own record',
+  );
+  assert.equal(
+    await page.getByRole('button', { name: 'Add employee' }).count(),
+    0,
+  );
   assert.deepEqual(errors, []);
   assert.deepEqual(externalRequests, []);
   console.log(

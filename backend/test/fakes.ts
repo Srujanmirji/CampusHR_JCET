@@ -1,19 +1,30 @@
 import { randomUUID } from 'node:crypto';
+import type { PrismaClient } from '../src/generated/prisma/client.js';
 import type {
   AuthRepository,
   AuthSession,
   AuthUser,
 } from '../src/modules/auth/auth.repository.js';
 
-type StoredUser = AuthUser & { passwordHash: string };
+type StoredUser = Omit<AuthUser, 'employeeId' | 'departmentId'> &
+  Partial<Pick<AuthUser, 'employeeId' | 'departmentId'>> & {
+    passwordHash: string;
+    employeeCode?: string;
+  };
 type StoredSession = AuthSession & { tokenHash: string };
 
 // In-memory AuthRepository with the same semantics as the Prisma one.
 export function createMemoryAuthRepository(users: StoredUser[] = []) {
   const sessions: StoredSession[] = [];
   const repo: AuthRepository = {
-    async findUserByEmail(email) {
-      return users.find((user) => user.email === email) ?? null;
+    async findUserByIdentifier(identifier) {
+      const id = identifier.toLowerCase();
+      const user = users.find(
+        (candidate) =>
+          candidate.email === id ||
+          candidate.employeeCode?.toLowerCase() === id,
+      );
+      return user ? { employeeId: null, departmentId: null, ...user } : null;
     },
     async findUserById(id) {
       const user = users.find((candidate) => candidate.id === id);
@@ -24,6 +35,8 @@ export function createMemoryAuthRepository(users: StoredUser[] = []) {
             status: user.status,
             role: user.role,
             permissions: user.permissions,
+            employeeId: user.employeeId ?? null,
+            departmentId: user.departmentId ?? null,
           }
         : null;
     },
@@ -63,3 +76,10 @@ export function createMemoryAuthRepository(users: StoredUser[] = []) {
   };
   return { repo, sessions };
 }
+
+// For tests that only exercise auth: domain routes are mounted but never called.
+export const unusedPrisma = new Proxy({} as PrismaClient, {
+  get() {
+    throw new Error('This test should not reach the database.');
+  },
+});
