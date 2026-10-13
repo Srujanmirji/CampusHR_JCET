@@ -1,0 +1,23 @@
+# Environment Variables
+
+## Backend
+- DATABASE_URL
+- JWT_ACCESS_SECRET
+- JWT_REFRESH_SECRET
+- STORAGE_URL
+- STORAGE_KEY
+- REDIS_URL
+- SMTP_HOST
+- SMTP_USER
+- SMTP_PASS
+- CORS_ORIGIN
+
+## Frontend
+- VITE_API_URL
+- VITE_SOCKET_URL
+
+## Mobile
+- EXPO_PUBLIC_API_URL
+- EXPO_PUBLIC_SOCKET_URL
+
+Never commit secrets.

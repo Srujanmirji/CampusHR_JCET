@@ -1,0 +1,56 @@
+# Documentation File Structure
+
+```text
+CampusHR_JCET_Docs/
+    README.md
+    mobile/
+        MOBILE_APP.md
+    backend/
+        API_ENDPOINTS.md
+        BACKEND.md
+        BUSINESS_RULES.md
+        DATABASE_SCHEMA.md
+        SECURITY.md
+    frontend/
+        COMPONENTS.md
+        FRONTEND.md
+        ROUTES.md
+        STATE_AND_API.md
+    features/
+        ATTENDANCE.md
+        AUDIT_LOGS.md
+        AUTH.md
+        DEPARTMENTS.md
+        DOCUMENTS.md
+        EMPLOYEE_MANAGEMENT.md
+        FACULTY_ACADEMIC_PROFILE.md
+        FACULTY_WORKLOAD.md
+        HELPDESK.md
+        LEAVE_MANAGEMENT.md
+        NAAC_NBA_REPORTING.md
+        NOTIFICATIONS.md
+        PAYROLL.md
+        README.md
+        RECRUITMENT.md
+        REPORTS_ANALYTICS.md
+        SMART_SUBSTITUTION.md
+        TIMETABLE.md
+    tasks/
+        BACKEND_TASKS.md
+        DELIVERY_PLAN.md
+        FRONTEND_TASKS.md
+        MASTER_TASKS.md
+        MOBILE_TASKS.md
+    design/
+        DESIGN_SYSTEM.md
+        MOBILE_UX.md
+        WEB_UX.md
+    shared/
+        ARCHITECTURE.md
+        ENVIRONMENT.md
+        TESTING.md
+    product/
+        PRD.md
+        SCOPE.md
+        USER_ROLES.md
+```
