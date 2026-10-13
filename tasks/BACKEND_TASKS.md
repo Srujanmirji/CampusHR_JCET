@@ -10,13 +10,13 @@
 
 ## BE-002 Auth
 
-- [ ] Users
-- [ ] Roles
-- [ ] Permissions
-- [ ] Login
-- [ ] Refresh
-- [ ] Logout
-- [ ] Password reset
+- [x] Users
+- [x] Roles (seeded)
+- [ ] Permissions (tables exist; catalogue and checks pending)
+- [x] Login (email; employee ID once employees exist)
+- [x] Refresh (rotation with replay detection)
+- [x] Logout
+- [ ] Password reset (needs SMTP)
 
 ## BE-003 Employees
 

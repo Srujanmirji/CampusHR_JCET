@@ -14,6 +14,18 @@
 - created_at
 - updated_at
 
+### refresh_sessions
+
+- id
+- user_id
+- token_hash (SHA-256 of the refresh token; the token itself is never stored)
+- expires_at
+- revoked_at
+- user_agent
+- ip
+- created_at
+- last_used_at
+
 ### roles
 
 - id

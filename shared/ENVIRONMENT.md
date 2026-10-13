@@ -2,9 +2,11 @@
 
 ## Backend
 
+- NODE_ENV (required: development, test or production; production sets Secure cookies)
+
 - DATABASE_URL
-- JWT_ACCESS_SECRET
-- JWT_REFRESH_SECRET
+- JWT_ACCESS_SECRET (refresh tokens are random values stored hashed; no secret needed)
+- SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD (only for `npm run db:seed`)
 - STORAGE_URL
 - STORAGE_KEY
 - REDIS_URL

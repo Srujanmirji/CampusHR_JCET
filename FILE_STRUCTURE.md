@@ -38,10 +38,12 @@ CampusHR_JCET/
 │   │   ├── server.ts       Startup, env validation, graceful shutdown
 │   │   ├── app.ts          Helmet, CORS, JSON limit, health route, 404
 │   │   ├── config/env.ts   Zod environment schema
-│   │   ├── middleware/     Central error handler
-│   │   ├── database/       schema.prisma (no domain models yet)
-│   │   └── modules/ jobs/ events/ sockets/ common/   Reserved
-│   └── test/               Foundation test
+│   │   ├── middleware/     Error handler, requireAuth, login rate limiter
+│   │   ├── common/         HttpError
+│   │   ├── database/       schema.prisma, migrations/, prisma.ts, seed.ts
+│   │   ├── modules/auth/   routes, controller, service, repository, schema
+│   │   └── jobs/ events/ sockets/   Reserved
+│   └── test/               Foundation and auth API tests
 │
 └── mobile/                 Mobile app — React Native + Expo + Expo Router
     ├── MOBILE_APP.md       Spec

@@ -9,7 +9,7 @@ from its approved interface toward a production system.
 | Part                   | State                                                                                                                                               |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Web app (`frontend/`)  | Full interface for every sidebar module, running on built-in sample data with demo sign-in. The leave → substitution workflow is fully interactive. |
-| API (`backend/`)       | Foundation only: environment validation, security headers, CORS, error handling, `GET /api/v1/health`. No domain endpoints or database tables yet.  |
+| API (`backend/`)       | Sign-in: login, token refresh with rotation, logout and `/auth/me`, backed by PostgreSQL. Other domain endpoints are not built yet.                 |
 | Mobile app (`mobile/`) | Foundation screen with local notifications. Remote push needs an EAS project ID.                                                                    |
 
 Sample data and the demo credentials stay in place until the API serves real data.

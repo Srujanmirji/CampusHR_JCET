@@ -1,0 +1,103 @@
+import type { PrismaClient } from '../../generated/prisma/client.js';
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  role: string;
+}
+
+export interface AuthSession {
+  id: string;
+  userId: string;
+  expiresAt: Date;
+  revokedAt: Date | null;
+}
+
+export interface NewSession {
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  userAgent?: string;
+  ip?: string;
+}
+
+// The service depends on this shape; tests supply an in-memory version.
+export interface AuthRepository {
+  findUserByEmail(
+    email: string,
+  ): Promise<(AuthUser & { passwordHash: string }) | null>;
+  findUserById(id: string): Promise<AuthUser | null>;
+  recordLogin(userId: string, at: Date): Promise<void>;
+  createSession(session: NewSession): Promise<void>;
+  findSessionByHash(tokenHash: string): Promise<AuthSession | null>;
+  /** Revokes one session on rotation; false if it was already revoked. */
+  revokeSession(id: string, at: Date): Promise<boolean>;
+  /** Ends a session for good (logout): revoked and expired. */
+  endSession(id: string, at: Date): Promise<void>;
+  /** Ends every session of a user (suspected token theft). */
+  revokeAllSessions(userId: string, at: Date): Promise<void>;
+}
+
+const userSelect = {
+  id: true,
+  email: true,
+  status: true,
+  role: { select: { name: true } },
+} as const;
+
+export function createPrismaAuthRepository(
+  prisma: PrismaClient,
+): AuthRepository {
+  return {
+    async findUserByEmail(email) {
+      const user = await prisma.user.findUnique({
+        where: { email },
+        select: { ...userSelect, passwordHash: true },
+      });
+      return user && { ...user, role: user.role.name };
+    },
+    async findUserById(id) {
+      const user = await prisma.user.findUnique({
+        where: { id },
+        select: userSelect,
+      });
+      return user && { ...user, role: user.role.name };
+    },
+    async recordLogin(userId, at) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { lastLoginAt: at },
+      });
+    },
+    async createSession(session) {
+      await prisma.refreshSession.create({ data: session });
+    },
+    findSessionByHash(tokenHash) {
+      return prisma.refreshSession.findUnique({
+        where: { tokenHash },
+        select: { id: true, userId: true, expiresAt: true, revokedAt: true },
+      });
+    },
+    async revokeSession(id, at) {
+      // Conditional update: two concurrent refreshes cannot both succeed.
+      const { count } = await prisma.refreshSession.updateMany({
+        where: { id, revokedAt: null },
+        data: { revokedAt: at, lastUsedAt: at },
+      });
+      return count === 1;
+    },
+    async endSession(id, at) {
+      await prisma.refreshSession.update({
+        where: { id },
+        data: { revokedAt: at, expiresAt: at },
+      });
+    },
+    async revokeAllSessions(userId, at) {
+      await prisma.refreshSession.updateMany({
+        where: { userId, expiresAt: { gt: at } },
+        data: { revokedAt: at, expiresAt: at },
+      });
+    },
+  };
+}

@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import { createApp } from './app.js';
 import { envSchema } from './config/env.js';
+import { createPrismaClient } from './database/prisma.js';
+import { createPrismaAuthRepository } from './modules/auth/auth.repository.js';
 
 const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
@@ -11,7 +13,10 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-const server = createApp(parsed.data).listen(parsed.data.PORT, () => {
+const prisma = createPrismaClient(parsed.data.DATABASE_URL);
+const server = createApp(parsed.data, {
+  authRepository: createPrismaAuthRepository(prisma),
+}).listen(parsed.data.PORT, () => {
   console.log(`CampusHR API listening on port ${parsed.data.PORT}`);
 });
 server.on('error', (error) => {
@@ -22,8 +27,9 @@ server.on('error', (error) => {
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
     const timeout = setTimeout(() => process.exit(1), 10_000).unref();
-    server.close((error) => {
+    server.close(async (error) => {
       clearTimeout(timeout);
+      await prisma.$disconnect();
       process.exit(error ? 1 : 0);
     });
   });

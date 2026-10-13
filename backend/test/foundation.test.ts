@@ -3,13 +3,13 @@ import { once } from 'node:events';
 import test from 'node:test';
 import { createApp } from '../src/app.js';
 import { envSchema } from '../src/config/env.js';
+import { createMemoryAuthRepository } from './fakes.js';
 
 test('foundation validates configuration and handles HTTP requests safely', async () => {
   const input = {
     NODE_ENV: 'test',
     DATABASE_URL: 'postgresql://localhost/campushr_test',
     JWT_ACCESS_SECRET: 'a'.repeat(32),
-    JWT_REFRESH_SECRET: 'b'.repeat(32),
     CORS_ORIGIN: 'http://localhost:5173',
   };
   assert.equal(
@@ -27,7 +27,9 @@ test('foundation validates configuration and handles HTTP requests safely', asyn
     false,
   );
 
-  const server = createApp(envSchema.parse(input)).listen(0, '127.0.0.1');
+  const server = createApp(envSchema.parse(input), {
+    authRepository: createMemoryAuthRepository().repo,
+  }).listen(0, '127.0.0.1');
   try {
     await once(server, 'listening');
     const address = server.address();

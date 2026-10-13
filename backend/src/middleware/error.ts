@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler } from 'express';
+import { HttpError } from '../common/http-error.js';
 
 export const errorHandler: ErrorRequestHandler = (
   error: unknown,
@@ -8,6 +9,12 @@ export const errorHandler: ErrorRequestHandler = (
 ) => {
   if (res.headersSent) {
     _next(error);
+    return;
+  }
+  if (error instanceof HttpError) {
+    res
+      .status(error.status)
+      .json({ error: { code: error.code, message: error.message } });
     return;
   }
   const status =

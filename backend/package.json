@@ -5,14 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "prebuild": "prisma generate",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "pretypecheck": "prisma generate",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.check.json",
     "lint": "eslint src test prisma.config.ts",
-    "test": "node --import tsx --test test/foundation.test.ts",
+    "pretest": "prisma generate",
+    "test": "node --import tsx --test test/*.test.ts",
     "db:validate": "prisma validate",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev"
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx src/database/seed.ts",
+    "db:deploy": "prisma migrate deploy"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

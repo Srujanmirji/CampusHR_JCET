@@ -21,24 +21,43 @@ Real `.env` files are git-ignored; never commit them. In a new checkout:
 
 - Set `POSTGRES_PASSWORD` in the root `.env` and use the same password in
   `backend/.env`'s `DATABASE_URL`.
-- Generate two independent JWT secrets (at least 32 characters each) with
-  `node -p "require('node:crypto').randomBytes(32).toString('hex')"`.
+- Generate the access-token secret (at least 32 characters) with
+  `node -p "require('node:crypto').randomBytes(32).toString('hex')"` and set it
+  as `JWT_ACCESS_SECRET` in `backend/.env`.
+
+## Database
+
+Start PostgreSQL with Docker (`npm run db:up`), or without Docker using Prisma's
+local server: `npx prisma dev --name campushr -d` in `backend/`, then put the URL
+it prints into `backend/.env` as `DATABASE_URL`.
+
+Apply migrations and create the roles and first Super Admin:
+
+```sh
+npm run db:migrate                 # development: apply and create migrations
+npm run db:deploy --workspace @campushr/api   # production: apply only
+SEED_ADMIN_EMAIL=you@jcethbl.edu.in SEED_ADMIN_PASSWORD='12+ characters' \
+  npm run db:seed --workspace @campushr/api
+```
+
+The seed is safe to rerun: it never changes an existing user's password.
 
 ## Run
 
 In separate terminals:
 
 ```sh
-npm run db:up        # PostgreSQL via Docker, bound to 127.0.0.1 only
 npm run dev:api      # http://localhost:4000/api/v1/health
 npm run dev:web      # http://localhost:5173
 npm run dev:mobile   # Expo Go or a simulator/emulator
 ```
 
-- **Web:** sign in with the prefilled demo credentials. All screens use the
-  sample data in `frontend/src/data/mock/` until the API is connected.
-- **API:** the health endpoint reports process liveness, not database readiness.
-  No database is needed yet.
+- **Web:** sign in with the prefilled demo credentials. The web app is not yet
+  connected to the API; all screens use the sample data in
+  `frontend/src/data/mock/`.
+- **API:** sign-in endpoints are under `/api/v1/auth` (see
+  `backend/API_ENDPOINTS.md`). The health endpoint reports process liveness,
+  not database readiness.
 - **Mobile on a physical phone:** replace `localhost` in `mobile/.env` with your
   computer's LAN IP.
 
@@ -86,19 +105,25 @@ npx expo export --platform ios --platform android
 - The web app's main bundle is 689 KB (201 KB gzipped); pages load as separate
   chunks.
 - Native runtime testing has been done on the iOS simulator only.
+- Auth follow-ups: deactivating a user or changing their role takes effect when
+  their 15-minute access token expires (check the database once RBAC lands), and
+  expired `refresh_sessions` rows need a periodic purge job.
 
 ## Decisions still required before connecting real data
 
 - **Database:** the schema spec lists fields but not types, constraints or deletion
   policies. Timetable references subjects and rooms without defining those tables.
-  Refresh sessions, academic profiles, recruitment, helpdesk and attachment
-  records also need models.
+  Academic profiles, recruitment, helpdesk and attachment records also need
+  models.
 - **Routes:** Departments, Documents and Helpdesk are in the web sidebar spec but
   have no pages or routes yet.
 - **Policies:** leave policies and approval chains, attendance policy and workload
   thresholds must be finalized before their services are built.
 - **Storage:** choose Supabase Storage or Cloudinary before document uploads.
-- **Auth:** confirm cookie settings against the deployment domains.
+- **Auth:** the refresh cookie is `SameSite=Strict`, which assumes the web app and
+  API share a site (e.g. `app.` and `api.jcethbl.edu.in`). Confirm the deployment
+  domains. Choose an SMTP provider for password reset. The login rate limit is
+  in memory, so it needs Redis if the API runs as several instances.
 
-The next delivery phase is authentication and RBAC, then employees and
-departments, as specified in `tasks/DELIVERY_PLAN.md` and `tasks/MASTER_TASKS.md`.
+Sign-in is built. Next: connect the web and mobile apps to it, add permission
+checks (RBAC), then employees and departments, as specified in `tasks/DELIVERY_PLAN.md` and `tasks/MASTER_TASKS.md`.
