@@ -1,6 +1,7 @@
 # Feature — Timetable
 
 ## Capabilities
+
 - Faculty timetable
 - Department timetable
 - Subject assignment

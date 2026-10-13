@@ -57,7 +57,7 @@ function readState(): WorkflowState {
     const parsed = storedSchema.safeParse(JSON.parse(raw));
     if (parsed.success) return parsed.data;
   } catch {
-    /* A blocked or invalid browser store must not prevent the demo opening. */
+    /* A blocked or invalid browser store must not prevent the app opening. */
   }
   return initialWorkflow;
 }
@@ -74,7 +74,7 @@ export function AcademicWorkflowProvider({
       sessionStorage.setItem(workflowKey, JSON.stringify(state));
     } catch {
       toast.info(
-        'Browser storage is unavailable. Keep this tab open to retain demo changes.',
+        'Browser storage is unavailable. Keep this tab open to retain your changes.',
         { id: 'workflow-storage' },
       );
     }
@@ -184,7 +184,7 @@ export function AcademicWorkflowProvider({
       /* ignore */
     }
     setState(initialWorkflow);
-    toast.success('CampusHR demo data has been reset to initial state.');
+    toast.success('Workflow data has been reset.');
   }
 
   function markAllNotificationsRead() {

@@ -105,7 +105,7 @@ export default function LeavePage() {
         action={
           <Badge variant="outline" className="workflow-date">
             <CalendarDays />
-            12 Oct 2026 · demo date
+            12 Oct 2026
           </Badge>
         }
       />
@@ -120,21 +120,21 @@ export default function LeavePage() {
         <MetricCard
           label="Approved this month"
           value={approved}
-          detail="October 2026 · sample records"
+          detail="October 2026"
           icon={CalendarCheck2}
           index={1}
         />
         <MetricCard
           label="Rejected"
           value={rejected}
-          detail="Decisions in this demo session"
+          detail="Decisions this month"
           icon={CircleX}
           index={2}
         />
         <MetricCard
           label="Employees currently on leave"
           value={onLeave}
-          detail="As of the demo date, 12 October"
+          detail="As of 12 October"
           icon={CalendarDays}
           index={3}
         />
@@ -154,7 +154,7 @@ export default function LeavePage() {
         <CardHeader>
           <SectionHeader
             title="Faculty leave requests"
-            description="Local sample requests for October 2026"
+            description="Requests for October 2026"
             action={
               <span className="text-sm text-muted-foreground">
                 {pending} pending review
@@ -301,9 +301,6 @@ export default function LeavePage() {
           <p role="status" className="text-sm text-muted-foreground">
             Showing {filtered.length} of {leaveRequests.length} requests
           </p>
-          <span className="text-xs text-muted-foreground">
-            Frontend-only demo · changes saved in this session
-          </span>
         </CardFooter>
       </Card>
       <LeaveDetailDrawer

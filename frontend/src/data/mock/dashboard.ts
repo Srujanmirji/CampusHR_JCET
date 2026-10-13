@@ -120,4 +120,4 @@ export const notifications = [
   },
 ] as const;
 
-export const previewMessage = 'This module is planned for the next phase.';
+export const previewMessage = 'This feature isn’t available yet.';

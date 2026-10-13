@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { MetricCard } from '@/components/shared/MetricCard';
-import { PlannedModuleBanner } from '@/components/shared/PlannedModuleBanner';
 import { WorkloadDrawer } from '../components/WorkloadDrawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +34,9 @@ export default function WorkloadPage() {
   const [departmentFilter, setDepartmentFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  const [selectedRecord, setSelectedRecord] = useState<WorkloadRecord | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<WorkloadRecord | null>(
+    null,
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const filteredWorkloads = useMemo(() => {
@@ -54,7 +55,10 @@ export default function WorkloadPage() {
           if (!matchesName && !matchesId) return false;
         }
 
-        if (departmentFilter !== 'ALL' && item.department !== departmentFilter) {
+        if (
+          departmentFilter !== 'ALL' &&
+          item.department !== departmentFilter
+        ) {
           return false;
         }
 
@@ -80,7 +84,7 @@ export default function WorkloadPage() {
           <Button
             variant="outline"
             onClick={() =>
-              toast.info('VTU Workload Compliance Dossier export will be enabled after backend integration.', {
+              toast.info('Workload dossier export isn’t available yet.', {
                 id: 'exp-wl',
               })
             }
@@ -91,10 +95,11 @@ export default function WorkloadPage() {
         }
       />
 
-      <PlannedModuleBanner route="/workload" />
-
       {/* Summary Cards */}
-      <section aria-label="Faculty workload summary statistics" className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section
+        aria-label="Faculty workload summary statistics"
+        className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
         <MetricCard
           label="Faculty Tracked"
           value={132}
@@ -139,7 +144,10 @@ export default function WorkloadPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <Select
+              value={departmentFilter}
+              onValueChange={setDepartmentFilter}
+            >
               <SelectTrigger className="w-[140px] text-xs">
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
@@ -167,7 +175,9 @@ export default function WorkloadPage() {
               </SelectContent>
             </Select>
 
-            {(search || departmentFilter !== 'ALL' || statusFilter !== 'ALL') && (
+            {(search ||
+              departmentFilter !== 'ALL' ||
+              statusFilter !== 'ALL') && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -199,7 +209,9 @@ export default function WorkloadPage() {
                 <th className="px-3 py-3 text-center">Project</th>
                 <th className="px-3 py-3 text-center">Mentoring</th>
                 <th className="px-3 py-3 text-center">Other</th>
-                <th className="px-3 py-3 text-center font-bold text-foreground">Total</th>
+                <th className="px-3 py-3 text-center font-bold text-foreground">
+                  Total
+                </th>
                 <th className="px-3 py-3 text-center">Cap</th>
                 <th className="px-4 py-3 min-w-[120px]">Workload Bar</th>
                 <th className="px-3 py-3 text-center">Status</th>
@@ -209,14 +221,20 @@ export default function WorkloadPage() {
             <tbody className="divide-y divide-border">
               {filteredWorkloads.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-8 text-center text-muted-foreground">
+                  <td
+                    colSpan={12}
+                    className="py-8 text-center text-muted-foreground"
+                  >
                     No faculty found matching the current filters.
                   </td>
                 </tr>
               ) : (
                 filteredWorkloads.map((item) => {
                   const emp = item.faculty!;
-                  const percent = Math.min(100, Math.round((item.total / item.capacity) * 100));
+                  const percent = Math.min(
+                    100,
+                    Math.round((item.total / item.capacity) * 100),
+                  );
 
                   return (
                     <tr
@@ -227,14 +245,20 @@ export default function WorkloadPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
                           <Avatar className="h-8 w-8">
-                            {emp.photo && <AvatarImage src={emp.photo} alt={emp.name} />}
+                            {emp.photo && (
+                              <AvatarImage src={emp.photo} alt={emp.name} />
+                            )}
                             <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
                               {emp.initials}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="font-semibold text-foreground">{emp.name}</div>
-                            <div className="text-[11px] font-mono text-muted-foreground">{emp.id}</div>
+                            <div className="font-semibold text-foreground">
+                              {emp.name}
+                            </div>
+                            <div className="text-[11px] font-mono text-muted-foreground">
+                              {emp.id}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -243,11 +267,21 @@ export default function WorkloadPage() {
                           {item.department}
                         </Badge>
                       </td>
-                      <td className="px-3 py-3 text-center font-mono text-xs">{item.theory}h</td>
-                      <td className="px-3 py-3 text-center font-mono text-xs">{item.lab}h</td>
-                      <td className="px-3 py-3 text-center font-mono text-xs">{item.project}h</td>
-                      <td className="px-3 py-3 text-center font-mono text-xs">{item.mentoring}h</td>
-                      <td className="px-3 py-3 text-center font-mono text-xs">{item.other}h</td>
+                      <td className="px-3 py-3 text-center font-mono text-xs">
+                        {item.theory}h
+                      </td>
+                      <td className="px-3 py-3 text-center font-mono text-xs">
+                        {item.lab}h
+                      </td>
+                      <td className="px-3 py-3 text-center font-mono text-xs">
+                        {item.project}h
+                      </td>
+                      <td className="px-3 py-3 text-center font-mono text-xs">
+                        {item.mentoring}h
+                      </td>
+                      <td className="px-3 py-3 text-center font-mono text-xs">
+                        {item.other}h
+                      </td>
                       <td className="px-3 py-3 text-center font-mono text-sm font-bold text-foreground">
                         {item.total}h
                       </td>
@@ -268,7 +302,9 @@ export default function WorkloadPage() {
                               style={{ width: `${percent}%` }}
                             />
                           </div>
-                          <span className="text-[10px] text-muted-foreground font-mono">{percent}% used</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {percent}% used
+                          </span>
                         </div>
                       </td>
                       <td className="px-3 py-3 text-center">
@@ -285,7 +321,10 @@ export default function WorkloadPage() {
                           {item.status}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <td
+                        className="px-4 py-3 text-right"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Button
                           variant="ghost"
                           size="sm"

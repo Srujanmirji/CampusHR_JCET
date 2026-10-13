@@ -3,7 +3,6 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { PlannedModuleBanner } from '@/components/shared/PlannedModuleBanner';
 import { EmployeeProfileDrawer } from '../components/EmployeeProfileDrawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,7 +46,9 @@ export default function EmployeesPage() {
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
+    null,
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Cross-module consistency: If Prof. Asha Patil's leave is approved, show On Leave
@@ -79,7 +80,10 @@ export default function EmployeesPage() {
       }
 
       // Designation filter
-      if (designationFilter !== 'ALL' && !emp.designation.includes(designationFilter)) {
+      if (
+        designationFilter !== 'ALL' &&
+        !emp.designation.includes(designationFilter)
+      ) {
         return false;
       }
 
@@ -95,7 +99,14 @@ export default function EmployeesPage() {
 
       return true;
     });
-  }, [search, departmentFilter, designationFilter, typeFilter, statusFilter, ashaLeaveStatus]);
+  }, [
+    search,
+    departmentFilter,
+    designationFilter,
+    typeFilter,
+    statusFilter,
+    ashaLeaveStatus,
+  ]);
 
   function handleViewProfile(emp: Employee) {
     setSelectedEmployee(emp);
@@ -118,7 +129,7 @@ export default function EmployeesPage() {
         action={
           <Button
             onClick={() =>
-              toast.info('Add Employee workflow will be available after backend integration.', {
+              toast.info('Adding employees isn’t available yet.', {
                 id: 'add-emp',
               })
             }
@@ -129,10 +140,11 @@ export default function EmployeesPage() {
         }
       />
 
-      <PlannedModuleBanner route="/employees" />
-
       {/* Summary Cards */}
-      <section aria-label="Employee summary statistics" className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section
+        aria-label="Employee summary statistics"
+        className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
         <MetricCard
           label="Total Employees"
           value={186}
@@ -177,7 +189,10 @@ export default function EmployeesPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <Select
+              value={departmentFilter}
+              onValueChange={setDepartmentFilter}
+            >
               <SelectTrigger className="w-[140px] text-xs">
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
@@ -192,7 +207,10 @@ export default function EmployeesPage() {
               </SelectContent>
             </Select>
 
-            <Select value={designationFilter} onValueChange={setDesignationFilter}>
+            <Select
+              value={designationFilter}
+              onValueChange={setDesignationFilter}
+            >
               <SelectTrigger className="w-[150px] text-xs">
                 <SelectValue placeholder="Designation" />
               </SelectTrigger>
@@ -217,8 +235,16 @@ export default function EmployeesPage() {
               </SelectContent>
             </Select>
 
-            {(search || departmentFilter !== 'ALL' || designationFilter !== 'ALL' || statusFilter !== 'ALL') && (
-              <Button variant="ghost" size="sm" onClick={handleResetFilters} className="h-9 px-2 text-xs">
+            {(search ||
+              departmentFilter !== 'ALL' ||
+              designationFilter !== 'ALL' ||
+              statusFilter !== 'ALL') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleResetFilters}
+                className="h-9 px-2 text-xs"
+              >
                 <FilterX className="mr-1 h-3.5 w-3.5" />
                 Reset
               </Button>
@@ -228,9 +254,11 @@ export default function EmployeesPage() {
 
         <div className="mt-3 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
           <span>
-            Showing <b>{filteredEmployees.length}</b> sample records from demo dataset
+            Showing <b>{filteredEmployees.length}</b> records
           </span>
-          <span className="italic">Click any row or 'View Profile' to inspect full academic credentials</span>
+          <span className="italic">
+            Click any row or 'View Profile' to inspect full academic credentials
+          </span>
         </div>
       </div>
 
@@ -253,7 +281,10 @@ export default function EmployeesPage() {
             <tbody className="divide-y divide-border">
               {filteredEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                  <td
+                    colSpan={8}
+                    className="py-8 text-center text-muted-foreground"
+                  >
                     No employees matching the selected criteria.
                   </td>
                 </tr>
@@ -261,7 +292,9 @@ export default function EmployeesPage() {
                 filteredEmployees.map((emp) => {
                   const isEffectiveOnLeave =
                     emp.id === 'JCET-CSE-021' && ashaLeaveStatus === 'Approved';
-                  const effectiveStatus = isEffectiveOnLeave ? 'On Leave' : emp.status;
+                  const effectiveStatus = isEffectiveOnLeave
+                    ? 'On Leave'
+                    : emp.status;
 
                   return (
                     <tr
@@ -272,14 +305,20 @@ export default function EmployeesPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9 border border-border">
-                            {emp.photo && <AvatarImage src={emp.photo} alt={emp.name} />}
+                            {emp.photo && (
+                              <AvatarImage src={emp.photo} alt={emp.name} />
+                            )}
                             <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
                               {emp.initials}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="font-semibold text-foreground">{emp.name}</div>
-                            <div className="text-xs text-muted-foreground">{emp.email}</div>
+                            <div className="font-semibold text-foreground">
+                              {emp.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {emp.email}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -287,7 +326,10 @@ export default function EmployeesPage() {
                         {emp.id}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant="outline" className="font-medium text-xs">
+                        <Badge
+                          variant="outline"
+                          className="font-medium text-xs"
+                        >
                           {emp.department}
                         </Badge>
                       </td>
@@ -312,7 +354,10 @@ export default function EmployeesPage() {
                           label={effectiveStatus}
                         />
                       </td>
-                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <td
+                        className="px-4 py-3 text-right"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
@@ -325,22 +370,31 @@ export default function EmployeesPage() {
                           </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                              >
                                 <MoreVertical className="h-3.5 w-3.5" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
                                 onClick={() =>
-                                  toast.info('Edit employee is disabled in prototype preview.', {
-                                    id: 'edit-emp',
-                                  })
+                                  toast.info(
+                                    'Editing employees isn’t available yet.',
+                                    {
+                                      id: 'edit-emp',
+                                    },
+                                  )
                                 }
                               >
                                 <Edit className="mr-2 h-3.5 w-3.5" />
                                 Edit Record
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleViewProfile(emp)}>
+                              <DropdownMenuItem
+                                onClick={() => handleViewProfile(emp)}
+                              >
                                 <UserCheck className="mr-2 h-3.5 w-3.5" />
                                 Workload & Timetable
                               </DropdownMenuItem>
@@ -363,7 +417,8 @@ export default function EmployeesPage() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         isEffectiveOnLeave={
-          selectedEmployee?.id === 'JCET-CSE-021' && ashaLeaveStatus === 'Approved'
+          selectedEmployee?.id === 'JCET-CSE-021' &&
+          ashaLeaveStatus === 'Approved'
         }
       />
     </PageTransition>

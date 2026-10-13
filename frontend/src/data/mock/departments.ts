@@ -10,7 +10,8 @@ export const departments: DepartmentInfo[] = [
     teaching: 34,
     nonTeaching: 8,
     attendanceRate: 96,
-    description: 'Autonomous department offering B.E and M.Tech programs with 12 research laboratories.',
+    description:
+      'Autonomous department offering B.E and M.Tech programs with 12 research laboratories.',
   },
   {
     code: 'ECE',
@@ -32,7 +33,8 @@ export const departments: DepartmentInfo[] = [
     teaching: 20,
     nonTeaching: 8,
     attendanceRate: 91,
-    description: 'Advanced manufacturing, thermal power testing, and SAE BAJA innovation hub.',
+    description:
+      'Advanced manufacturing, thermal power testing, and SAE BAJA innovation hub.',
   },
   {
     code: 'CE',
@@ -43,7 +45,8 @@ export const departments: DepartmentInfo[] = [
     teaching: 18,
     nonTeaching: 6,
     attendanceRate: 93,
-    description: 'Material testing, structural analysis, and environmental engineering testing center.',
+    description:
+      'Material testing, structural analysis, and environmental engineering testing center.',
   },
   {
     code: 'AI & ML',
@@ -54,7 +57,8 @@ export const departments: DepartmentInfo[] = [
     teaching: 16,
     nonTeaching: 6,
     attendanceRate: 95,
-    description: 'Cutting-edge deep learning rigs, generative AI computing cluster, and robotics wing.',
+    description:
+      'Cutting-edge deep learning rigs, generative AI computing cluster, and robotics wing.',
   },
   {
     code: 'MBA',
@@ -65,7 +69,8 @@ export const departments: DepartmentInfo[] = [
     teaching: 16,
     nonTeaching: 16,
     attendanceRate: 92,
-    description: 'Postgraduate management studies focusing on Finance, Marketing, and Human Resource Management.',
+    description:
+      'Postgraduate management studies focusing on Finance, Marketing, and Human Resource Management.',
   },
 ];
 

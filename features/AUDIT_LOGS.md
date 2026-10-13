@@ -1,6 +1,7 @@
 # Feature — Audit Logs
 
 ## Log
+
 - User
 - Action
 - Resource
@@ -11,7 +12,7 @@
 - Timestamp
 
 ## Mandatory For
-- Payroll
+
 - Employee changes
 - Leave approvals
 - Permission changes

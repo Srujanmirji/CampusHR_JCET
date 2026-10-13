@@ -42,6 +42,7 @@ modules/employees/
 ```
 
 ## Rules
+
 - Controllers stay thin.
 - Business logic in services.
 - DB access in repositories/Prisma layer.

@@ -118,10 +118,7 @@ export function LeaveDetailDrawer({
               >
                 <div className="faculty-profile">
                   <Avatar>
-                    <AvatarImage
-                      src={faculty.photo}
-                      alt="Sample faculty portrait"
-                    />
+                    <AvatarImage src={faculty.photo} alt="" />
                     <AvatarFallback>{faculty.initials}</AvatarFallback>
                   </Avatar>
                   <div>
@@ -135,7 +132,7 @@ export function LeaveDetailDrawer({
                 <div className="flex items-center justify-between gap-3">
                   <StatusBadge status={status} />
                   <span className="text-xs text-muted-foreground">
-                    Sample faculty profile
+                    Faculty profile
                   </span>
                 </div>
                 <dl className="leave-detail-grid">
@@ -244,7 +241,7 @@ export function LeaveDetailDrawer({
                     </ol>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      No scheduled classes fall within this sample leave period.
+                      No scheduled classes fall within this leave period.
                     </p>
                   )}
                 </section>
@@ -341,7 +338,7 @@ export function LeaveDetailDrawer({
                 ? classes.length
                   ? `Approving this leave will affect ${classes.length} scheduled ${classes.length === 1 ? 'class' : 'classes'}. Would you like CampusHR to find substitute faculty?`
                   : 'No scheduled classes are affected. You can approve this leave without a substitute.'
-                : `This will mark ${faculty?.name}’s leave request as rejected in the current demo session.`}
+                : `This will mark ${faculty?.name}’s leave request as rejected .`}
             </DialogDescription>
           </DialogHeader>
           {confirmation === 'reject' && (

@@ -3,6 +3,7 @@
 ## Core Tables
 
 ### users
+
 - id
 - email
 - password_hash
@@ -14,19 +15,23 @@
 - updated_at
 
 ### roles
+
 - id
 - name
 
 ### permissions
+
 - id
 - key
 - description
 
 ### role_permissions
+
 - role_id
 - permission_id
 
 ### employees
+
 - id
 - employee_code
 - first_name
@@ -42,17 +47,20 @@
 - updated_at
 
 ### departments
+
 - id
 - name
 - code
 - hod_employee_id
 
 ### designations
+
 - id
 - name
 - level
 
 ### attendance
+
 - id
 - employee_id
 - date
@@ -62,11 +70,13 @@
 - source
 
 ### leave_types
+
 - id
 - name
 - annual_limit
 
 ### leave_balances
+
 - id
 - employee_id
 - leave_type_id
@@ -76,6 +86,7 @@
 - remaining
 
 ### leave_requests
+
 - id
 - employee_id
 - leave_type_id
@@ -86,6 +97,7 @@
 - current_approver_id
 
 ### timetable_entries
+
 - id
 - department_id
 - faculty_id
@@ -97,6 +109,7 @@
 - class_section
 
 ### workload_entries
+
 - id
 - faculty_id
 - type
@@ -104,6 +117,7 @@
 - week_start
 
 ### substitutions
+
 - id
 - original_faculty_id
 - substitute_faculty_id
@@ -111,22 +125,8 @@
 - date
 - status
 
-### payroll_runs
-- id
-- month
-- year
-- status
-- processed_by
-
-### payslips
-- id
-- payroll_run_id
-- employee_id
-- gross
-- deductions
-- net
-
 ### documents
+
 - id
 - employee_id
 - type
@@ -135,6 +135,7 @@
 - expiry_date
 
 ### notifications
+
 - id
 - user_id
 - type
@@ -143,6 +144,7 @@
 - read_at
 
 ### audit_logs
+
 - id
 - actor_user_id
 - action

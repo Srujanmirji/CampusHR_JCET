@@ -1,9 +1,11 @@
 # Feature — Smart Faculty Substitution
 
 ## Trigger
+
 Approved leave or unavailable faculty causes affected timetable periods.
 
 ## Recommendation Logic
+
 1. Find affected classes.
 2. Find free faculty.
 3. Match department.
@@ -14,6 +16,7 @@ Approved leave or unavailable faculty causes affected timetable periods.
 8. Notify substitute faculty.
 
 ## Ranking Inputs
+
 - Subject match
 - Free slot
 - Current workload
@@ -21,4 +24,5 @@ Approved leave or unavailable faculty causes affected timetable periods.
 - Previous subject experience
 
 ## MVP
+
 Use rule-based scoring first. AI may be added later.

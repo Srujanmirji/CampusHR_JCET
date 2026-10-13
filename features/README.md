@@ -12,7 +12,6 @@
 - [Leave Management](LEAVE_MANAGEMENT.md)
 - [Naac Nba Reporting](NAAC_NBA_REPORTING.md)
 - [Notifications](NOTIFICATIONS.md)
-- [Payroll](PAYROLL.md)
 - [Recruitment](RECRUITMENT.md)
 - [Reports Analytics](REPORTS_ANALYTICS.md)
 - [Smart Substitution](SMART_SUBSTITUTION.md)

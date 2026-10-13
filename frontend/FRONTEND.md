@@ -41,7 +41,6 @@ features/
 ├── timetable/
 ├── workload/
 ├── substitution/
-├── payroll/
 ├── documents/
 ├── reports/
 └── notifications/

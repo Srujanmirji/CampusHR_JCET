@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageTransition } from '@/components/shared/PageTransition';
-import { PlannedModuleBanner } from '@/components/shared/PlannedModuleBanner';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -17,13 +21,7 @@ import {
 } from '@/components/ui/dialog';
 import { useAcademicWorkflow } from '@/features/leave/useAcademicWorkflow';
 import { initialSettings } from '@/data/mock/settings';
-import {
-  Building2,
-  Clock,
-  Bell,
-  RotateCcw,
-  Save,
-} from 'lucide-react';
+import { Building2, Clock, Bell, RotateCcw, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
@@ -33,7 +31,7 @@ export default function SettingsPage() {
 
   function handleSaveSettings(e: React.FormEvent) {
     e.preventDefault();
-    toast.success('Configuration preferences saved for this demo session.');
+    toast.success('Settings saved for this session.');
   }
 
   function handleConfirmReset() {
@@ -48,23 +46,19 @@ export default function SettingsPage() {
         description="Configure academic parameters, VTU workload thresholds, and system preferences."
       />
 
-      <PlannedModuleBanner route="/settings" />
-
       <form onSubmit={handleSaveSettings} className="space-y-6">
-        {/* Presentation Demo Controls (Required for phase 3 smoke check & demo presentations) */}
+        {/* Workflow data reset */}
         <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-5 shadow-xs">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <Badge className="bg-primary text-primary-foreground font-semibold">
-                  Demo Utility
-                </Badge>
                 <span className="font-bold text-base text-foreground">
-                  Presentation Demo Controls
+                  Reset workflow data
                 </span>
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed max-w-xl">
-                Reset all mock leave applications, substitute assignments, notifications, and metric counters back to the initial seeded state. Useful for repeating presentations to the HOD.
+                Restore leave requests, substitute assignments, notifications,
+                and counts to their starting state.
               </p>
             </div>
             <Button
@@ -74,7 +68,7 @@ export default function SettingsPage() {
               onClick={() => setResetModalOpen(true)}
             >
               <RotateCcw className="h-4 w-4" />
-              Reset Demo Data
+              Reset data
             </Button>
           </div>
         </div>
@@ -84,7 +78,9 @@ export default function SettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">General Institution Settings</CardTitle>
+              <CardTitle className="text-base">
+                General Institution Settings
+              </CardTitle>
             </div>
             <CardDescription className="text-xs">
               Affiliation parameters and active academic calendar period.
@@ -98,7 +94,10 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setSettings({
                     ...settings,
-                    general: { ...settings.general, collegeName: e.target.value },
+                    general: {
+                      ...settings.general,
+                      collegeName: e.target.value,
+                    },
                   })
                 }
               />
@@ -110,7 +109,10 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setSettings({
                     ...settings,
-                    general: { ...settings.general, campusLocation: e.target.value },
+                    general: {
+                      ...settings.general,
+                      campusLocation: e.target.value,
+                    },
                   })
                 }
               />
@@ -122,7 +124,10 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setSettings({
                     ...settings,
-                    general: { ...settings.general, affiliation: e.target.value },
+                    general: {
+                      ...settings.general,
+                      affiliation: e.target.value,
+                    },
                   })
                 }
               />
@@ -143,10 +148,13 @@ export default function SettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">HR Rules & VTU Workload Thresholds</CardTitle>
+              <CardTitle className="text-base">
+                HR Rules & VTU Workload Thresholds
+              </CardTitle>
             </div>
             <CardDescription className="text-xs">
-              Weekly teaching hour maximums governing the Smart Substitution engine.
+              Weekly teaching hour maximums governing the Smart Substitution
+              engine.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-3">
@@ -247,20 +255,27 @@ export default function SettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Bell className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">Notification Delivery Channels</CardTitle>
+              <CardTitle className="text-base">
+                Notification Delivery Channels
+              </CardTitle>
             </div>
             <CardDescription className="text-xs">
-              Delivery preferences for leave requests, substitution allocations, and circulars.
+              Delivery preferences for leave requests, substitution allocations,
+              and circulars.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
-                <Label className="text-xs font-semibold cursor-pointer" htmlFor="email-notif">
+                <Label
+                  className="text-xs font-semibold cursor-pointer"
+                  htmlFor="email-notif"
+                >
                   Email Notifications
                 </Label>
                 <p className="text-[11px] text-muted-foreground">
-                  Send immediate email dispatch to substitute faculty when class reassignment is confirmed.
+                  Send immediate email dispatch to substitute faculty when class
+                  reassignment is confirmed.
                 </p>
               </div>
               <Checkbox
@@ -269,7 +284,10 @@ export default function SettingsPage() {
                 onCheckedChange={(checked) =>
                   setSettings({
                     ...settings,
-                    notifications: { ...settings.notifications, emailAlerts: Boolean(checked) },
+                    notifications: {
+                      ...settings.notifications,
+                      emailAlerts: Boolean(checked),
+                    },
                   })
                 }
               />
@@ -277,11 +295,15 @@ export default function SettingsPage() {
 
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
-                <Label className="text-xs font-semibold cursor-pointer" htmlFor="inapp-notif">
+                <Label
+                  className="text-xs font-semibold cursor-pointer"
+                  htmlFor="inapp-notif"
+                >
                   In-App Notification Alerts
                 </Label>
                 <p className="text-[11px] text-muted-foreground">
-                  Display real-time badge updates and activity logs in the Topbar bell dropdown.
+                  Display real-time badge updates and activity logs in the
+                  Topbar bell dropdown.
                 </p>
               </div>
               <Checkbox
@@ -301,11 +323,15 @@ export default function SettingsPage() {
 
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
-                <Label className="text-xs font-semibold cursor-pointer" htmlFor="push-notif">
+                <Label
+                  className="text-xs font-semibold cursor-pointer"
+                  htmlFor="push-notif"
+                >
                   Mobile SMS & WhatsApp Circulars
                 </Label>
                 <p className="text-[11px] text-muted-foreground">
-                  Send high-priority SMS alerts for urgent timetable changes or college declarations.
+                  Send high-priority SMS alerts for urgent timetable changes or
+                  college declarations.
                 </p>
               </div>
               <Checkbox
@@ -314,7 +340,10 @@ export default function SettingsPage() {
                 onCheckedChange={(checked) =>
                   setSettings({
                     ...settings,
-                    notifications: { ...settings.notifications, mobilePush: Boolean(checked) },
+                    notifications: {
+                      ...settings.notifications,
+                      mobilePush: Boolean(checked),
+                    },
                   })
                 }
               />
@@ -330,13 +359,14 @@ export default function SettingsPage() {
         </div>
       </form>
 
-      {/* Confirmation Dialog for Reset Demo Data */}
+      {/* Confirmation dialog for workflow data reset */}
       <Dialog open={resetModalOpen} onOpenChange={setResetModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Reset CampusHR demo data?</DialogTitle>
+            <DialogTitle>Reset workflow data?</DialogTitle>
             <DialogDescription>
-              This will restore all original mock leave requests, remove substitute assignments, and reset all counts to their seeded state.
+              This restores all leave requests to their starting state, removes
+              substitute assignments, and resets counts.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 pt-4">
@@ -344,7 +374,7 @@ export default function SettingsPage() {
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleConfirmReset}>
-              Reset Demo Data
+              Reset data
             </Button>
           </div>
         </DialogContent>

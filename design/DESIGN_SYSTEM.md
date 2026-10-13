@@ -19,6 +19,7 @@ Professional academic enterprise UI.
 ## Typography
 
 Recommended:
+
 - Inter
 - Manrope
 - Geist

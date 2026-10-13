@@ -6,7 +6,6 @@ import {
   CalendarRange,
   ChartNoAxesCombined,
   Repeat2,
-  WalletCards,
   ChartColumn,
   Bell,
   Settings,
@@ -54,12 +53,6 @@ export const navigation = [
     label: 'Smart Substitution',
     icon: Repeat2,
     group: 'People & academics',
-  },
-  {
-    path: '/payroll',
-    label: 'Payroll',
-    icon: WalletCards,
-    group: 'Administration',
   },
   {
     path: '/reports',

@@ -888,10 +888,7 @@ progress::-webkit-progress-bar {
   }
 }
 @media (max-width: 767px) {
-  .page-heading:has(.substitution-leave-select) {
-    grid-template-columns: 1fr;
-  }
-  .page-heading:has(.workflow-date) {
+  .page-heading {
     grid-template-columns: 1fr;
   }
   .workflow-date {

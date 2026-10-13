@@ -1,7 +1,7 @@
-# CampusHR Phase 1 visual plan
+# CampusHR visual plan
 
 Extend the established JCET brand and token system in `design/DESIGN_SYSTEM.md`.
-This phase is an HOD review prototype: local data and a mock login only.
+This direction was approved by the HOD and is the production design.
 
 - Navy `#051F5B`: navigation, headings, institutional identity.
 - Orange `#F05023`: primary action and active navigation, used sparingly.
@@ -36,8 +36,7 @@ Signature: the JCET campus architectural visual, cropped into a calm institution
 masthead and reused on login. This grounds the proposal in the college rather
 than a generic dashboard. Chart/table hierarchy stays quiet around it.
 
-No decorative gradients, glow, glass, oversized typography, or fictional live
-statistics. The screen identifies its mock data as a prototype. Motion communicates
+No decorative gradients, glow, glass, or oversized typography. Motion communicates
 navigation, loading, and disclosure, with reduced-motion support.
 
 Brand assets are sourced from the official JCET and campus-event websites because no supplied logo

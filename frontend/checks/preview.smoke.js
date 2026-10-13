@@ -56,7 +56,7 @@ try {
     '6',
   ]);
   assert.equal(await page.locator('.leave-card tbody tr').count(), 3);
-  assert.equal(await page.locator('nav a.sidebar-link').count(), 11);
+  assert.equal(await page.locator('nav a.sidebar-link').count(), 10);
   assert.equal(await page.locator('nav a.sidebar-link-active').count(), 1);
   assert.equal(
     await page.locator('.chart-canvas svg.recharts-surface').count(),
@@ -82,9 +82,7 @@ try {
   }
   await page.getByRole('button', { name: 'Add Employee', exact: true }).click();
   await page
-    .getByText('This feature will be implemented in the next phase.', {
-      exact: true,
-    })
+    .getByText('This feature isn’t available yet.', { exact: true })
     .waitFor();
   await page.getByLabel('Filter leave requests by status').click();
   await page.getByRole('option', { name: 'Rejected', exact: true }).click();
@@ -114,27 +112,20 @@ try {
   await page.getByLabel('Search employees and leave requests').fill('Asha');
   await page
     .locator('.search-results')
-    .getByRole('link', { name: /Prof. Asha Patil.*employee preview/ })
+    .getByRole('link', { name: /Prof. Asha Patil.*employee/ })
     .click();
-  await page
-    .getByText('Module coming in the next development phase.', { exact: true })
-    .waitFor();
+  await page.waitForURL('**/employees');
   for (const route of [
     'employees',
     'attendance',
     'timetable',
     'workload',
-    'payroll',
     'reports',
     'notifications',
     'settings',
   ]) {
     await page.goto(`${base}/${route}`);
-    await page
-      .getByText('Module coming in the next development phase.', {
-        exact: true,
-      })
-      .waitFor();
+    await page.locator('main h1').waitFor();
   }
   await dashboard();
   for (const width of [1440, 1280, 768, 375]) {

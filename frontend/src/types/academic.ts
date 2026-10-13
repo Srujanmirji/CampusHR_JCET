@@ -36,11 +36,7 @@ export interface DepartmentInfo {
 }
 
 export type AttendanceStatus =
-  | 'Present'
-  | 'Late'
-  | 'Absent'
-  | 'On Leave'
-  | 'Half Day';
+  'Present' | 'Late' | 'Absent' | 'On Leave' | 'Half Day';
 
 export interface AttendanceRecord {
   employeeId: string;
@@ -63,28 +59,10 @@ export interface WorkloadRecord {
   other: number;
   total: number;
   capacity: number;
-  status: 'Underloaded' | 'Normal' | 'Near Limit' | 'At Capacity' | 'Overloaded';
+  status:
+    'Underloaded' | 'Normal' | 'Near Limit' | 'At Capacity' | 'Overloaded';
   freeSlots: { day: string; time: string }[];
   breakdown: { label: string; hours: number }[];
-}
-
-export interface PayrollRecord {
-  id: string;
-  employeeId: string;
-  month: string;
-  grossSalary: number;
-  basicSalary: number;
-  hra: number;
-  da: number;
-  allowances: number;
-  deductions: number;
-  pf: number;
-  pt: number;
-  tds: number;
-  netSalary: number;
-  status: 'Processed' | 'Draft' | 'On Hold';
-  paymentMode: string;
-  accountNumber: string;
 }
 
 export interface TimetableClass {
@@ -151,8 +129,7 @@ export interface FacultyExpertise {
 }
 
 export type Coverage =
-  | { kind: 'faculty'; facultyId: string }
-  | { kind: 'waived'; reason: string };
+  { kind: 'faculty'; facultyId: string } | { kind: 'waived'; reason: string };
 
 export interface AppNotification {
   id: string;
@@ -160,7 +137,7 @@ export interface AppNotification {
   body: string;
   time: string;
   unread?: boolean;
-  category?: 'Leave' | 'Timetable' | 'Attendance' | 'Payroll' | 'System';
+  category?: 'Leave' | 'Timetable' | 'Attendance' | 'System';
 }
 
 export interface WorkflowState {

@@ -106,7 +106,7 @@ export function DashboardCharts() {
         <CardHeader>
           <SectionHeader
             title="Attendance overview"
-            description="Weekly campus attendance · sample week"
+            description="Weekly campus attendance"
             action={<span className="chart-period">9–14 Mar</span>}
           />
         </CardHeader>

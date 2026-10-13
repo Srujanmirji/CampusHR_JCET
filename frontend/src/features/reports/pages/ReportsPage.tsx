@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageTransition } from '@/components/shared/PageTransition';
-import { PlannedModuleBanner } from '@/components/shared/PlannedModuleBanner';
 import { ReportPreviewModal } from '../components/ReportPreviewModal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +29,6 @@ import {
   ChartNoAxesCombined,
   Building2,
   GraduationCap,
-  WalletCards,
   Award,
   ArrowRight,
   type LucideIcon,
@@ -43,12 +41,13 @@ const iconMap: Record<string, LucideIcon> = {
   ChartNoAxesCombined,
   Building2,
   GraduationCap,
-  WalletCards,
   Award,
 };
 
 export default function ReportsPage() {
-  const [selectedReport, setSelectedReport] = useState<ReportCategory | null>(null);
+  const [selectedReport, setSelectedReport] = useState<ReportCategory | null>(
+    null,
+  );
   const [previewOpen, setPreviewOpen] = useState(false);
 
   function handleOpenReport(report: ReportCategory) {
@@ -62,8 +61,6 @@ export default function ReportsPage() {
         title="Reports & Institutional Analytics"
         description="Accreditation dossier generation, academic continuity tracking, and campus audit metrics."
       />
-
-      <PlannedModuleBanner route="/reports" />
 
       {/* Featured KPI: Academic Continuity Banner */}
       <div className="mb-6 rounded-xl border-2 border-primary/30 bg-primary/5 p-5 shadow-xs">
@@ -81,19 +78,25 @@ export default function ReportsPage() {
               Academic Continuity Rate: {academicContinuityData.coverageRate}%
             </h3>
             <p className="text-xs text-muted-foreground max-w-2xl leading-relaxed">
-              When faculty members submit leave requests, CampusHR automatically computes timetable conflicts and suggests substitute allocations to guarantee zero missed syllabus lectures.
+              When faculty members submit leave requests, CampusHR automatically
+              computes timetable conflicts and suggests substitute allocations
+              to guarantee zero missed syllabus lectures.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
             <div className="rounded-lg border bg-card px-4 py-2 text-center shadow-xs">
-              <span className="text-[11px] text-muted-foreground">Affected Lectures</span>
+              <span className="text-[11px] text-muted-foreground">
+                Affected Lectures
+              </span>
               <div className="text-xl font-bold text-foreground">
                 {academicContinuityData.affectedClassesThisMonth}
               </div>
             </div>
             <div className="rounded-lg border bg-card px-4 py-2 text-center shadow-xs">
-              <span className="text-[11px] text-muted-foreground">Covered with Substitute</span>
+              <span className="text-[11px] text-muted-foreground">
+                Covered with Substitute
+              </span>
               <div className="text-xl font-bold text-emerald-600">
                 {academicContinuityData.classesSuccessfullyCovered}
               </div>
@@ -125,7 +128,9 @@ export default function ReportsPage() {
                 key={report.id}
                 onClick={() => handleOpenReport(report)}
                 className={`group cursor-pointer rounded-xl border p-4 transition-all hover:border-primary/50 hover:shadow-md ${
-                  isContinuity ? 'border-primary/40 bg-card' : 'border-border bg-card'
+                  isContinuity
+                    ? 'border-primary/40 bg-card'
+                    : 'border-border bg-card'
                 }`}
               >
                 <div className="flex items-start justify-between">
@@ -133,7 +138,10 @@ export default function ReportsPage() {
                     <Icon className="h-5 w-5" />
                   </div>
                   {report.badge ? (
-                    <Badge variant="outline" className="border-primary/40 text-[10px] text-primary">
+                    <Badge
+                      variant="outline"
+                      className="border-primary/40 text-[10px] text-primary"
+                    >
                       {report.badge}
                     </Badge>
                   ) : (
@@ -155,7 +163,9 @@ export default function ReportsPage() {
                     <span className="block text-[10px] text-muted-foreground uppercase tracking-wider">
                       {report.metricLabel}
                     </span>
-                    <span className="font-bold text-sm text-foreground">{report.metricValue}</span>
+                    <span className="font-bold text-sm text-foreground">
+                      {report.metricValue}
+                    </span>
                   </div>
                   <span className="text-xs font-semibold text-primary group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
                     Preview <ArrowRight className="h-3 w-3" />
@@ -173,15 +183,26 @@ export default function ReportsPage() {
         <div className="rounded-xl border bg-card p-5 shadow-xs">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-foreground">Faculty Strength by Department</h3>
-              <p className="text-xs text-muted-foreground">Headcount distribution across 6 academic wings (186 Total)</p>
+              <h3 className="font-semibold text-foreground">
+                Faculty Strength by Department
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Headcount distribution across 6 academic wings (186 Total)
+              </p>
             </div>
             <Badge variant="outline">Cadre Audit</Badge>
           </div>
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={facultyByDepartmentData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+              <BarChart
+                data={facultyByDepartmentData}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  opacity={0.3}
+                />
                 <XAxis dataKey="department" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip
@@ -192,7 +213,12 @@ export default function ReportsPage() {
                     fontSize: '12px',
                   }}
                 />
-                <Bar dataKey="employees" fill="#ea580c" radius={[4, 4, 0, 0]} name="Faculty Count" />
+                <Bar
+                  dataKey="employees"
+                  fill="#ea580c"
+                  radius={[4, 4, 0, 0]}
+                  name="Faculty Count"
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -202,15 +228,26 @@ export default function ReportsPage() {
         <div className="rounded-xl border bg-card p-5 shadow-xs">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-foreground">Leave Trend by Quota Category</h3>
-              <p className="text-xs text-muted-foreground">Monthly utilization of Casual, Medical, and Earned leaves</p>
+              <h3 className="font-semibold text-foreground">
+                Leave Trend by Quota Category
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Monthly utilization of Casual, Medical, and Earned leaves
+              </p>
             </div>
             <Badge variant="outline">Odd Semester</Badge>
           </div>
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyLeaveTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+              <BarChart
+                data={monthlyLeaveTrends}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  opacity={0.3}
+                />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip

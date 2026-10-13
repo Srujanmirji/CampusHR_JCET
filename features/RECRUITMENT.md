@@ -1,6 +1,7 @@
 # Feature — Recruitment
 
 ## Capabilities
+
 - Job openings
 - Applicants
 - Resume upload

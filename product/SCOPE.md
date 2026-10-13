@@ -9,7 +9,6 @@
 - Timetable
 - Faculty workload
 - Smart substitute recommendation
-- Payroll
 - Documents
 - Notifications
 - Reports
@@ -21,6 +20,7 @@
 - Full student ERP
 - Student admissions
 - Fee collection
+- Payroll and salary processing
 - LMS
 - Examination result management
 - Hostel management

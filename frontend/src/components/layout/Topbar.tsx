@@ -8,12 +8,9 @@ import {
   Menu,
   Settings,
   UserRound,
-  CircleHelp,
-  RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -31,11 +28,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { navigation } from '@/data/navigation';
 import { mockUser } from '@/data/mock/dashboard';
 import { usePreviewSession } from '@/features/auth/hooks/usePreviewSession';
@@ -48,9 +40,7 @@ export function Topbar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
   const session = usePreviewSession();
   const workflow = useAcademicWorkflow();
   const profileMenuTrigger = useRef<HTMLButtonElement>(null);
-  const dialogTrigger = useRef<HTMLButtonElement | null>(null);
-  const [dialog, setDialog] = useState<'profile' | 'about' | null>(null);
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const label =
     navigation.find((item) => item.path === pathname)?.label ?? 'CampusHR';
 
@@ -75,25 +65,6 @@ export function Topbar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
         </div>
         <GlobalSearch />
         <div className="topbar-actions">
-          <Badge variant="outline" className="preview-badge">
-            Prototype • Demo Data
-          </Badge>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="About this preview"
-                onClick={(event) => {
-                  dialogTrigger.current = event.currentTarget;
-                  setDialog('about');
-                }}
-              >
-                <CircleHelp />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>About this preview</TooltipContent>
-          </Tooltip>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -177,8 +148,7 @@ export function Topbar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
               <DropdownMenuGroup>
                 <DropdownMenuItem
                   onSelect={() => {
-                    dialogTrigger.current = profileMenuTrigger.current;
-                    setDialog('profile');
+                    setProfileOpen(true);
                   }}
                 >
                   <UserRound />
@@ -190,15 +160,6 @@ export function Topbar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
                     Settings
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => {
-                    dialogTrigger.current = profileMenuTrigger.current;
-                    setResetConfirmOpen(true);
-                  }}
-                >
-                  <RotateCcw />
-                  Reset Demo Data
-                </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
@@ -207,7 +168,7 @@ export function Topbar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
                   onSelect={() => {
                     session.logout();
                     navigate('/login', { replace: true });
-                    toast.success('Signed out of the preview.');
+                    toast.success('Signed out.');
                   }}
                 >
                   <LogOut />
@@ -218,54 +179,7 @@ export function Topbar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
           </DropdownMenu>
         </div>
       </header>
-      <Dialog
-        open={dialog !== null}
-        onOpenChange={(open) => {
-          if (!open) setDialog(null);
-        }}
-      >
-        <DialogContent
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            dialogTrigger.current?.focus();
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {dialog === 'profile'
-                ? 'Your decision-maker profile'
-                : 'CampusHR · Frontend prototype'}
-            </DialogTitle>
-            <DialogDescription>
-              {dialog === 'profile'
-                ? 'The sample Dr. Ramesh K (HOD / HR Administrator) identity used throughout this prototype.'
-                : 'A UI/UX proposal for Jain College of Engineering and Technology, Hubballi. Explore the dashboard and the leave-to-substitution workflow with local sample data. Other modules remain placeholders.'}
-            </DialogDescription>
-          </DialogHeader>
-          {dialog === 'profile' && (
-            <dl className="profile-details">
-              <div>
-                <dt>Name</dt>
-                <dd>{mockUser.name}</dd>
-              </div>
-              <div>
-                <dt>Role</dt>
-                <dd>{mockUser.role}</dd>
-              </div>
-              <div>
-                <dt>Department</dt>
-                <dd>{mockUser.department}</dd>
-              </div>
-              <div>
-                <dt>Email</dt>
-                <dd>{mockUser.email}</dd>
-              </div>
-            </dl>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
         <DialogContent
           onCloseAutoFocus={(event) => {
             event.preventDefault();
@@ -273,31 +187,29 @@ export function Topbar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
           }}
         >
           <DialogHeader>
-            <DialogTitle>Reset CampusHR demo data?</DialogTitle>
+            <DialogTitle>Your profile</DialogTitle>
             <DialogDescription>
-              This will restore all sample leave requests to pending, remove
-              substitute assignments, and reset notifications and counts to
-              their original demo state.
+              Your CampusHR account details.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setResetConfirmOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                workflow.resetDemoData();
-                setResetConfirmOpen(false);
-              }}
-            >
-              <RotateCcw />
-              Reset Demo Data
-            </Button>
-          </div>
+          <dl className="profile-details">
+            <div>
+              <dt>Name</dt>
+              <dd>{mockUser.name}</dd>
+            </div>
+            <div>
+              <dt>Role</dt>
+              <dd>{mockUser.role}</dd>
+            </div>
+            <div>
+              <dt>Department</dt>
+              <dd>{mockUser.department}</dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd>{mockUser.email}</dd>
+            </div>
+          </dl>
         </DialogContent>
       </Dialog>
     </>

@@ -29,4 +29,5 @@
 ```
 
 ## Principle
+
 One backend. One source of truth. Multiple clients.

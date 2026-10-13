@@ -6,23 +6,24 @@
 
 ## 2. Problem
 
-College HR operations are often spread across spreadsheets, attendance systems, paper leave forms, payroll files, timetable documents, messaging apps, and departmental records.
+College HR operations are often spread across spreadsheets, attendance systems, paper leave forms, timetable documents, messaging apps, and departmental records.
 
 CampusHR centralizes these workflows into one system.
 
 ## 3. Primary Users
 
 ### Admin / HR
+
 - Manage employees
 - Manage departments
 - Process attendance
 - Manage leave
-- Process payroll
 - Manage documents
 - Generate reports
 - Configure system
 
 ### HOD
+
 - Manage department faculty
 - Approve leave
 - Review workload
@@ -31,6 +32,7 @@ CampusHR centralizes these workflows into one system.
 - View department reports
 
 ### Principal
+
 - View institution-wide analytics
 - Review staffing
 - Review department performance
@@ -38,22 +40,24 @@ CampusHR centralizes these workflows into one system.
 - Approve high-level workflows
 
 ### Faculty / Staff
+
 - View profile
 - View attendance
 - Apply for leave
 - View timetable
 - View workload
 - Receive substitution assignments
-- View payslips
 - Upload documents
 - Receive notices
 
 ## 4. Product Platforms
 
 ### Web
+
 Primary platform for HR, Admin, HOD, Principal.
 
 ### Mobile
+
 Primary platform for Faculty and Staff.
 
 ## 5. Core Modules
@@ -66,15 +70,14 @@ Primary platform for Faculty and Staff.
 6. Timetable
 7. Faculty Workload
 8. Smart Faculty Substitution
-9. Payroll
-10. Document Management
-11. Notifications
-12. Reports & Analytics
-13. Faculty Academic Profile
-14. Recruitment
-15. Helpdesk
-16. Audit Logs
-17. Settings
+9. Document Management
+10. Notifications
+11. Reports & Analytics
+12. Faculty Academic Profile
+13. Recruitment
+14. Helpdesk
+15. Audit Logs
+16. Settings
 
 ## 6. MVP
 

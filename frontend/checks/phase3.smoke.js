@@ -35,10 +35,11 @@ try {
   await page.waitForURL('**/dashboard');
   await page.waitForSelector('.metric-value');
 
-  // 2. Demo Indicator & HOD Role Context
-  assert.ok(
-    await page.getByText('Prototype • Demo Data').first().isVisible(),
-    'Demo data indicator must be clearly visible in Topbar or header',
+  // 2. No prototype labelling; HOD role context
+  assert.equal(
+    await page.getByText(/prototype|demo data/i).count(),
+    0,
+    'Prototype/demo labels must not appear',
   );
   assert.ok(
     await page.getByText('Dr. Ramesh K').first().isVisible(),
@@ -239,21 +240,18 @@ try {
     await page.keyboard.press('Escape');
   }
 
-  // 11. Demo Mode Reset
-  const profileButton = page.getByRole('button', {
-    name: 'Open Dr. Ramesh K profile menu',
-  });
-  await profileButton.click();
-  await page.getByRole('menuitem', { name: 'Reset Demo Data' }).click();
+  // 11. Workflow data reset (Settings)
+  await page.goto(`${base}/settings`);
+  await page.getByRole('button', { name: 'Reset data', exact: true }).click();
 
   const resetModal = page.getByRole('dialog');
   await resetModal.waitFor();
   assert.ok(
-    await resetModal.getByText('Reset CampusHR demo data?').isVisible(),
+    await resetModal.getByText('Reset workflow data?').isVisible(),
     'Confirmation dialog title must match',
   );
   await resetModal
-    .getByRole('button', { name: 'Reset Demo Data', exact: true })
+    .getByRole('button', { name: 'Reset data', exact: true })
     .click();
 
   // Return to Dashboard and check that requests are back to Pending
@@ -263,42 +261,23 @@ try {
   assert.equal(
     await firstLeaveStatus.textContent(),
     'Pending',
-    'Leave request status must return to Pending after demo reset',
+    'Leave request status must return to Pending after reset',
   );
 
-  // 12. Placeholder Modules Intentional Polish
-  for (const route of ['workload', 'employees', 'payroll', 'settings']) {
+  // 12. Module pages carry no planned/prototype banners
+  for (const route of ['workload', 'employees', 'settings']) {
     await page.goto(`${base}/${route}`);
-    assert.ok(
-      await page.getByText('Planned Module').first().isVisible(),
-      `${route} must show Planned Module badge`,
-    );
-    assert.ok(
-      await page
-        .getByText('This module will be implemented after prototype approval.')
-        .first()
-        .isVisible(),
-      `${route} must show implementation note`,
-    );
-    assert.ok(
-      await page
-        .getByText('Planned Capabilities & Specifications')
-        .first()
-        .isVisible(),
-      `${route} must have 3 planned capabilities`,
+    await page.locator('main h1').waitFor();
+    assert.equal(
+      await page.getByText(/Planned Module|prototype|fictional/i).count(),
+      0,
+      `${route} must not show prototype banners`,
     );
   }
 
-  // Check Settings page has Presentation Demo Controls
-  await page.goto(`${base}/settings`);
-  assert.ok(
-    await page.getByText('Presentation Demo Controls').isVisible(),
-    'Settings page must contain Presentation Demo Controls',
-  );
-
   assert.deepEqual(errors, []);
   console.log(
-    'Phase 3 smoke check PASSED! All 19 acceptance criteria verified successfully.',
+    'Phase 3 smoke check PASSED! All acceptance criteria verified.',
   );
 } finally {
   await browser.close();

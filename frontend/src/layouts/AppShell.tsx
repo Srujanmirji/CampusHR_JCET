@@ -46,7 +46,6 @@ export default function AppShell() {
           <span>
             CampusHR · Jain College of Engineering and Technology, Hubballi
           </span>
-          <span>Prototype • Demo Data</span>
         </footer>
       </div>
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -57,7 +56,7 @@ export default function AppShell() {
         >
           <SheetTitle className="sr-only">Main navigation</SheetTitle>
           <SheetDescription className="sr-only">
-            Navigate the CampusHR preview.
+            Navigate CampusHR.
           </SheetDescription>
           <Sidebar
             onClose={() => setMobileOpen(false)}

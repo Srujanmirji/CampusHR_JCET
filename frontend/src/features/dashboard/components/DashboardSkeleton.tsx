@@ -5,7 +5,7 @@ export function DashboardSkeleton() {
     <div
       className="flex flex-col gap-6"
       role="status"
-      aria-label="Loading dashboard preview"
+      aria-label="Loading dashboard"
     >
       <Skeleton className="h-40 w-full rounded-xl" />
       <div className="metrics-grid">
@@ -18,7 +18,7 @@ export function DashboardSkeleton() {
         <Skeleton className="h-80 rounded-xl" />
       </div>
       <Skeleton className="h-64 rounded-xl" />
-      <span className="sr-only">Preparing sample campus data.</span>
+      <span className="sr-only">Loading campus data.</span>
     </div>
   );
 }

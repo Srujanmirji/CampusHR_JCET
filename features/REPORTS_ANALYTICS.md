@@ -1,10 +1,10 @@
 # Feature — Reports & Analytics
 
 ## Reports
+
 - Employee list
 - Attendance
 - Leave
-- Payroll
 - Workload
 - Department
 - Faculty qualification
@@ -12,11 +12,13 @@
 - Document compliance
 
 ## Export
+
 - PDF
 - CSV
 - Excel
 
 ## Dashboard Analytics
+
 - Staff strength
 - Attendance rate
 - Leave trends

@@ -1,7 +1,7 @@
 import type { AppNotification } from '@/types/academic';
 
 export const seededNotifications: (AppNotification & {
-  category: 'Leave' | 'Timetable' | 'Attendance' | 'Payroll' | 'System';
+  category: 'Leave' | 'Timetable' | 'Attendance' | 'System';
   date: string;
 })[] = [
   {
@@ -39,15 +39,6 @@ export const seededNotifications: (AppNotification & {
     date: 'Today, 07:00 AM',
     unread: false,
     category: 'Attendance',
-  },
-  {
-    id: 'N005',
-    title: 'October Payroll Draft Generated',
-    body: 'Draft payroll register for October 2026 is ready for administrative verification.',
-    time: 'Yesterday',
-    date: 'Yesterday, 04:30 PM',
-    unread: false,
-    category: 'Payroll',
   },
   {
     id: 'N006',

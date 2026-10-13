@@ -405,7 +405,7 @@ export default function SubstitutionPage() {
                           </div>
                         ) : (
                           <EmptyState
-                            title="No available faculty in this sample"
+                            title="No available faculty"
                             description="Record an academic arrangement if no substitute is required."
                           />
                         )}

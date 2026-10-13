@@ -1,6 +1,7 @@
 # Feature — Employee Management
 
 ## Capabilities
+
 - Create employee
 - Update employee
 - View employee profile
@@ -9,15 +10,15 @@
 - Assign designation
 - Store qualifications
 - Store experience
-- Store bank and statutory details
+- Store statutory details (Aadhaar, PAN)
 - Employee ID generation
 - Search and filters
 
 ## Employee Profile Sections
+
 - Personal
 - Employment
 - Academic
-- Payroll
 - Documents
 - Attendance
 - Leave

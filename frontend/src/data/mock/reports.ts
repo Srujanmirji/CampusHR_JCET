@@ -79,17 +79,6 @@ export const reportCategories: ReportCategory[] = [
     updatedAt: 'NBA Cycle 2026',
   },
   {
-    id: 'payroll-summary',
-    title: 'Payroll & Disbursal Summary',
-    category: 'Finance & Accounts',
-    description:
-      'Consolidated monthly compensation, statutory PF/ESI/PT deductions, and bank transfer batches.',
-    metricLabel: 'Net Disbursable',
-    metricValue: '₹1.04 Cr',
-    iconName: 'WalletCards',
-    updatedAt: 'Draft for Oct 2026',
-  },
-  {
     id: 'naac-nba-reporting',
     title: 'NAAC / NBA Faculty Metric Dossier',
     category: 'Compliance & Audit',

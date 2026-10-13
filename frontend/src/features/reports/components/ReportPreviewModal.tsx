@@ -18,7 +18,11 @@ interface ReportPreviewModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function ReportPreviewModal({ report, open, onOpenChange }: ReportPreviewModalProps) {
+export function ReportPreviewModal({
+  report,
+  open,
+  onOpenChange,
+}: ReportPreviewModalProps) {
   if (!report) return null;
 
   const isAcademicContinuity = report.id === 'academic-continuity';
@@ -32,12 +36,17 @@ export function ReportPreviewModal({ report, open, onOpenChange }: ReportPreview
               <div className="flex items-center gap-2">
                 <Badge variant="outline">{report.category}</Badge>
                 {report.badge && (
-                  <Badge variant="secondary" className="font-semibold text-primary">
+                  <Badge
+                    variant="secondary"
+                    className="font-semibold text-primary"
+                  >
                     {report.badge}
                   </Badge>
                 )}
               </div>
-              <DialogTitle className="mt-1 text-xl font-bold">{report.title}</DialogTitle>
+              <DialogTitle className="mt-1 text-xl font-bold">
+                {report.title}
+              </DialogTitle>
               <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
                 {report.description}
               </DialogDescription>
@@ -49,12 +58,18 @@ export function ReportPreviewModal({ report, open, onOpenChange }: ReportPreview
           {/* Executive Metric Callout */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="rounded-lg border bg-muted/20 p-3 text-center">
-              <span className="text-muted-foreground">{report.metricLabel}</span>
-              <div className="mt-1 text-2xl font-bold text-primary">{report.metricValue}</div>
+              <span className="text-muted-foreground">
+                {report.metricLabel}
+              </span>
+              <div className="mt-1 text-2xl font-bold text-primary">
+                {report.metricValue}
+              </div>
             </div>
             <div className="rounded-lg border bg-muted/20 p-3 text-center">
               <span className="text-muted-foreground">Audit Status</span>
-              <div className="mt-1 text-sm font-bold text-emerald-600">Verified</div>
+              <div className="mt-1 text-sm font-bold text-emerald-600">
+                Verified
+              </div>
             </div>
             <div className="rounded-lg border bg-muted/20 p-3 text-center">
               <span className="text-muted-foreground">Cycle</span>
@@ -75,21 +90,33 @@ export function ReportPreviewModal({ report, open, onOpenChange }: ReportPreview
               </h4>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                 <div className="rounded border bg-card p-2.5">
-                  <span className="text-muted-foreground">Total Faculty Leaves</span>
-                  <div className="text-lg font-bold">{academicContinuityData.facultyLeavesHandled}</div>
+                  <span className="text-muted-foreground">
+                    Total Faculty Leaves
+                  </span>
+                  <div className="text-lg font-bold">
+                    {academicContinuityData.facultyLeavesHandled}
+                  </div>
                 </div>
                 <div className="rounded border bg-card p-2.5">
-                  <span className="text-muted-foreground">Affected Lectures</span>
-                  <div className="text-lg font-bold">{academicContinuityData.affectedClassesThisMonth}</div>
+                  <span className="text-muted-foreground">
+                    Affected Lectures
+                  </span>
+                  <div className="text-lg font-bold">
+                    {academicContinuityData.affectedClassesThisMonth}
+                  </div>
                 </div>
                 <div className="rounded border bg-card p-2.5">
-                  <span className="text-muted-foreground">Substitutes Assigned</span>
+                  <span className="text-muted-foreground">
+                    Substitutes Assigned
+                  </span>
                   <div className="text-lg font-bold text-emerald-600">
                     {academicContinuityData.classesSuccessfullyCovered}
                   </div>
                 </div>
                 <div className="rounded border bg-card p-2.5">
-                  <span className="text-muted-foreground">Uncovered Lectures</span>
+                  <span className="text-muted-foreground">
+                    Uncovered Lectures
+                  </span>
                   <div className="text-lg font-bold text-amber-600">
                     {academicContinuityData.uncoveredClasses}
                   </div>
@@ -112,9 +139,14 @@ export function ReportPreviewModal({ report, open, onOpenChange }: ReportPreview
                       <td className="p-2.5 font-mono">2026-10-12</td>
                       <td className="p-2.5 font-medium">DBMS · LH-203</td>
                       <td className="p-2.5">Prof. Asha Patil</td>
-                      <td className="p-2.5 font-semibold text-primary">Prof. Priya Kulkarni</td>
+                      <td className="p-2.5 font-semibold text-primary">
+                        Prof. Priya Kulkarni
+                      </td>
                       <td className="p-2.5 text-right">
-                        <Badge variant="outline" className="border-emerald-500 text-emerald-600">
+                        <Badge
+                          variant="outline"
+                          className="border-emerald-500 text-emerald-600"
+                        >
                           Covered
                         </Badge>
                       </td>
@@ -123,20 +155,30 @@ export function ReportPreviewModal({ report, open, onOpenChange }: ReportPreview
                       <td className="p-2.5 font-mono">2026-10-12</td>
                       <td className="p-2.5 font-medium">DBMS Lab · Lab 2</td>
                       <td className="p-2.5">Prof. Asha Patil</td>
-                      <td className="p-2.5 font-semibold text-primary">Prof. Priya Kulkarni</td>
+                      <td className="p-2.5 font-semibold text-primary">
+                        Prof. Priya Kulkarni
+                      </td>
                       <td className="p-2.5 text-right">
-                        <Badge variant="outline" className="border-emerald-500 text-emerald-600">
+                        <Badge
+                          variant="outline"
+                          className="border-emerald-500 text-emerald-600"
+                        >
                           Covered
                         </Badge>
                       </td>
                     </tr>
                     <tr>
                       <td className="p-2.5 font-mono">2026-10-10</td>
-                      <td className="p-2.5 font-medium">Thermodynamics · LH-104</td>
+                      <td className="p-2.5 font-medium">
+                        Thermodynamics · LH-104
+                      </td>
                       <td className="p-2.5">Dr. Mahesh B</td>
                       <td className="p-2.5">Prof. Kiran Hiremath</td>
                       <td className="p-2.5 text-right">
-                        <Badge variant="outline" className="border-emerald-500 text-emerald-600">
+                        <Badge
+                          variant="outline"
+                          className="border-emerald-500 text-emerald-600"
+                        >
                           Covered
                         </Badge>
                       </td>
@@ -151,7 +193,9 @@ export function ReportPreviewModal({ report, open, onOpenChange }: ReportPreview
                 Executive Report Dataset
               </h4>
               <p className="text-muted-foreground leading-relaxed">
-                Contains validated departmental returns, VTU compliance metrics, AICTE cadre benchmarks, and staff workload distribution matrices.
+                Contains validated departmental returns, VTU compliance metrics,
+                AICTE cadre benchmarks, and staff workload distribution
+                matrices.
               </p>
               <div className="mt-3 rounded border bg-muted/20 p-3 space-y-1 font-mono text-[11px]">
                 <div>• Source System: CampusHR Biometric & Timetable Core</div>
@@ -170,14 +214,22 @@ export function ReportPreviewModal({ report, open, onOpenChange }: ReportPreview
             <Button
               variant="outline"
               size="sm"
-              onClick={() => toast.info('Export will be enabled after backend integration.', { id: 'rep-excel' })}
+              onClick={() =>
+                toast.info('Report export isn’t available yet.', {
+                  id: 'rep-excel',
+                })
+              }
             >
               <Download className="mr-1.5 h-3.5 w-3.5" />
               Export Excel
             </Button>
             <Button
               size="sm"
-              onClick={() => toast.info('Export will be enabled after backend integration.', { id: 'rep-pdf' })}
+              onClick={() =>
+                toast.info('Report export isn’t available yet.', {
+                  id: 'rep-pdf',
+                })
+              }
             >
               <FileText className="mr-1.5 h-3.5 w-3.5" />
               Export PDF

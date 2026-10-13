@@ -1,32 +1,48 @@
 # CampusHR — JCET Hubballi
 
-CampusHR is a college-focused Human Resource Management System for Jain College of Engineering and Technology, Hubballi.
+CampusHR is the HR and faculty management system for Jain College of Engineering
+and Technology, Hubballi. The project has been approved by the HOD and is moving
+from its approved interface toward a production system.
 
-## Product Surfaces
+## Current status
 
-- **Web App:** Admin, HR, Principal, HOD
-- **Mobile App:** Faculty, Staff, HOD
-- **Shared Backend:** Node.js + Express + PostgreSQL
+| Part                   | State                                                                                                                                               |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web app (`frontend/`)  | Full interface for every sidebar module, running on built-in sample data with demo sign-in. The leave → substitution workflow is fully interactive. |
+| API (`backend/`)       | Foundation only: environment validation, security headers, CORS, error handling, `GET /api/v1/health`. No domain endpoints or database tables yet.  |
+| Mobile app (`mobile/`) | Foundation screen with local notifications. Remote push needs an EAS project ID.                                                                    |
+
+Sample data and the demo credentials stay in place until the API serves real data.
+Payroll is out of scope and is not part of this product.
+
+## Product surfaces
+
+- **Web app:** Admin, HR, Principal, HOD
+- **Mobile app:** Faculty, Staff, HOD
+- **Shared backend:** Node.js + Express + PostgreSQL (Prisma)
 - **Realtime:** Socket.IO
 - **Authentication:** JWT + RBAC
-- **File Storage:** Supabase Storage or Cloudinary
+- **File storage:** Supabase Storage or Cloudinary (to be chosen)
 
-## Documentation Structure
+## Quick start
 
-```text
-CampusHR_JCET_Docs/
-├── README.md
-├── product/
-├── design/
-├── features/
-├── frontend/
-├── backend/
-├── mobile/
-├── shared/
-└── tasks/
+Requires Node 24 and npm 11.
+
+```sh
+nvm use
+npm ci
+npm run dev:web     # http://localhost:5173 — demo sign-in is prefilled
 ```
 
-## College Context
+Full setup, environment files, the API, the database and the mobile app:
+see [SETUP.md](SETUP.md).
+
+## Repository layout
+
+See [FILE_STRUCTURE.md](FILE_STRUCTURE.md). Specifications live in `product/`,
+`design/`, `features/`, `shared/`, `backend/`, `frontend/`, `mobile/` and `tasks/`.
+
+## College context
 
 - Institution: Jain College of Engineering and Technology, Hubballi
 - Established: 2017
@@ -36,6 +52,8 @@ CampusHR_JCET_Docs/
 - Phone: 0836-2002117
 - Email: contactus@jcethbl.edu.in
 
-## Core Product Goal
+## Core product goal
 
-Create one unified HR platform for employee records, attendance, leave, payroll, timetable, faculty workload, smart substitution, documents, reporting, notifications, and college-specific academic HR workflows.
+One unified HR platform for employee records, attendance, leave, timetable,
+faculty workload, smart substitution, documents, reporting, notifications, and
+college-specific academic HR workflows.

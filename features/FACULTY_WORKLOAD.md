@@ -1,6 +1,7 @@
 # Feature — Faculty Workload
 
 ## Track
+
 - Theory hours
 - Lab hours
 - Project guidance
@@ -9,6 +10,7 @@
 - Research duties
 
 ## Outputs
+
 - Total weekly workload
 - Underloaded faculty
 - Normal load

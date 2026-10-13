@@ -3,6 +3,7 @@
 Base path: `/api/v1`
 
 ## Auth
+
 - POST /auth/login
 - POST /auth/refresh
 - POST /auth/logout
@@ -11,6 +12,7 @@ Base path: `/api/v1`
 - GET /auth/me
 
 ## Employees
+
 - GET /employees
 - POST /employees
 - GET /employees/:id
@@ -18,12 +20,14 @@ Base path: `/api/v1`
 - DELETE /employees/:id
 
 ## Departments
+
 - GET /departments
 - POST /departments
 - GET /departments/:id
 - PATCH /departments/:id
 
 ## Attendance
+
 - GET /attendance
 - POST /attendance/check-in
 - POST /attendance/check-out
@@ -32,6 +36,7 @@ Base path: `/api/v1`
 - PATCH /attendance/corrections/:id
 
 ## Leave
+
 - GET /leave/requests
 - POST /leave/requests
 - GET /leave/requests/:id
@@ -41,6 +46,7 @@ Base path: `/api/v1`
 - GET /leave/balances
 
 ## Timetable
+
 - GET /timetable/faculty/:facultyId
 - GET /timetable/department/:departmentId
 - POST /timetable/entries
@@ -48,32 +54,31 @@ Base path: `/api/v1`
 - DELETE /timetable/entries/:id
 
 ## Workload
+
 - GET /workload
 - GET /workload/faculty/:facultyId
 - POST /workload/recalculate
 
 ## Substitution
+
 - POST /substitution/recommend
 - GET /substitution/:id/candidates
 - PATCH /substitution/:id/assign
 
-## Payroll
-- GET /payroll/runs
-- POST /payroll/runs
-- GET /payroll/payslips/:employeeId
-
 ## Documents
+
 - POST /documents
 - GET /documents
 - PATCH /documents/:id/verify
 - PATCH /documents/:id/reject
 
 ## Notifications
+
 - GET /notifications
 - PATCH /notifications/:id/read
 
 ## Reports
+
 - GET /reports/attendance
 - GET /reports/leave
 - GET /reports/workload
-- GET /reports/payroll

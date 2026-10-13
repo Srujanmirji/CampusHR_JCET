@@ -1,8 +1,8 @@
 # Frontend Tasks
 
-Phase 1 complete: FE-001–FE-005 are a frontend-only HOD review prototype.
-Phase 2 complete: leave review → timetable impact → faculty substitution.
-All data is local. Real authentication and unrelated modules remain unimplemented.
+The approved interface is built for every sidebar module except Departments,
+Documents and Helpdesk. All screens use sample data; ticked items work against
+that data. Items that need the API (create, edit, export, real sign-in) stay open.
 Verification and launch steps: `frontend/README.md`.
 
 ## FE-001 Project Setup
@@ -10,7 +10,7 @@ Verification and launch steps: `frontend/README.md`.
 - [x] Vite + React + TypeScript
 - [x] Tailwind
 - [x] shadcn/ui
-- [x] Router
+- [x] Router (pages lazy-loaded as separate chunks)
 - [x] TanStack Query
 - [x] ESLint + Prettier
 
@@ -23,7 +23,7 @@ Verification and launch steps: `frontend/README.md`.
 - [x] Cards
 - [x] Tables
 - [x] Modals
-- [x] Badges (all nine requested status variants)
+- [x] Badges (all nine status variants)
 - [x] Search, select, avatar, metric, tabs, dropdown, tooltip, drawer, toast, skeleton, empty state, page/section headers
 
 ## FE-003 App Shell
@@ -31,72 +31,66 @@ Verification and launch steps: `frontend/README.md`.
 - [x] Sidebar
 - [x] Topbar
 - [x] Responsive layout
-- [x] Mock preview route redirects (no security/authentication)
+- [x] Signed-in route redirects (UI only; real protection needs the auth API)
 
 ## FE-004 Login UI
 
-- [x] Login
-- [x] Forgot password preview help dialog (no recovery service)
-- [x] Local/session storage preview flag; remember me and mock logout
+- [x] Login with prefilled demo credentials
+- [x] Forgot password help dialog (no recovery service yet)
+- [x] Remember me and logout
+- [ ] Sign-in against the auth API
 
 ## FE-005 Dashboard
 
 - [x] KPI cards
 - [x] Charts
 - [x] Recent leave
-- [x] Quick actions (Approve Leave opens review; other actions show next-phase toasts)
-- [x] Campus updates preview
+- [x] Quick actions (Approve Leave opens review; others report unavailable)
+- [x] Campus updates
 - [x] Keyboard and 375/768/1280/1440px responsive verification
 
 ## FE-006 Employees
 
-- [ ] Employee list
-- [ ] Filters
+- [x] Employee list
+- [x] Filters
 - [ ] Create employee
-- [ ] Profile
+- [x] Profile
 - [ ] Edit employee
 
 ## FE-007 Attendance
 
-- [ ] Daily view
-- [ ] Monthly view
+- [x] Daily view
+- [x] Monthly view
 - [ ] Corrections
 
 ## FE-008 Leave
 
 - [ ] Apply
-- [x] Approval list (mock data, summaries, search, status/department filters)
+- [x] Approval list (summaries, search, status/department filters)
 - [x] Approval drawer (details, balance/history, academic impact, approve/reject)
 - [ ] Calendar
 
 ## FE-009 Timetable
 
-- [x] Phase 2 updated-timetable preview only (original and substitute faculty)
-
-- [ ] Grid
-- [ ] Faculty filter
-- [ ] Department filter
+- [x] Grid
+- [x] Faculty filter
+- [x] Department filter
 - [ ] Conflict display
+- [x] Substitute assignments shown in the grid
 
 ## FE-010 Workload
 
-- [ ] Faculty workload table
+- [x] Faculty workload table
 - [ ] Workload chart
-- [ ] Status badges
+- [x] Status badges
 
 ## FE-011 Substitution
 
 - [x] Affected class list
-- [x] Candidate ranking (visible rule rubric; mock availability/workload)
-- [x] Assignment action (confirmation, coverage progress, completion, timetable preview)
+- [x] Candidate ranking (visible rule rubric; availability and workload checks)
+- [x] Assignment action (confirmation, coverage progress, completion, updated timetable)
 - [x] Manual no-substitute decision with academic arrangement
-- [x] Current-tab session persistence and interactive end-to-end check
-
-## FE-012 Payroll
-
-- [ ] Payroll runs
-- [ ] Payslips
-- [ ] Salary details
+- [x] Session persistence and interactive end-to-end check
 
 ## FE-013 Documents
 
@@ -107,10 +101,10 @@ Verification and launch steps: `frontend/README.md`.
 ## FE-014 Reports
 
 - [ ] Filters
-- [ ] Charts
+- [x] Charts
 - [ ] Export actions
 
 ## FE-015 Notifications
 
-- [ ] Notification center
+- [x] Notification center
 - [ ] Realtime unread count

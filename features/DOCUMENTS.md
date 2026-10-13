@@ -1,6 +1,7 @@
 # Feature — Document Management
 
 ## Documents
+
 - Aadhaar
 - PAN
 - Degree certificates
@@ -11,6 +12,7 @@
 - Other HR documents
 
 ## Capabilities
+
 - Upload
 - Preview
 - Download

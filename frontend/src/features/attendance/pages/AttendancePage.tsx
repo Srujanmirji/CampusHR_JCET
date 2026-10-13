@@ -3,7 +3,6 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { PlannedModuleBanner } from '@/components/shared/PlannedModuleBanner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -81,7 +80,10 @@ export default function AttendancePage() {
       })
       .filter((item) => {
         if (!item.employee) return false;
-        if (departmentFilter !== 'ALL' && item.employee.department !== departmentFilter) {
+        if (
+          departmentFilter !== 'ALL' &&
+          item.employee.department !== departmentFilter
+        ) {
           return false;
         }
         if (statusFilter !== 'ALL' && item.status !== statusFilter) {
@@ -100,7 +102,7 @@ export default function AttendancePage() {
           <Button
             variant="outline"
             onClick={() =>
-              toast.info('Attendance export report will be enabled after backend integration.', {
+              toast.info('Attendance export isn’t available yet.', {
                 id: 'export-att',
               })
             }
@@ -111,10 +113,11 @@ export default function AttendancePage() {
         }
       />
 
-      <PlannedModuleBanner route="/attendance" />
-
       {/* Summary Cards */}
-      <section aria-label="Attendance key metrics" className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <section
+        aria-label="Attendance key metrics"
+        className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
+      >
         <MetricCard
           label="Present Today"
           value={162}
@@ -158,15 +161,26 @@ export default function AttendancePage() {
         <div className="rounded-xl border bg-card p-5 shadow-xs lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-foreground">Monthly Attendance Trend</h3>
-              <p className="text-xs text-muted-foreground">October 2026 daily presence vs absences across JCET</p>
+              <h3 className="font-semibold text-foreground">
+                Monthly Attendance Trend
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                October 2026 daily presence vs absences across JCET
+              </p>
             </div>
             <Badge variant="outline">Past 12 Days</Badge>
           </div>
           <div className="h-[240px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyAttendanceTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+              <BarChart
+                data={monthlyAttendanceTrend}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  opacity={0.3}
+                />
                 <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip
@@ -189,16 +203,24 @@ export default function AttendancePage() {
         {/* Department Attendance Compact Section */}
         <div className="rounded-xl border bg-card p-5 shadow-xs">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-semibold text-foreground">Department Attendance</h3>
+            <h3 className="font-semibold text-foreground">
+              Department Attendance
+            </h3>
             <Building className="h-4 w-4 text-muted-foreground" />
           </div>
-          <p className="mb-4 text-xs text-muted-foreground">Today's verified biometric presence percentage</p>
+          <p className="mb-4 text-xs text-muted-foreground">
+            Today's verified biometric presence percentage
+          </p>
           <div className="space-y-3.5">
             {departmentAttendanceRates.map((dept) => (
               <div key={dept.department}>
                 <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="font-medium text-foreground">{dept.name} ({dept.department})</span>
-                  <span className="font-bold text-foreground">{dept.rate}%</span>
+                  <span className="font-medium text-foreground">
+                    {dept.name} ({dept.department})
+                  </span>
+                  <span className="font-bold text-foreground">
+                    {dept.rate}%
+                  </span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                   <div
@@ -227,7 +249,10 @@ export default function AttendancePage() {
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Filter Log:
             </span>
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <Select
+              value={departmentFilter}
+              onValueChange={setDepartmentFilter}
+            >
               <SelectTrigger className="w-[140px] text-xs">
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
@@ -283,7 +308,8 @@ export default function AttendancePage() {
           </div>
 
           <div className="text-xs text-muted-foreground">
-            Showing <b>{filteredRecords.length}</b> verified punches for {selectedDate}
+            Showing <b>{filteredRecords.length}</b> verified punches for{' '}
+            {selectedDate}
           </div>
         </div>
       </div>
@@ -306,7 +332,10 @@ export default function AttendancePage() {
             <tbody className="divide-y divide-border">
               {filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <td
+                    colSpan={7}
+                    className="py-8 text-center text-muted-foreground"
+                  >
                     No punch records found matching current filters.
                   </td>
                 </tr>
@@ -314,18 +343,27 @@ export default function AttendancePage() {
                 filteredRecords.map((item) => {
                   const emp = item.employee!;
                   return (
-                    <tr key={item.employeeId} className="transition-colors hover:bg-muted/30">
+                    <tr
+                      key={item.employeeId}
+                      className="transition-colors hover:bg-muted/30"
+                    >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
-                            {emp.photo && <AvatarImage src={emp.photo} alt={emp.name} />}
+                            {emp.photo && (
+                              <AvatarImage src={emp.photo} alt={emp.name} />
+                            )}
                             <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
                               {emp.initials}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="font-semibold text-foreground">{emp.name}</div>
-                            <div className="text-xs font-mono text-muted-foreground">{emp.id}</div>
+                            <div className="font-semibold text-foreground">
+                              {emp.name}
+                            </div>
+                            <div className="text-xs font-mono text-muted-foreground">
+                              {emp.id}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -334,10 +372,18 @@ export default function AttendancePage() {
                           {emp.department}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs">{item.checkIn}</td>
-                      <td className="px-4 py-3 font-mono text-xs">{item.checkOut}</td>
-                      <td className="px-4 py-3 font-mono text-xs font-semibold">{item.workingHours}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{item.biometricTerminal}</td>
+                      <td className="px-4 py-3 font-mono text-xs">
+                        {item.checkIn}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">
+                        {item.checkOut}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs font-semibold">
+                        {item.workingHours}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {item.biometricTerminal}
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <StatusBadge
                           status={

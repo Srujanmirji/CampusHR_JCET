@@ -33,14 +33,14 @@ export default function DashboardPage() {
           <div className="dashboard-heading-actions">
             <span>
               <CalendarDays aria-hidden="true" />
-              March 2026 · sample data
+              March 2026
             </span>
             <Button
               variant="outline"
               size="icon"
               onClick={() => setLoading(true)}
               disabled={loading}
-              aria-label="Refresh dashboard preview"
+              aria-label="Refresh dashboard"
             >
               <RefreshCw />
             </Button>

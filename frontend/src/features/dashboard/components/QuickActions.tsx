@@ -45,15 +45,13 @@ export function QuickActions() {
         navigate('/reports');
         break;
       case 'Add Employee':
-        toast.info('This module is planned for the next phase.', {
-          description: 'This feature will be implemented in the next phase.',
-        });
+        toast.info('This feature isn’t available yet.', {});
         break;
       case 'Send Notification':
         navigate('/notifications');
         break;
       default:
-        toast.info('This module is planned for the next phase.', {
+        toast.info('This feature isn’t available yet.', {
           description: label,
         });
     }

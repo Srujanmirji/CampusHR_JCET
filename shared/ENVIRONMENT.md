@@ -1,6 +1,7 @@
 # Environment Variables
 
 ## Backend
+
 - DATABASE_URL
 - JWT_ACCESS_SECRET
 - JWT_REFRESH_SECRET
@@ -13,10 +14,12 @@
 - CORS_ORIGIN
 
 ## Frontend
+
 - VITE_API_URL
 - VITE_SOCKET_URL
 
 ## Mobile
+
 - EXPO_PUBLIC_API_URL
 - EXPO_PUBLIC_SOCKET_URL
 

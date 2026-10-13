@@ -1,18 +1,13 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import LoginPage from '@/features/auth/pages/LoginPage';
 import AppShell from '@/layouts/AppShell';
-import DashboardPage from '@/features/dashboard/pages/DashboardPage';
-import EmployeesPage from '@/features/employees/pages/EmployeesPage';
-import AttendancePage from '@/features/attendance/pages/AttendancePage';
-import LeavePage from '@/features/leave/pages/LeavePage';
-import TimetablePage from '@/features/timetable/pages/TimetablePage';
-import WorkloadPage from '@/features/workload/pages/WorkloadPage';
-import SubstitutionPage from '@/features/substitution/pages/SubstitutionPage';
-import PayrollPage from '@/features/payroll/pages/PayrollPage';
-import ReportsPage from '@/features/reports/pages/ReportsPage';
-import NotificationsPage from '@/features/notifications/pages/NotificationsPage';
-import SettingsPage from '@/features/settings/pages/SettingsPage';
 import NotFoundPage from '@/pages/NotFoundPage';
+
+// Each workspace page is a separate chunk, loaded on first visit.
+const page =
+  (load: () => Promise<{ default: React.ComponentType }>) => async () => ({
+    Component: (await load()).default,
+  });
 
 export const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/login" replace /> },
@@ -25,47 +20,47 @@ export const router = createBrowserRouter([
     children: [
       {
         path: '/dashboard',
-        Component: DashboardPage,
+        lazy: page(() => import('@/features/dashboard/pages/DashboardPage')),
       },
       {
         path: '/employees',
-        Component: EmployeesPage,
+        lazy: page(() => import('@/features/employees/pages/EmployeesPage')),
       },
       {
         path: '/attendance',
-        Component: AttendancePage,
+        lazy: page(() => import('@/features/attendance/pages/AttendancePage')),
       },
       {
         path: '/leave',
-        Component: LeavePage,
+        lazy: page(() => import('@/features/leave/pages/LeavePage')),
       },
       {
         path: '/timetable',
-        Component: TimetablePage,
+        lazy: page(() => import('@/features/timetable/pages/TimetablePage')),
       },
       {
         path: '/workload',
-        Component: WorkloadPage,
+        lazy: page(() => import('@/features/workload/pages/WorkloadPage')),
       },
       {
         path: '/substitution',
-        Component: SubstitutionPage,
-      },
-      {
-        path: '/payroll',
-        Component: PayrollPage,
+        lazy: page(
+          () => import('@/features/substitution/pages/SubstitutionPage'),
+        ),
       },
       {
         path: '/reports',
-        Component: ReportsPage,
+        lazy: page(() => import('@/features/reports/pages/ReportsPage')),
       },
       {
         path: '/notifications',
-        Component: NotificationsPage,
+        lazy: page(
+          () => import('@/features/notifications/pages/NotificationsPage'),
+        ),
       },
       {
         path: '/settings',
-        Component: SettingsPage,
+        lazy: page(() => import('@/features/settings/pages/SettingsPage')),
       },
     ],
   },

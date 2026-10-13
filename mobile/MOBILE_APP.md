@@ -1,6 +1,7 @@
 # Mobile App Specification
 
 ## Stack
+
 - React Native
 - Expo
 - TypeScript
@@ -11,11 +12,13 @@
 - Expo Notifications
 
 ## Primary Users
+
 - Faculty
 - Staff
 - HOD
 
 ## Screens
+
 - Splash
 - Login
 - Home
@@ -24,7 +27,6 @@
 - Leave
 - Leave Request
 - Notifications
-- Payslips
 - Documents
 - Profile
 - Settings
@@ -36,7 +38,6 @@ app/
 ├── (auth)/
 ├── (tabs)/
 ├── leave/
-├── payslips/
 ├── documents/
 └── profile/
 ```

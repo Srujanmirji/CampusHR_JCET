@@ -1,4 +1,10 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -12,13 +18,20 @@ interface WorkloadDrawerProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function WorkloadDrawer({ record, open, onOpenChange }: WorkloadDrawerProps) {
+export function WorkloadDrawer({
+  record,
+  open,
+  onOpenChange,
+}: WorkloadDrawerProps) {
   if (!record) return null;
 
   const faculty = employees.find((e) => e.id === record.facultyId);
   if (!faculty) return null;
 
-  const percentage = Math.min(100, Math.round((record.total / record.capacity) * 100));
+  const percentage = Math.min(
+    100,
+    Math.round((record.total / record.capacity) * 100),
+  );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -30,17 +43,22 @@ export function WorkloadDrawer({ record, open, onOpenChange }: WorkloadDrawerPro
         <SheetHeader className="border-b pb-4">
           <div className="flex items-start gap-3.5">
             <Avatar className="h-14 w-14 border border-border">
-              {faculty.photo && <AvatarImage src={faculty.photo} alt={faculty.name} />}
+              {faculty.photo && (
+                <AvatarImage src={faculty.photo} alt={faculty.name} />
+              )}
               <AvatarFallback className="bg-primary/10 font-bold text-primary">
                 {faculty.initials}
               </AvatarFallback>
             </Avatar>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <SheetTitle className="text-lg font-bold">{faculty.name}</SheetTitle>
+                <SheetTitle className="text-lg font-bold">
+                  {faculty.name}
+                </SheetTitle>
                 <Badge
                   variant={
-                    record.status === 'At Capacity' || record.status === 'Overloaded'
+                    record.status === 'At Capacity' ||
+                    record.status === 'Overloaded'
                       ? 'destructive'
                       : record.status === 'Near Limit'
                         ? 'secondary'
@@ -56,7 +74,8 @@ export function WorkloadDrawer({ record, open, onOpenChange }: WorkloadDrawerPro
             </div>
           </div>
           <SheetDescription className="sr-only">
-            Weekly workload breakdown, teaching allocations, and free substitution slots.
+            Weekly workload breakdown, teaching allocations, and free
+            substitution slots.
           </SheetDescription>
         </SheetHeader>
 
@@ -65,15 +84,23 @@ export function WorkloadDrawer({ record, open, onOpenChange }: WorkloadDrawerPro
           <div className="rounded-xl border bg-card p-4 shadow-xs">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs font-medium text-muted-foreground">Weekly Teaching Workload</span>
+                <span className="text-xs font-medium text-muted-foreground">
+                  Weekly Teaching Workload
+                </span>
                 <div className="mt-0.5 text-2xl font-bold">
                   {record.total} / {record.capacity}{' '}
-                  <span className="text-sm font-normal text-muted-foreground">hours / week</span>
+                  <span className="text-sm font-normal text-muted-foreground">
+                    hours / week
+                  </span>
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-xs text-muted-foreground">Capacity Used</span>
-                <div className="text-lg font-bold text-primary">{percentage}%</div>
+                <span className="text-xs text-muted-foreground">
+                  Capacity Used
+                </span>
+                <div className="text-lg font-bold text-primary">
+                  {percentage}%
+                </div>
               </div>
             </div>
 
@@ -94,7 +121,8 @@ export function WorkloadDrawer({ record, open, onOpenChange }: WorkloadDrawerPro
               <div className="mt-3 flex items-center gap-2 rounded-md bg-destructive/10 p-2 text-xs text-destructive">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 <span>
-                  Maximum VTU teaching hours reached. Smart Substitution engine automatically locks this faculty.
+                  Maximum VTU teaching hours reached. Smart Substitution engine
+                  automatically locks this faculty.
                 </span>
               </div>
             )}
@@ -113,7 +141,9 @@ export function WorkloadDrawer({ record, open, onOpenChange }: WorkloadDrawerPro
                   className="flex items-center justify-between border-b pb-2 last:border-b-0 last:pb-0"
                 >
                   <span className="text-foreground/90">{item.label}</span>
-                  <span className="font-mono font-bold text-foreground">{item.hours}h</span>
+                  <span className="font-mono font-bold text-foreground">
+                    {item.hours}h
+                  </span>
                 </div>
               ))}
             </div>
@@ -147,16 +177,24 @@ export function WorkloadDrawer({ record, open, onOpenChange }: WorkloadDrawerPro
               Free Timetable Slots (Available for Substitution)
             </h4>
             <p className="mb-3 text-xs text-muted-foreground">
-              These unoccupied lecture periods are factored into the Smart Substitution algorithm.
+              These unoccupied lecture periods are factored into the Smart
+              Substitution algorithm.
             </p>
             <div className="space-y-2 text-xs">
               {record.freeSlots.map((slot, idx) => (
-                <div key={idx} className="flex items-center justify-between rounded-lg border bg-muted/20 p-2.5">
+                <div
+                  key={idx}
+                  className="flex items-center justify-between rounded-lg border bg-muted/20 p-2.5"
+                >
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                    <span className="font-semibold text-foreground">{slot.day}</span>
+                    <span className="font-semibold text-foreground">
+                      {slot.day}
+                    </span>
                   </div>
-                  <span className="font-mono text-muted-foreground">{slot.time}</span>
+                  <span className="font-mono text-muted-foreground">
+                    {slot.time}
+                  </span>
                 </div>
               ))}
             </div>

@@ -7,7 +7,7 @@ come from the institution's public websites:
 - `jcet-campus.png`: [JCET Vaibhav 2026 campus visual](https://www.vaibhav2k26.online/clg.png).
   This is an architectural visual, rather than a campus photograph.
 
-They are bundled locally so the HOD prototype requires no external image requests.
+They are bundled locally so the app makes no external image requests.
 
 ## Fictional faculty portrait thumbnails
 

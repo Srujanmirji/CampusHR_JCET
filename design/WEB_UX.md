@@ -3,6 +3,7 @@
 ## Main Layout
 
 Desktop:
+
 - Left sidebar
 - Top navigation
 - Main content area
@@ -18,16 +19,16 @@ Desktop:
 6. Timetable
 7. Faculty Workload
 8. Substitution
-9. Payroll
-10. Documents
-11. Reports
-12. Notifications
-13. Helpdesk
-14. Settings
+9. Documents
+10. Reports
+11. Notifications
+12. Helpdesk
+13. Settings
 
 ## Dashboard
 
 Cards:
+
 - Total Employees
 - Present Today
 - Absent Today
@@ -36,12 +37,14 @@ Cards:
 - Departments
 
 Charts:
+
 - Employees by Department
 - Attendance Trend
 - Leave Trend
 - Workload Distribution
 
 Tables:
+
 - Recent Leave Requests
 - Upcoming Contract Expiry
 - Missing Documents

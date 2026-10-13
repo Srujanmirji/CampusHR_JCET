@@ -1,6 +1,7 @@
 # Feature — Authentication & RBAC
 
 ## Capabilities
+
 - Login
 - Logout
 - Refresh token
@@ -12,9 +13,11 @@
 - Session history
 
 ## Roles
-Super Admin, HR, Principal, HOD, Faculty, Staff, Accountant.
+
+Super Admin, HR, Principal, HOD, Faculty, Staff.
 
 ## Acceptance Criteria
+
 - Unauthorized users cannot access protected routes.
 - Expired access tokens can be refreshed securely.
 - Permissions are enforced on both frontend and backend.

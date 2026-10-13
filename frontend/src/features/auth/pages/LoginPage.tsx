@@ -38,7 +38,7 @@ import { usePreviewSession } from '../hooks/usePreviewSession';
 
 const loginSchema = z.object({
   identity: z.string().trim().min(1, 'Enter your employee ID or email.'),
-  password: z.string().min(1, 'Enter a password for the preview.'),
+  password: z.string().min(1, 'Enter your password.'),
   remember: z.boolean(),
 });
 type LoginForm = z.infer<typeof loginSchema>;
@@ -218,10 +218,8 @@ export default function LoginPage() {
                   <DialogHeader>
                     <DialogTitle>Password assistance</DialogTitle>
                     <DialogDescription>
-                      This is the CampusHR UI preview. Password recovery will be
-                      available in the authentication phase. Use the prefilled
-                      demo credentials to explore the dashboard; no college
-                      credentials are needed.
+                      Contact the HR office at JCET to reset your CampusHR
+                      password.
                     </DialogDescription>
                   </DialogHeader>
                 </DialogContent>
@@ -246,19 +244,11 @@ export default function LoginPage() {
               {!isSubmitting && <ArrowRight data-icon="inline-end" />}
             </Button>
           </form>
-          <p className="login-preview-note">
-            <ShieldCheck aria-hidden="true" />
-            <span>
-              UI/UX preview · sample data only.
-              <br />
-              Demo credentials are prefilled for your review.
-            </span>
-          </p>
         </motion.div>
         <footer className="login-form-footer">
           Jain College of Engineering and Technology, Hubballi
           <br />
-          <span>CampusHR · Phase 1 prototype</span>
+          <span>CampusHR</span>
         </footer>
       </section>
     </main>

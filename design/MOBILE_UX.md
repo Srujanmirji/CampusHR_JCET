@@ -24,9 +24,8 @@
 3. Apply leave
 4. View leave status
 5. Receive substitute assignment
-6. View payslip
-7. View notices
-8. Upload documents
+6. View notices
+7. Upload documents
 
 ## Interaction Principles
 

@@ -44,7 +44,7 @@ export function RecentLeaveRequests() {
       <CardHeader>
         <SectionHeader
           title="Recent leave requests"
-          description="October 2026 · sample approval queue"
+          description="October 2026 · approval queue"
           action={
             <div>
               <label htmlFor="leave-status" className="sr-only">
@@ -71,7 +71,7 @@ export function RecentLeaveRequests() {
         {requests.length ? (
           <Table>
             <TableCaption className="sr-only">
-              Sample leave requests for October 2026
+              Leave requests for October 2026
             </TableCaption>
             <TableHeader>
               <TableRow>
@@ -158,7 +158,7 @@ export function RecentLeaveRequests() {
         ) : (
           <EmptyState
             title="No requests in this status"
-            description="The sample data has no rejected leave requests. Choose all statuses to see the preview queue."
+            description="There are no rejected leave requests. Choose all statuses to see the full queue."
             actionLabel="Reset filter"
             onAction={() => setStatus('all')}
           />
@@ -166,8 +166,7 @@ export function RecentLeaveRequests() {
       </CardContent>
       <CardFooter>
         <span className="text-sm text-muted-foreground">
-          {requests.length} sample{' '}
-          {requests.length === 1 ? 'request' : 'requests'}
+          {requests.length} {requests.length === 1 ? 'request' : 'requests'}
         </span>
         <Button asChild variant="link">
           <Link to="/leave">

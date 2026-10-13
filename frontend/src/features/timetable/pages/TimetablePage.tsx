@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageTransition } from '@/components/shared/PageTransition';
-import { PlannedModuleBanner } from '@/components/shared/PlannedModuleBanner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -26,11 +25,7 @@ import {
   timeSlots,
 } from '@/data/mock/timetable';
 import type { TimetableClass } from '@/types/academic';
-import {
-  MapPin,
-  UserCheck,
-  Download,
-} from 'lucide-react';
+import { MapPin, UserCheck, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function TimetablePage() {
@@ -59,17 +54,23 @@ export default function TimetablePage() {
             if (slot.id === 'period-5') return true;
             if (slot.id === 'period-6') return false; // covered by span
           }
-          if (slot.id === 'period-2') return c.id === 'TT001' || c.timeSlot.includes('10:00');
+          if (slot.id === 'period-2')
+            return c.id === 'TT001' || c.timeSlot.includes('10:00');
           if (slot.id === 'period-1') return c.timeSlot.includes('09:00');
           if (slot.id === 'period-3') return c.timeSlot.includes('11:15');
           if (slot.id === 'period-4') return c.timeSlot.includes('12:15');
-          if (slot.id === 'period-5') return c.timeSlot.includes('02:00') && !c.isLab;
+          if (slot.id === 'period-5')
+            return c.timeSlot.includes('02:00') && !c.isLab;
           if (slot.id === 'period-7') return c.timeSlot.includes('04:00');
           return false;
         });
 
         // Filter by faculty if selected
-        if (found && facultyFilter !== 'ALL' && found.facultyId !== facultyFilter) {
+        if (
+          found &&
+          facultyFilter !== 'ALL' &&
+          found.facultyId !== facultyFilter
+        ) {
           daysRecord[day] = undefined;
         } else {
           daysRecord[day] = found;
@@ -113,7 +114,7 @@ export default function TimetablePage() {
           <Button
             variant="outline"
             onClick={() =>
-              toast.info('Timetable PDF print schedule will be enabled after backend integration.', {
+              toast.info('Timetable printing isn’t available yet.', {
                 id: 'export-tt',
               })
             }
@@ -123,8 +124,6 @@ export default function TimetablePage() {
           </Button>
         }
       />
-
-      <PlannedModuleBanner route="/timetable" />
 
       {/* Filter Header */}
       <div className="mb-6 rounded-xl border bg-card p-4 shadow-xs">
@@ -191,9 +190,15 @@ export default function TimetablePage() {
                 <SelectContent>
                   <SelectItem value="ALL">All Faculty</SelectItem>
                   <SelectItem value="JCET-CSE-021">Prof. Asha Patil</SelectItem>
-                  <SelectItem value="JCET-CSE-025">Prof. Priya Kulkarni</SelectItem>
-                  <SelectItem value="JCET-CSE-007">Dr. Rahul Deshpande</SelectItem>
-                  <SelectItem value="JCET-CSE-018">Prof. Deepa Shetty</SelectItem>
+                  <SelectItem value="JCET-CSE-025">
+                    Prof. Priya Kulkarni
+                  </SelectItem>
+                  <SelectItem value="JCET-CSE-007">
+                    Dr. Rahul Deshpande
+                  </SelectItem>
+                  <SelectItem value="JCET-CSE-018">
+                    Prof. Deepa Shetty
+                  </SelectItem>
                   <SelectItem value="JCET-CSE-032">Dr. Kavya Rao</SelectItem>
                   <SelectItem value="JCET-CSE-001">Dr. Ramesh K</SelectItem>
                 </SelectContent>
@@ -228,7 +233,10 @@ export default function TimetablePage() {
               <tr className="border-b bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <th className="w-32 border-r p-3 text-center">Time</th>
                 {timetableDays.map((day) => (
-                  <th key={day} className="min-w-[170px] border-r p-3 text-center last:border-r-0">
+                  <th
+                    key={day}
+                    className="min-w-[170px] border-r p-3 text-center last:border-r-0"
+                  >
                     {day}
                   </th>
                 ))}
@@ -236,15 +244,23 @@ export default function TimetablePage() {
             </thead>
             <tbody className="divide-y divide-border">
               {gridData.map(({ slot, daysRecord }) => (
-                <tr key={slot.id} className="transition-colors hover:bg-muted/10">
+                <tr
+                  key={slot.id}
+                  className="transition-colors hover:bg-muted/10"
+                >
                   <td className="border-r bg-muted/20 p-2.5 text-center font-mono text-xs font-medium text-muted-foreground">
-                    <div className="font-semibold text-foreground">{slot.label}</div>
+                    <div className="font-semibold text-foreground">
+                      {slot.label}
+                    </div>
                   </td>
                   {timetableDays.map((day) => {
                     const cls = daysRecord[day];
                     if (!cls) {
                       return (
-                        <td key={day} className="border-r p-2 text-center text-xs text-muted-foreground/40 last:border-r-0">
+                        <td
+                          key={day}
+                          className="border-r p-2 text-center text-xs text-muted-foreground/40 last:border-r-0"
+                        >
                           —
                         </td>
                       );
@@ -275,7 +291,10 @@ export default function TimetablePage() {
                               {cls.subject}
                             </span>
                             {subInfo.isSubstitute && (
-                              <Badge variant="outline" className="border-amber-500 bg-amber-500/20 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                              <Badge
+                                variant="outline"
+                                className="border-amber-500 bg-amber-500/20 text-[10px] font-bold text-amber-700 dark:text-amber-300"
+                              >
                                 [Substitute]
                               </Badge>
                             )}
@@ -284,8 +303,16 @@ export default function TimetablePage() {
                           <div className="mt-1.5 space-y-1 text-xs">
                             <div className="flex items-center gap-1 text-foreground/90 font-medium">
                               <UserCheck className="h-3 w-3 shrink-0 text-muted-foreground" />
-                              <span className={subInfo.isSubstitute ? 'font-bold text-amber-800 dark:text-amber-200' : ''}>
-                                {subInfo.isSubstitute ? subInfo.substituteName : cls.facultyName}
+                              <span
+                                className={
+                                  subInfo.isSubstitute
+                                    ? 'font-bold text-amber-800 dark:text-amber-200'
+                                    : ''
+                                }
+                              >
+                                {subInfo.isSubstitute
+                                  ? subInfo.substituteName
+                                  : cls.facultyName}
                               </span>
                             </div>
 
@@ -300,7 +327,9 @@ export default function TimetablePage() {
                                 <MapPin className="h-3 w-3 shrink-0" />
                                 {cls.room}
                               </span>
-                              <span className="font-mono text-[10px] font-semibold">{cls.cohort}</span>
+                              <span className="font-mono text-[10px] font-semibold">
+                                {cls.cohort}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -323,20 +352,28 @@ export default function TimetablePage() {
                 <div className="flex items-center gap-2">
                   <Badge variant="outline">{selectedSlot.subjectCode}</Badge>
                   {getSubstituteInfo(selectedSlot).isSubstitute && (
-                    <Badge variant="outline" className="border-amber-500 bg-amber-500/10 text-amber-600">
+                    <Badge
+                      variant="outline"
+                      className="border-amber-500 bg-amber-500/10 text-amber-600"
+                    >
                       [Substitute Assigned]
                     </Badge>
                   )}
                 </div>
-                <DialogTitle className="text-lg font-bold">{selectedSlot.subject}</DialogTitle>
+                <DialogTitle className="text-lg font-bold">
+                  {selectedSlot.subject}
+                </DialogTitle>
                 <DialogDescription>
-                  {selectedSlot.day} · {selectedSlot.timeRange} · {selectedSlot.room}
+                  {selectedSlot.day} · {selectedSlot.timeRange} ·{' '}
+                  {selectedSlot.room}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-3.5 text-xs">
                 <div className="rounded-lg border bg-muted/30 p-3">
-                  <div className="text-muted-foreground">Faculty Allocation:</div>
+                  <div className="text-muted-foreground">
+                    Faculty Allocation:
+                  </div>
                   <div className="mt-1 flex items-center justify-between text-sm font-semibold">
                     <span>
                       {getSubstituteInfo(selectedSlot).isSubstitute
@@ -349,7 +386,8 @@ export default function TimetablePage() {
                   </div>
                   {getSubstituteInfo(selectedSlot).isSubstitute && (
                     <div className="mt-1 text-[11px] text-muted-foreground">
-                      Originally scheduled for {selectedSlot.facultyName} (On Approved Leave).
+                      Originally scheduled for {selectedSlot.facultyName} (On
+                      Approved Leave).
                     </div>
                   )}
                 </div>
@@ -357,18 +395,25 @@ export default function TimetablePage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded border p-2.5">
                     <span className="text-muted-foreground">Location:</span>
-                    <div className="font-medium text-foreground">{selectedSlot.room}</div>
+                    <div className="font-medium text-foreground">
+                      {selectedSlot.room}
+                    </div>
                   </div>
                   <div className="rounded border p-2.5">
                     <span className="text-muted-foreground">Cohort:</span>
-                    <div className="font-medium text-foreground">{selectedSlot.cohort}</div>
+                    <div className="font-medium text-foreground">
+                      {selectedSlot.cohort}
+                    </div>
                   </div>
                 </div>
 
                 <div className="rounded border p-2.5">
-                  <span className="text-muted-foreground">VTU Course Unit:</span>
+                  <span className="text-muted-foreground">
+                    VTU Course Unit:
+                  </span>
                   <div className="mt-0.5 font-medium text-foreground">
-                    Module 3 — Transaction Processing, ACID Properties & Concurrency Control Protocols
+                    Module 3 — Transaction Processing, ACID Properties &
+                    Concurrency Control Protocols
                   </div>
                 </div>
               </div>

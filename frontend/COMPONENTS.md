@@ -1,6 +1,7 @@
 # Frontend Component Inventory
 
 ## Global
+
 - AppShell
 - Sidebar
 - Topbar
@@ -18,6 +19,7 @@
 - LoadingSkeleton
 
 ## Domain
+
 - EmployeeCard
 - EmployeeProfileHeader
 - AttendanceTable
@@ -26,5 +28,4 @@
 - TimetableGrid
 - WorkloadMeter
 - SubstituteCandidateCard
-- PayslipCard
 - DocumentVerificationCard

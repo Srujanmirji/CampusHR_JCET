@@ -22,7 +22,7 @@ export function GlobalSearch() {
           .map((request) => ({
             id: request.id,
             label: request.employee,
-            detail: `${request.department} · employee preview`,
+            detail: `${request.department} · employee`,
             path: '/employees',
             icon: UsersRound,
           })),
@@ -77,7 +77,7 @@ export function GlobalSearch() {
         onChange={setQuery}
       />
       <span role="status" className="sr-only">
-        {focused && search ? `${results.length} preview results` : ''}
+        {focused && search ? `${results.length} results` : ''}
       </span>
       <AnimatePresence mode="wait">
         {focused && search && (
@@ -88,7 +88,7 @@ export function GlobalSearch() {
             exit={{ opacity: 0 }}
             className="search-results"
           >
-            <p className="search-results-label">Search the preview</p>
+            <p className="search-results-label">Search CampusHR</p>
             {results.length ? (
               <ul>
                 {results.map(({ id, label, detail, path, icon: Icon }) => (
@@ -112,7 +112,7 @@ export function GlobalSearch() {
               </ul>
             ) : (
               <EmptyState
-                title="No matching preview items"
+                title="No matching results"
                 description="Try Asha, leave, or a module name."
                 actionLabel="Clear search"
                 onAction={() => setQuery('')}

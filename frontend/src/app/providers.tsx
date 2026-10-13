@@ -26,7 +26,7 @@ export function Providers({ children }: { children: ReactNode }) {
       );
     } catch {
       toast.info(
-        'Browser storage is unavailable. This preview session lasts while the page is open.',
+        'Browser storage is unavailable. Your session lasts while the page is open.',
       );
     }
     setSignedIn(true);
@@ -37,7 +37,7 @@ export function Providers({ children }: { children: ReactNode }) {
       sessionStorage.removeItem(previewSessionKey);
     } catch {
       toast.info(
-        'Browser storage could not be cleared. Close this browser tab to end the preview.',
+        'Browser storage could not be cleared. Close this browser tab to sign out.',
       );
     }
     setSignedIn(false);

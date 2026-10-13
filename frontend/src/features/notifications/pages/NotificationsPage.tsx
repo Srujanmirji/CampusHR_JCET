@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageTransition } from '@/components/shared/PageTransition';
-import { PlannedModuleBanner } from '@/components/shared/PlannedModuleBanner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,25 +11,29 @@ import {
   CalendarDays,
   Repeat2,
   CalendarCheck2,
-  WalletCards,
   Info,
   CheckCheck,
   Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-type NotificationCategory = 'All' | 'Leave' | 'Timetable' | 'Attendance' | 'Payroll' | 'System';
+type NotificationCategory =
+  'All' | 'Leave' | 'Timetable' | 'Attendance' | 'System';
 
 export default function NotificationsPage() {
   const workflow = useAcademicWorkflow();
-  const [selectedCategory, setSelectedCategory] = useState<NotificationCategory>('All');
+  const [selectedCategory, setSelectedCategory] =
+    useState<NotificationCategory>('All');
 
   // Merge workflow notifications with seeded notifications
   const mergedNotifications = useMemo(() => {
     // Dynamic notifications from leave/substitute workflow
     const dynamicItems = workflow.notifications.map((n) => {
-      let cat: 'Leave' | 'Timetable' | 'Attendance' | 'Payroll' | 'System' = 'Leave';
-      if (n.title.toLowerCase().includes('substitute') || n.title.toLowerCase().includes('timetable')) {
+      let cat: 'Leave' | 'Timetable' | 'Attendance' | 'System' = 'Leave';
+      if (
+        n.title.toLowerCase().includes('substitute') ||
+        n.title.toLowerCase().includes('timetable')
+      ) {
         cat = 'Timetable';
       } else if (n.title.toLowerCase().includes('attendance')) {
         cat = 'Attendance';
@@ -70,8 +73,6 @@ export default function NotificationsPage() {
         return <Repeat2 className="h-4 w-4 text-amber-600" />;
       case 'Attendance':
         return <CalendarCheck2 className="h-4 w-4 text-emerald-600" />;
-      case 'Payroll':
-        return <WalletCards className="h-4 w-4 text-purple-600" />;
       default:
         return <Info className="h-4 w-4 text-blue-600" />;
     }
@@ -97,13 +98,13 @@ export default function NotificationsPage() {
         }
       />
 
-      <PlannedModuleBanner route="/notifications" />
-
       {/* Header Tabs & Unread Counter */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Tabs
           value={selectedCategory}
-          onValueChange={(val) => setSelectedCategory(val as NotificationCategory)}
+          onValueChange={(val) =>
+            setSelectedCategory(val as NotificationCategory)
+          }
           className="w-full sm:w-auto"
         >
           <TabsList className="grid grid-cols-3 sm:flex sm:flex-wrap">
@@ -119,9 +120,6 @@ export default function NotificationsPage() {
             <TabsTrigger value="Attendance" className="text-xs">
               Attendance
             </TabsTrigger>
-            <TabsTrigger value="Payroll" className="text-xs">
-              Payroll
-            </TabsTrigger>
             <TabsTrigger value="System" className="text-xs">
               System
             </TabsTrigger>
@@ -129,7 +127,10 @@ export default function NotificationsPage() {
         </Tabs>
 
         {unreadCount > 0 && (
-          <Badge variant="secondary" className="self-start text-xs font-semibold sm:self-auto">
+          <Badge
+            variant="secondary"
+            className="self-start text-xs font-semibold sm:self-auto"
+          >
             <Bell className="mr-1.5 h-3 w-3 text-primary animate-pulse" />
             {unreadCount} Unread Notifications
           </Badge>
@@ -141,8 +142,12 @@ export default function NotificationsPage() {
         {filteredNotifications.length === 0 ? (
           <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground shadow-xs">
             <Bell className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
-            <h4 className="font-semibold text-foreground">No notifications in this category</h4>
-            <p className="mt-1 text-xs">New approvals, timetable swaps, and broadcasts will appear here.</p>
+            <h4 className="font-semibold text-foreground">
+              No notifications in this category
+            </h4>
+            <p className="mt-1 text-xs">
+              New approvals, timetable swaps, and broadcasts will appear here.
+            </p>
           </div>
         ) : (
           filteredNotifications.map((notif) => (
@@ -161,12 +166,17 @@ export default function NotificationsPage() {
               <div className="flex-1 space-y-1">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-foreground">{notif.title}</span>
+                    <span className="font-bold text-sm text-foreground">
+                      {notif.title}
+                    </span>
                     <Badge variant="outline" className="text-[10px]">
                       {notif.category}
                     </Badge>
                     {notif.unread && (
-                      <span className="h-2 w-2 rounded-full bg-primary" aria-label="Unread notification" />
+                      <span
+                        className="h-2 w-2 rounded-full bg-primary"
+                        aria-label="Unread notification"
+                      />
                     )}
                   </div>
                   <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
@@ -175,7 +185,9 @@ export default function NotificationsPage() {
                   </span>
                 </div>
 
-                <p className="text-xs text-foreground/80 leading-relaxed">{notif.body}</p>
+                <p className="text-xs text-foreground/80 leading-relaxed">
+                  {notif.body}
+                </p>
               </div>
             </div>
           ))

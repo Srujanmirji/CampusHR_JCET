@@ -1,6 +1,7 @@
 # Feature — Attendance
 
 ## Capabilities
+
 - Daily attendance
 - Check-in/check-out
 - Manual entry
@@ -14,4 +15,5 @@
 - Attendance percentage
 
 ## Rules
+
 Attendance policy must be configurable.
