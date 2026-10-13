@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { HttpError } from '../../common/http-error.js';
 import type { AuthRepository, AuthUser } from './auth.repository.js';
+import { widestScope, type Scope } from './permissions.js';
 
 export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 export const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -24,6 +25,7 @@ export interface PublicUser {
   id: string;
   email: string;
   role: string;
+  permissions: string[];
 }
 
 export interface AuthResult {
@@ -52,10 +54,11 @@ const invalidSession = () =>
 const hashToken = (token: string) =>
   createHash('sha256').update(token).digest('hex');
 
-const toPublic = ({ id, email, role }: AuthUser): PublicUser => ({
+const toPublic = ({ id, email, role, permissions }: AuthUser): PublicUser => ({
   id,
   email,
   role,
+  permissions,
 });
 
 export function createAuthService(
@@ -141,6 +144,25 @@ export function createAuthService(
       if (!refreshToken) return;
       const session = await repo.findSessionByHash(hashToken(refreshToken));
       if (session) await repo.endSession(session.id, now());
+    },
+
+    /**
+     * Checks `permission` (`resource.action`) against the database, so a
+     * deactivated user or a changed role takes effect immediately.
+     * Returns the widest granted scope.
+     */
+    async authorize(userId: string, permission: string): Promise<Scope> {
+      const user = await repo.findUserById(userId);
+      if (!user || user.status !== 'ACTIVE') throw invalidSession();
+      const scope = widestScope(user.permissions, permission);
+      if (!scope) {
+        throw new HttpError(
+          403,
+          'FORBIDDEN',
+          'You don’t have permission to do this.',
+        );
+      }
+      return scope;
     },
 
     async me(userId: string) {

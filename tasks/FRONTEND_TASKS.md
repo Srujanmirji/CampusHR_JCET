@@ -32,6 +32,7 @@ Verification and launch steps: `frontend/README.md`.
 - [x] Topbar
 - [x] Responsive layout
 - [x] Signed-in route guard backed by the auth API
+- [x] Sidebar, search and routes follow the user's permissions
 
 ## FE-004 Login UI
 

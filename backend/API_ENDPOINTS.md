@@ -21,7 +21,18 @@ Implemented: login, refresh, logout, me. Forgot/reset password wait for SMTP.
 - `GET /auth/me` (`Authorization: Bearer <accessToken>`) → `{ user }`.
   Error: 401 `UNAUTHENTICATED`.
 
-Access tokens are HS256 JWTs valid for 15 minutes.
+Access tokens are HS256 JWTs valid for 15 minutes. `user` includes
+`permissions`, the granted keys (e.g. `leave.approve.department`), so clients can
+hide what the user cannot do.
+
+## Permissions
+
+Protected routes use `requirePermission(auth, 'resource.action')`
+(`src/middleware/auth.ts`). It re-reads the user from the database on every
+request, so deactivation and role changes apply immediately, and responds 403
+`FORBIDDEN` when the role lacks the permission. Handlers receive the widest
+granted scope in `res.locals.scope` (`all`, `department` or `own`) and must limit
+records to it. Grants: `product/USER_ROLES.md`.
 
 - POST /auth/login
 - POST /auth/refresh

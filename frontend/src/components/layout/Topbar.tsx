@@ -182,7 +182,6 @@ export function Topbar({
                   variant="destructive"
                   onSelect={async () => {
                     await session.logout();
-                    navigate('/login', { replace: true });
                     toast.success('Signed out.');
                   }}
                 >

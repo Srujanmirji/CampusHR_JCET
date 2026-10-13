@@ -9,6 +9,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { useCan } from '@/features/auth/hooks/useCan';
 import { useAcademicWorkflow } from '@/features/leave/useAcademicWorkflow';
 import { leaveRequests } from '@/data/mock/leaveRequests';
 
@@ -24,6 +25,8 @@ export function Sidebar({
   onClose?: () => void;
 }) {
   const { pathname } = useLocation();
+  const can = useCan();
+  const items = navigation.filter((item) => can(item.permission));
   const workflow = useAcademicWorkflow();
   const pending = leaveRequests.filter(
     (request) => workflow.status(request.id) === 'Pending',
@@ -65,41 +68,43 @@ export function Sidebar({
         )}
       </div>
       <nav aria-label="Main navigation" className="sidebar-nav">
-        {['Overview', 'People & academics', 'Administration'].map((group) => (
-          <div className="sidebar-group" key={group}>
-            {!collapsed && <p className="sidebar-group-label">{group}</p>}
-            <ul>
-              {navigation
-                .filter((item) => item.group === group)
-                .map(({ path, label, icon: Icon }) => (
-                  <li key={path}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <NavLink
-                          to={path}
-                          onClick={onNavigate}
-                          aria-label={collapsed ? label : undefined}
-                          className={cn(
-                            'sidebar-link',
-                            pathname === path && 'sidebar-link-active',
-                          )}
-                        >
-                          <Icon aria-hidden="true" />
-                          {!collapsed && <span>{label}</span>}
-                          {!collapsed && path === '/leave' && (
-                            <span className="sidebar-count">{pending}</span>
-                          )}
-                        </NavLink>
-                      </TooltipTrigger>
-                      {collapsed && (
-                        <TooltipContent side="right">{label}</TooltipContent>
-                      )}
-                    </Tooltip>
-                  </li>
-                ))}
-            </ul>
-          </div>
-        ))}
+        {['Overview', 'People & academics', 'Administration']
+          .filter((group) => items.some((item) => item.group === group))
+          .map((group) => (
+            <div className="sidebar-group" key={group}>
+              {!collapsed && <p className="sidebar-group-label">{group}</p>}
+              <ul>
+                {items
+                  .filter((item) => item.group === group)
+                  .map(({ path, label, icon: Icon }) => (
+                    <li key={path}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <NavLink
+                            to={path}
+                            onClick={onNavigate}
+                            aria-label={collapsed ? label : undefined}
+                            className={cn(
+                              'sidebar-link',
+                              pathname === path && 'sidebar-link-active',
+                            )}
+                          >
+                            <Icon aria-hidden="true" />
+                            {!collapsed && <span>{label}</span>}
+                            {!collapsed && path === '/leave' && (
+                              <span className="sidebar-count">{pending}</span>
+                            )}
+                          </NavLink>
+                        </TooltipTrigger>
+                        {collapsed && (
+                          <TooltipContent side="right">{label}</TooltipContent>
+                        )}
+                      </Tooltip>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ))}
       </nav>
       <div className="sidebar-footer">
         {!collapsed && (

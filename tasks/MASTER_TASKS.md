@@ -3,7 +3,7 @@
 ## Phase 0 — Foundation
 
 - [ ] Finalize PRD
-- [ ] Finalize roles
+- [x] Finalize roles
 - [ ] Finalize database
 - [ ] Finalize API conventions
 - [ ] Finalize design system

@@ -5,6 +5,7 @@ const sessionUserSchema = z.object({
   id: z.string(),
   email: z.string(),
   role: z.string(),
+  permissions: z.array(z.string()),
 });
 const sessionSchema = z.object({
   accessToken: z.string(),

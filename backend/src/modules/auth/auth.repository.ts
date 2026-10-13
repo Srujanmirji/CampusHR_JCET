@@ -5,6 +5,8 @@ export interface AuthUser {
   email: string;
   status: 'ACTIVE' | 'INACTIVE';
   role: string;
+  /** Granted permission keys, e.g. `leave.approve.department`. */
+  permissions: string[];
 }
 
 export interface AuthSession {
@@ -45,8 +47,22 @@ const userSelect = {
   id: true,
   email: true,
   status: true,
-  role: { select: { name: true } },
+  role: {
+    select: {
+      name: true,
+      permissions: { select: { permission: { select: { key: true } } } },
+    },
+  },
 } as const;
+
+type SelectedRole = {
+  name: string;
+  permissions: { permission: { key: string } }[];
+};
+const flattenRole = ({ name, permissions }: SelectedRole) => ({
+  role: name,
+  permissions: permissions.map(({ permission }) => permission.key),
+});
 
 export function createPrismaAuthRepository(
   prisma: PrismaClient,
@@ -57,14 +73,14 @@ export function createPrismaAuthRepository(
         where: { email },
         select: { ...userSelect, passwordHash: true },
       });
-      return user && { ...user, role: user.role.name };
+      return user && { ...user, ...flattenRole(user.role) };
     },
     async findUserById(id) {
       const user = await prisma.user.findUnique({
         where: { id },
         select: userSelect,
       });
-      return user && { ...user, role: user.role.name };
+      return user && { ...user, ...flattenRole(user.role) };
     },
     async recordLogin(userId, at) {
       await prisma.user.update({

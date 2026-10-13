@@ -23,6 +23,7 @@ export function createMemoryAuthRepository(users: StoredUser[] = []) {
             email: user.email,
             status: user.status,
             role: user.role,
+            permissions: user.permissions,
           }
         : null;
     },

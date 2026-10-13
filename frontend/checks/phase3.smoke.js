@@ -51,7 +51,7 @@ try {
   assert.ok(
     await page
       .locator('.profile-copy')
-      .getByText('HOD', { exact: true })
+      .getByText('Super Admin', { exact: true })
       .isVisible(),
     'Signed-in role must be displayed',
   );

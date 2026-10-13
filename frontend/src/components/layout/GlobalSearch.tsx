@@ -6,18 +6,22 @@ import { leaveRequests } from '@/data/mock/dashboard';
 import { navigation } from '@/data/navigation';
 import { SearchInput } from '@/components/shared/SearchInput';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { useCan } from '@/features/auth/hooks/useCan';
 
 export function GlobalSearch() {
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
+  const can = useCan();
   const search = query.trim().toLocaleLowerCase();
   const results = search
     ? [
         ...leaveRequests
-          .filter((request) =>
-            `${request.employee} ${request.department}`
-              .toLowerCase()
-              .includes(search),
+          .filter(
+            (request) =>
+              can('employee.read') &&
+              `${request.employee} ${request.department}`
+                .toLowerCase()
+                .includes(search),
           )
           .map((request) => ({
             id: request.id,
@@ -27,10 +31,12 @@ export function GlobalSearch() {
             icon: UsersRound,
           })),
         ...leaveRequests
-          .filter((request) =>
-            `${request.id} ${request.type} ${request.employee} leave`
-              .toLowerCase()
-              .includes(search),
+          .filter(
+            (request) =>
+              can('leave.read') &&
+              `${request.id} ${request.type} ${request.employee} leave`
+                .toLowerCase()
+                .includes(search),
           )
           .map((request) => ({
             id: `leave-${request.id}`,
@@ -40,15 +46,14 @@ export function GlobalSearch() {
             icon: FileText,
           })),
         ...navigation
-          .filter((item) => item.label.toLowerCase().includes(search))
+          .filter(
+            (item) =>
+              can(item.permission) && item.label.toLowerCase().includes(search),
+          )
           .map((item) => ({
             id: item.path,
             label: item.label,
-            detail: ['/dashboard', '/leave', '/substitution'].includes(
-              item.path,
-            )
-              ? 'Module overview'
-              : 'Upcoming module',
+            detail: 'Module',
             path: item.path,
             icon: LayoutGrid,
           })),

@@ -9,12 +9,16 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { FullPageLoader } from '@/components/shared/FullPageLoader';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { navigation } from '@/data/navigation';
+import { useCan } from '@/features/auth/hooks/useCan';
 import { useSession } from '@/features/auth/hooks/useSession';
 
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const session = useSession();
+  const can = useCan();
   const location = useLocation();
   const { pathname } = location;
   const main = useRef<HTMLElement>(null);
@@ -26,8 +30,15 @@ export default function AppShell() {
     return <FullPageLoader label="Checking your sign-in…" />;
   }
   if (session.status === 'signedOut') {
-    // Return here after signing in.
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    // After an expired session, return here once signed in again. After an
+    // explicit logout, don't: the next person may be someone else.
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={session.loggedOut ? undefined : { from: location }}
+      />
+    );
   }
   return (
     <div className="app-shell" data-collapsed={collapsed}>
@@ -51,7 +62,16 @@ export default function AppShell() {
           tabIndex={-1}
           className="main-content"
         >
-          <Outlet />
+          {can(
+            navigation.find((item) => item.path === pathname)?.permission,
+          ) ? (
+            <Outlet />
+          ) : (
+            <EmptyState
+              title="You don’t have access to this page"
+              description="Your role doesn’t include this module. Ask the HR office if you need access."
+            />
+          )}
         </main>
         <footer className="workspace-footer">
           <span>

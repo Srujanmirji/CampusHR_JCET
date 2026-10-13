@@ -3,7 +3,8 @@ import type { SessionUser } from '../api/auth';
 
 export type Session =
   | { status: 'loading' }
-  | { status: 'signedOut' }
+  // `loggedOut`: ended by the user, so the next sign-in starts fresh.
+  | { status: 'signedOut'; loggedOut?: boolean }
   | { status: 'signedIn'; user: SessionUser };
 
 export const SessionContext = createContext<

@@ -9,6 +9,7 @@ import {
   createAuthService,
   REFRESH_TOKEN_TTL_MS,
 } from '../src/modules/auth/auth.service.js';
+import { defaultGrants } from '../src/modules/auth/permissions.js';
 import { createMemoryAuthRepository } from './fakes.js';
 
 const password = 'correct horse battery';
@@ -33,6 +34,7 @@ describe('auth API', () => {
         passwordHash,
         status: 'ACTIVE',
         role: 'HOD',
+        permissions: defaultGrants('HOD'),
       },
       {
         id: '22222222-2222-4222-8222-222222222222',
@@ -40,6 +42,7 @@ describe('auth API', () => {
         passwordHash,
         status: 'INACTIVE',
         role: 'Faculty',
+        permissions: defaultGrants('Faculty'),
       },
       {
         id: '33333333-3333-4333-8333-333333333333',
@@ -47,6 +50,7 @@ describe('auth API', () => {
         passwordHash,
         status: 'ACTIVE',
         role: 'Faculty',
+        permissions: defaultGrants('Faculty'),
       },
     ]);
     sessions = memory.sessions;
@@ -99,6 +103,7 @@ describe('auth API', () => {
       id: '11111111-1111-4111-8111-111111111111',
       email: 'hod@jcet.test',
       role: 'HOD',
+      permissions: defaultGrants('HOD'),
     });
     const { header } = refreshCookie(response);
     assert.match(header, /HttpOnly/);
@@ -265,6 +270,7 @@ test('refresh fails once the session has expired', async () => {
       passwordHash,
       status: 'ACTIVE',
       role: 'HOD',
+      permissions: defaultGrants('HOD'),
     },
   ]);
   let clock = new Date('2026-10-13T09:00:00Z');
@@ -285,6 +291,7 @@ test('replaying a rotated token after the grace period ends every session', asyn
       passwordHash,
       status: 'ACTIVE',
       role: 'HOD',
+      permissions: defaultGrants('HOD'),
     },
   ]);
   let clock = new Date('2026-10-13T09:00:00Z');

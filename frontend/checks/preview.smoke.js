@@ -3,7 +3,13 @@ import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { apiUrl, checkPassword, checkUser, mockAuthApi } from './mock-api.js';
+import {
+  apiUrl,
+  checkPassword,
+  checkUser,
+  facultyUser,
+  mockAuthApi,
+} from './mock-api.js';
 
 const require = createRequire(import.meta.url);
 const bundled = join(
@@ -102,6 +108,14 @@ try {
   await page.getByRole('dialog').waitFor();
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  // The dialog returns focus once its close transition ends.
+  await page
+    .waitForFunction(
+      (name) => document.activeElement?.getAttribute('aria-label') === name,
+      profileMenu.name,
+      { timeout: 2000 },
+    )
+    .catch(() => {});
   assert.ok(
     await profileButton.evaluate(
       (element) => element === document.activeElement,
@@ -389,7 +403,7 @@ try {
   await page.getByRole('button', profileMenu).click();
   await page.getByRole('menuitem', { name: 'Logout' }).click();
   await page.waitForURL('**/login');
-  assert.equal(api.signedIn, false, 'logout must reach the API');
+  assert.equal(api.user, undefined, 'logout must reach the API');
   await page.goto(`${base}/leave`);
   await page.waitForURL('**/login');
   await page.getByLabel('College email').fill(checkUser.email);
@@ -401,6 +415,20 @@ try {
   await page.reload();
   await page.locator('main h1').waitFor();
   assert.ok(page.url().endsWith('/leave'), 'session restored after reload');
+
+  // A Faculty account sees only its modules and is refused the rest.
+  await page.getByRole('button', profileMenu).click();
+  await page.getByRole('menuitem', { name: 'Logout' }).click();
+  await page.waitForURL('**/login');
+  await page.getByLabel('College email').fill(facultyUser.email);
+  await page.getByLabel('Password', { exact: true }).fill(checkPassword);
+  await page.getByRole('button', { name: 'Login', exact: true }).click();
+  await page.waitForURL('**/dashboard');
+  const facultyNav = await page.locator('nav a.sidebar-link').allTextContents();
+  assert.equal(facultyNav.length, 8, `Faculty sidebar: ${facultyNav}`);
+  assert.ok(!facultyNav.some((label) => /Reports|Settings/.test(label)));
+  await page.goto(`${base}/reports`);
+  await page.getByText('You don’t have access to this page').waitFor();
   assert.deepEqual(errors, []);
   assert.deepEqual(externalRequests, []);
   console.log(

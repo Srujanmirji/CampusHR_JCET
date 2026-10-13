@@ -40,7 +40,9 @@ SEED_ADMIN_EMAIL=you@jcethbl.edu.in SEED_ADMIN_PASSWORD='12+ characters' \
   npm run db:seed --workspace @campushr/api
 ```
 
-The seed is safe to rerun: it never changes an existing user's password.
+The seed is safe to rerun: it adds missing roles, permissions and default
+grants (`product/USER_ROLES.md`) and never changes an existing user's password.
+Rerun it after pulling changes to the permission matrix.
 
 ## Run
 
@@ -105,9 +107,7 @@ npx expo export --platform ios --platform android
 - The web app's main bundle is 689 KB (201 KB gzipped); pages load as separate
   chunks.
 - Native runtime testing has been done on the iOS simulator only.
-- Auth follow-ups: deactivating a user or changing their role takes effect when
-  their 15-minute access token expires (check the database once RBAC lands), and
-  expired `refresh_sessions` rows need a periodic purge job.
+- Auth follow-up: expired `refresh_sessions` rows need a periodic purge job.
 
 ## Decisions still required before connecting real data
 

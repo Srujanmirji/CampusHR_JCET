@@ -12,7 +12,7 @@
 
 - [x] Users
 - [x] Roles (seeded)
-- [ ] Permissions (tables exist; catalogue and checks pending)
+- [x] Permissions (approved matrix seeded; `requirePermission` checks; record-level scope with employees)
 - [x] Login (email; employee ID once employees exist)
 - [x] Refresh (rotation with replay detection)
 - [x] Logout

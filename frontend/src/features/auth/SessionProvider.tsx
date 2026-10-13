@@ -52,7 +52,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       await authApi.logout();
     } finally {
       // Sign out locally even if the server is unreachable.
-      setSession({ status: 'signedOut' });
+      setSession({ status: 'signedOut', loggedOut: true });
     }
   }
 
