@@ -12,7 +12,8 @@ CampusHR_JCET/
 ├── design/                 DESIGN_SYSTEM.md, WEB_UX.md, MOBILE_UX.md
 ├── features/               One spec per module (README.md is the index)
 ├── shared/                 ARCHITECTURE.md, ENVIRONMENT.md, TESTING.md
-├── tasks/                  MASTER, BACKEND, FRONTEND, MOBILE tasks, DELIVERY_PLAN
+├── tasks/                  MASTER, BACKEND, FRONTEND, MOBILE tasks, DELIVERY_PLAN,
+│                           TEAM_PLAN, team/ (one checklist per person)
 │
 ├── frontend/               Web app — React + Vite + TypeScript + Tailwind + shadcn/ui
 │   ├── README.md           What the web app does and how to verify it

@@ -12,9 +12,14 @@
 - Attachment support
 - Leave history
 
-## Example Approval Flow
+## Decisions (14 October 2026)
 
-Faculty -> HOD -> HR
+- **Leave year:** calendar year; balances renew on 1 January.
+- **Approval:** every request goes Faculty → HOD → HR. Non-Teaching Staff → HR.
+  An HOD's leave → Principal; the Principal's → Super Admin
+  (`product/USER_ROLES.md`).
+- **Pending from JCET:** leave types, yearly quotas, half-day rules and what
+  happens to unused leave at year end. Leave is built once these arrive.
 
 ## Validation
 
