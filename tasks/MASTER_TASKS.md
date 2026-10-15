@@ -23,8 +23,8 @@
 
 ## Phase 3 — Academic HR
 
-- [ ] Timetable
-- [ ] Faculty workload
+- [x] Timetable
+- [x] Faculty workload
 - [ ] Smart substitution
 
 ## Phase 4 — HR Operations

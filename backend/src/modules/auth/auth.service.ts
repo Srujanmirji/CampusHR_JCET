@@ -27,6 +27,7 @@ export interface PublicUser {
   role: string;
   permissions: string[];
   employeeId: string | null;
+  departmentId: number | null;
 }
 
 /** Who is acting and how far their permission reaches. */
@@ -73,7 +74,15 @@ const toPublic = ({
   role,
   permissions,
   employeeId,
-}: AuthUser): PublicUser => ({ id, email, role, permissions, employeeId });
+  departmentId,
+}: AuthUser): PublicUser => ({
+  id,
+  email,
+  role,
+  permissions,
+  employeeId,
+  departmentId,
+});
 
 export function createAuthService(
   repo: AuthRepository,

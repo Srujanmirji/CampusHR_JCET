@@ -116,25 +116,51 @@ Aadhaar and PAN are not stored here; they belong to the Documents module.
 - status
 - current_approver_id
 
+### periods
+
+Implemented. number (1–7), start_time, end_time ("HH:MM").
+
+### subjects
+
+- id
+- code (unique VTU course code, uppercase)
+- name
+- department_id → departments
+- semester (1–8)
+- kind (THEORY, LAB)
+
+### rooms
+
+- id
+- name (unique)
+- kind (CLASSROOM, LAB)
+
 ### timetable_entries
 
-- id
-- department_id
-- faculty_id
-- subject_id
-- room_id
-- day_of_week
-- start_time
-- end_time
-- class_section
+Implemented.
 
-### workload_entries
+- id (uuid)
+- department_id, semester, section (e.g. A), batch (optional, e.g. A1)
+- subject_id → subjects
+- faculty_id → employees
+- room_id → rooms
+- day (MON–SAT)
+- start_period, end_period (inclusive; a lab may span two)
+- created_at, updated_at
 
-- id
-- faculty_id
-- type
-- hours
-- week_start
+### workload_thresholds
+
+Implemented. Weekly hours themselves are not stored: they are summed from
+`timetable_entries` (one period = one contact hour; theory vs lab by the
+subject's kind).
+
+- designation_id (primary key) → designations (teaching only)
+- min_hours, max_hours (check: 0 ≤ min ≤ max); below min is underloaded,
+  above max overloaded
+- updated_at
+
+Seeded: Professor 10–14, Associate Professor 12–16, Assistant Professor
+14–18. The Principal changes them in the app.
 
 ### substitutions
 

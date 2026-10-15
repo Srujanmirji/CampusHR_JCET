@@ -9,6 +9,7 @@ export const checkUser = {
   email: 'admin@jcethbl.edu.in',
   role: 'Super Admin',
   employeeId: null,
+  departmentId: null,
   permissions: [
     ...scoped('all', [
       'employee.read',
@@ -35,6 +36,7 @@ export const facultyUser = {
   email: 'faculty.cse@jcethbl.edu.in',
   role: 'Faculty',
   employeeId: 'e0000000-0000-4000-8000-000000000002',
+  departmentId: 1,
   permissions: [
     'department.read.all',
     ...scoped('own', [
@@ -196,6 +198,39 @@ export async function mockAuthApi(page, webOrigin) {
       });
     }
     if (path === 'departments') return json(route, 200, { data: departments });
+    if (path === 'timetable/periods') {
+      return json(route, 200, {
+        data: [
+          { number: 1, startTime: '09:00', endTime: '10:00' },
+          { number: 2, startTime: '10:00', endTime: '10:50' },
+        ],
+      });
+    }
+    if (path === 'timetable/entries') return json(route, 200, { data: [] });
+    if (path === 'timetable/subjects' || path === 'timetable/rooms') {
+      return json(route, 200, { data: [] });
+    }
+    if (path === 'workload') {
+      return json(route, 200, {
+        data: [
+          {
+            faculty: {
+              id: employees[1].id,
+              employeeCode: employees[1].employeeCode,
+              name: `${employees[1].firstName} ${employees[1].lastName}`,
+              department: cse,
+              designation: { id: 3, name: 'Assistant Professor' },
+            },
+            theoryHours: 12,
+            labHours: 6,
+            totalHours: 18,
+            minHours: 14,
+            maxHours: 18,
+            status: 'NORMAL',
+          },
+        ],
+      });
+    }
     if (path === 'designations') {
       return json(route, 200, { data: designations });
     }

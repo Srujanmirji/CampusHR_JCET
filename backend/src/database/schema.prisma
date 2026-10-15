@@ -109,53 +109,57 @@ enum EmployeeStatus {
 }
 
 model Department {
-  id            Int        @id @default(autoincrement())
+  id            Int              @id @default(autoincrement())
   // Short code used in employee IDs, e.g. CSE in JCET-CSE-021.
-  code          String     @unique
-  name          String     @unique
-  hodEmployeeId String?    @unique @map("hod_employee_id") @db.Uuid
-  hod           Employee?  @relation("DepartmentHod", fields: [hodEmployeeId], references: [id], onDelete: SetNull)
-  employees     Employee[] @relation("DepartmentEmployees")
-  createdAt     DateTime   @default(now()) @map("created_at")
-  updatedAt     DateTime   @updatedAt @map("updated_at")
+  code          String           @unique
+  name          String           @unique
+  hodEmployeeId String?          @unique @map("hod_employee_id") @db.Uuid
+  hod           Employee?        @relation("DepartmentHod", fields: [hodEmployeeId], references: [id], onDelete: SetNull)
+  employees     Employee[]       @relation("DepartmentEmployees")
+  subjects      Subject[]
+  timetable     TimetableEntry[]
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
 
   @@map("departments")
 }
 
 model Designation {
-  id        Int           @id @default(autoincrement())
-  name      String        @unique
+  id        Int                @id @default(autoincrement())
+  name      String             @unique
   // Lower is more senior.
   level     Int
   category  StaffCategory
   employees Employee[]
+  workload  WorkloadThreshold?
 
   @@map("designations")
 }
 
 model Employee {
-  id              String         @id @default(uuid()) @db.Uuid
+  id              String           @id @default(uuid()) @db.Uuid
   // College employee ID, stored uppercase, e.g. JCET-CSE-021.
-  employeeCode    String         @unique @map("employee_code")
-  firstName       String         @map("first_name")
-  lastName        String         @map("last_name")
+  employeeCode    String           @unique @map("employee_code")
+  firstName       String           @map("first_name")
+  lastName        String           @map("last_name")
   // Stored lowercase.
-  email           String         @unique
+  email           String           @unique
   phone           String?
-  departmentId    Int            @map("department_id")
-  department      Department     @relation("DepartmentEmployees", fields: [departmentId], references: [id], onDelete: Restrict)
-  designationId   Int            @map("designation_id")
-  designation     Designation    @relation(fields: [designationId], references: [id], onDelete: Restrict)
-  employmentType  EmploymentType @map("employment_type")
-  joiningDate     DateTime       @map("joining_date") @db.Date
-  status          EmployeeStatus @default(ACTIVE)
+  departmentId    Int              @map("department_id")
+  department      Department       @relation("DepartmentEmployees", fields: [departmentId], references: [id], onDelete: Restrict)
+  designationId   Int              @map("designation_id")
+  designation     Designation      @relation(fields: [designationId], references: [id], onDelete: Restrict)
+  employmentType  EmploymentType   @map("employment_type")
+  joiningDate     DateTime         @map("joining_date") @db.Date
+  status          EmployeeStatus   @default(ACTIVE)
   qualification   String?
   specialization  String?
-  experienceYears Int?           @map("experience_years")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
+  experienceYears Int?             @map("experience_years")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
   user            User?
-  headOf          Department?    @relation("DepartmentHod")
+  headOf          Department?      @relation("DepartmentHod")
+  timetable       TimetableEntry[]
 
   @@index([departmentId])
   @@index([status])
@@ -176,4 +180,110 @@ model AuditLog {
 
   @@index([resource, resourceId])
   @@map("audit_logs")
+}
+
+// Timetable (features/TIMETABLE.md): fixed periods, Monday to Saturday.
+
+enum Weekday {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+
+  @@map("weekday")
+}
+
+enum SubjectKind {
+  THEORY
+  LAB
+
+  @@map("subject_kind")
+}
+
+enum RoomKind {
+  CLASSROOM
+  LAB
+
+  @@map("room_kind")
+}
+
+model Period {
+  // 1 = first period of the day.
+  number    Int    @id
+  // 24-hour "HH:MM".
+  startTime String @map("start_time")
+  endTime   String @map("end_time")
+
+  @@map("periods")
+}
+
+model Subject {
+  id           Int              @id @default(autoincrement())
+  // VTU course code, stored uppercase, e.g. BCS501.
+  code         String           @unique
+  name         String
+  departmentId Int              @map("department_id")
+  department   Department       @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  semester     Int
+  kind         SubjectKind
+  entries      TimetableEntry[]
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  @@index([departmentId, semester])
+  @@map("subjects")
+}
+
+model Room {
+  id      Int              @id @default(autoincrement())
+  name    String           @unique
+  kind    RoomKind
+  entries TimetableEntry[]
+
+  @@map("rooms")
+}
+
+// One class: a section (or a lab batch of it) on a day, over one or more
+// consecutive periods.
+model TimetableEntry {
+  id           String     @id @default(uuid()) @db.Uuid
+  departmentId Int        @map("department_id")
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  semester     Int
+  // Class section, e.g. A.
+  section      String
+  // Lab batch within the section, e.g. A1; null for the whole section.
+  batch        String?
+  subjectId    Int        @map("subject_id")
+  subject      Subject    @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  facultyId    String     @map("faculty_id") @db.Uuid
+  faculty      Employee   @relation(fields: [facultyId], references: [id], onDelete: Restrict)
+  roomId       Int        @map("room_id")
+  room         Room       @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  day          Weekday
+  startPeriod  Int        @map("start_period")
+  endPeriod    Int        @map("end_period")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  @@index([departmentId, semester, section, day])
+  @@index([facultyId, day])
+  @@index([roomId, day])
+  @@map("timetable_entries")
+}
+
+// Faculty workload (features/FACULTY_WORKLOAD.md). Weekly hours are computed
+// from timetable entries; only the bands the Principal sets are stored.
+
+// Weekly teaching-hour band for one teaching designation: below minHours is
+// underloaded, above maxHours overloaded.
+model WorkloadThreshold {
+  designationId Int         @id @map("designation_id")
+  designation   Designation @relation(fields: [designationId], references: [id], onDelete: Cascade)
+  minHours      Int         @map("min_hours")
+  maxHours      Int         @map("max_hours")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@map("workload_thresholds")
 }

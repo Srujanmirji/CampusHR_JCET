@@ -98,17 +98,50 @@ Implemented.
 
 ## Timetable
 
-- GET /timetable/faculty/:facultyId
-- GET /timetable/department/:departmentId
-- POST /timetable/entries
-- PATCH /timetable/entries/:id
-- DELETE /timetable/entries/:id
+Implemented. Reads need `timetable.read`, changes `timetable.manage`. HODs
+manage their own department; faculty read only the classes they teach.
+
+- `GET /timetable/periods` → the day's periods `{ number, startTime, endTime }`
+  (seeded: seven periods, 09:00–17:00 with breaks).
+- `GET /timetable/subjects?departmentId&semester`;
+  `POST /timetable/subjects` `{ code, name, departmentId, semester, kind: THEORY|LAB }`
+  → 201, 409 if the code exists. HODs add only their department's subjects.
+- `GET /timetable/rooms`; `POST /timetable/rooms` `{ name, kind: CLASSROOM|LAB }`
+  → 201, 409 if the name exists. Rooms are shared.
+- `GET /timetable/entries?departmentId&semester&section&facultyId` → classes
+  in the caller's scope, ordered by day and period. Faculty get their own
+  classes; HODs their department's plus any they teach.
+- `POST /timetable/entries` `{ departmentId, semester, section, batch?,
+subjectId, facultyId, roomId, day: MON–SAT, startPeriod, endPeriod }` → 201.
+- `PATCH /timetable/entries/:id` (same body, replaces the entry);
+  `DELETE /timetable/entries/:id` → 204.
+
+Rules: the subject must belong to the entry's department and semester; the
+faculty member must be active and teaching; lab subjects need a lab room.
+**Clashes answer 409 `CLASH`** with a plain sentence, e.g. "Asha Patil already
+teaches BCS501 to CSE 5A on Monday, period 2." A clash is the same faculty
+member, room or class section at overlapping periods on one day; two different
+lab batches (A1, A2) of a section may run together. Changes are audit-logged.
 
 ## Workload
 
-- GET /workload
-- GET /workload/faculty/:facultyId
-- POST /workload/recalculate
+Implemented. Reads need `workload.read`, band changes `workload.configure`
+(Super Admin, Principal). Hours are computed live from the timetable, so
+there is nothing to recalculate. Only active teaching staff are listed.
+
+- `GET /workload?departmentId` → one row per faculty member in the caller's
+  scope (all; HOD: own department; faculty: themselves):
+  `{ faculty: { id, employeeCode, name, department, designation },
+theoryHours, labHours, totalHours, minHours, maxHours,
+status: UNDERLOADED|NORMAL|OVERLOADED|null }`. One period counts as one
+  hour; `status` is null when the designation has no band.
+- `GET /workload/faculty/:id` → the same row plus `classes` (timetable
+  entries, as in `GET /timetable/entries`). 404 outside the caller's scope.
+- `GET /workload/thresholds` → `[{ designation: { id, name }, minHours,
+maxHours, updatedAt }]` for every teaching designation.
+- `PUT /workload/thresholds/:designationId` `{ minHours, maxHours }` (whole
+  hours, 0–72, min ≤ max) → the saved band; 404 for a non-teaching
+  designation. Audit-logged.
 
 ## Substitution
 

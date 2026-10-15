@@ -49,22 +49,6 @@ export interface AttendanceRecord {
   biometricTerminal: string;
 }
 
-export interface WorkloadRecord {
-  facultyId: string;
-  department: Department;
-  theory: number;
-  lab: number;
-  project: number;
-  mentoring: number;
-  other: number;
-  total: number;
-  capacity: number;
-  status:
-    'Underloaded' | 'Normal' | 'Near Limit' | 'At Capacity' | 'Overloaded';
-  freeSlots: { day: string; time: string }[];
-  breakdown: { label: string; hours: number }[];
-}
-
 export interface TimetableClass {
   id: string;
   day: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';

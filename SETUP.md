@@ -91,20 +91,21 @@ npm run check:preview --workspace @campushr/web   # login, leave → substitutio
 npm run check:phase3 --workspace @campushr/web    # dashboard, module pages, reset
 ```
 
-Database tests (employees, departments, access limits) run against real
-PostgreSQL and **wipe it first**:
+Database tests (employees, departments, timetable, access limits) run against
+a real PostgreSQL:
 
 ```sh
-TEST_DATABASE_URL=postgresql://user:pass@localhost:5433/campushr_test \
-  npm run test:db --workspace @campushr/api
+npm run test:db --workspace @campushr/api
 ```
 
-The test database must be on a **separate PostgreSQL server** (different
-host or port) from `DATABASE_URL`; the runner refuses otherwise. A different
-database name on the same server is not enough: `prisma dev` serves a single
-database whatever name you ask for, so a "test" database there is your
-development data. With Docker, run a second container on another port, e.g.
-`docker run -d -p 5433:5432 -e POSTGRES_PASSWORD=test postgres:17-alpine`.
+By default this starts a throwaway **in-memory** PostgreSQL (PGlite), applies
+the migrations, runs the tests and discards it. No Docker, nothing on disk.
+
+To use your own server instead, set `TEST_DATABASE_URL`. That database is
+**wiped first**, so it must be on a different server (host or port) from
+`DATABASE_URL`; the runner refuses otherwise. A different database name on the
+same server is not enough: `prisma dev` serves a single database whatever name
+you ask for.
 
 Mobile bundles:
 

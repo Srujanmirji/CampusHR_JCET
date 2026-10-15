@@ -10,33 +10,29 @@ Code goes in `backend/src/modules/<module>/` (routes, controller, service,
 repository, schema — copy `employees/`) and
 `frontend/src/features/<module>/` (api, components, pages).
 
-## 1. Timetable — BE-006, FE-009 · start now
+## 1. Timetable — BE-006, FE-009 · done
 
-- [ ] Agree the data model with the team; add to `backend/DATABASE_SCHEMA.md`:
-      `subjects` (code, name, department, semester), `rooms` (name, type:
-      classroom / lab), `timetable_entries` (department, semester, section,
-      subject, faculty, room, day, start, end)
-- [ ] Migration (announce first; only one migration at a time)
-- [ ] API: subjects and rooms (list, create), timetable by department / faculty,
-      create / update / delete entry — permissions `timetable.read`,
-      `timetable.manage` (HOD: own department)
-- [ ] Clash detection: same faculty, room or class section at overlapping
-      times is refused with a clear message
-- [ ] Faculty availability: free slots for a faculty member on a day
-- [ ] Web: replace the sample grid on `/timetable` with API data; HOD adds and
-      edits entries; clashes shown inline
-- [ ] Tests: clash rules (unit), endpoints (`test/db`)
-- [ ] Document endpoints in `backend/API_ENDPOINTS.md` (Arihant's mobile
-      timetable uses them)
+- [x] Data model in `backend/DATABASE_SCHEMA.md`: periods, subjects, rooms,
+      timetable entries (with lab batches)
+- [x] Migration `timetable`
+- [x] API: periods, subjects and rooms (list, create), entries by class or
+      faculty, create / update / delete — `timetable.read`, `timetable.manage`
+- [x] Clash detection: same faculty, room or class section at overlapping
+      periods is refused with a clear message
+- [ ] Faculty availability (who is free in a slot) — build with Substitution
+- [x] Web: `/timetable` on API data; HOD adds, edits and removes classes;
+      clashes shown in the dialog; faculty see "My timetable"
+- [x] Tests: clash rules (unit), endpoints (`test/db`, in-memory PostgreSQL)
+- [x] Endpoints documented in `backend/API_ENDPOINTS.md` for Arihant
 
-## 2. Faculty Workload — BE-007, FE-010
+## 2. Faculty Workload — BE-007, FE-010 · done
 
-- [ ] Weekly hours per faculty from timetable entries (theory, lab)
-- [ ] Thresholds (underloaded / normal / overloaded) as settings the
+- [x] Weekly hours per faculty from timetable entries (theory, lab)
+- [x] Thresholds (underloaded / normal / overloaded) as settings the
       Principal edits (`workload.configure`)
-- [ ] API: workload list (scoped) and one faculty's breakdown
-- [ ] Web: `/workload` on real data, plus the workload chart
-- [ ] Tests for the calculation
+- [x] API: workload list (scoped) and one faculty's breakdown
+- [x] Web: `/workload` on real data, plus the workload chart
+- [x] Tests for the calculation (unit) and endpoints (`test/db`)
 
 ## 3. Leave — BE-005, FE-008 · waits for JCET leave rules
 

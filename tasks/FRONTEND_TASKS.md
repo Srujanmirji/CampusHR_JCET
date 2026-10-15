@@ -77,14 +77,16 @@ Verification and launch steps: `frontend/README.md`.
 - [x] Grid
 - [x] Faculty filter
 - [x] Department filter
-- [ ] Conflict display
-- [x] Substitute assignments shown in the grid
+- [x] Conflict display (clash message in the add/edit dialog)
+- [x] API data; HOD adds, edits and removes classes; subjects and rooms
+- [ ] Substitute assignments shown in the grid (with Smart Substitution)
 
 ## FE-010 Workload
 
-- [x] Faculty workload table
-- [ ] Workload chart
+- [x] Faculty workload table (on API data)
+- [x] Workload chart
 - [x] Status badges
+- [x] Per-faculty breakdown; "My workload" for faculty; bands dialog for the Principal
 
 ## FE-011 Substitution
 

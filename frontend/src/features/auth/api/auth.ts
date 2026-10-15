@@ -7,6 +7,7 @@ const sessionUserSchema = z.object({
   role: z.string(),
   permissions: z.array(z.string()),
   employeeId: z.string().nullable(),
+  departmentId: z.number().nullable(),
 });
 const sessionSchema = z.object({
   accessToken: z.string(),

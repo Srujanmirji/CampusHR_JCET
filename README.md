@@ -6,11 +6,11 @@ from its approved interface toward a production system.
 
 ## Current status
 
-| Part                   | State                                                                                                                                                     |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web app (`frontend/`)  | Full interface for every sidebar module. Sign-in, Employees and Departments use the API; other screens use built-in sample data.                          |
-| API (`backend/`)       | Sign-in (email or employee ID), role permissions, employees, departments and designations, with an audit log. Other modules' endpoints are not built yet. |
-| Mobile app (`mobile/`) | Foundation screen with local notifications. Remote push needs an EAS project ID.                                                                          |
+| Part                   | State                                                                                                                                                                |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web app (`frontend/`)  | Full interface for every sidebar module. Sign-in, Employees, Departments and Timetable use the API; other screens use built-in sample data.                          |
+| API (`backend/`)       | Sign-in (email or employee ID), role permissions, employees, departments, designations and timetable, with an audit log. Other modules' endpoints are not built yet. |
+| Mobile app (`mobile/`) | Foundation screen with local notifications. Remote push needs an EAS project ID.                                                                                     |
 
 Module sample data stays in place until each module's API endpoints exist.
 Payroll is out of scope and is not part of this product.

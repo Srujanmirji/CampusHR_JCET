@@ -25,10 +25,31 @@ const DESIGNATIONS = [
   ['Office Assistant', 6, 'NON_TEACHING'],
 ] as const;
 
+// The approved timetable grid (frontend/DESIGN.md): seven periods with a
+// short break after period 2 and lunch after period 4.
+const PERIODS = [
+  [1, '09:00', '10:00'],
+  [2, '10:00', '10:50'],
+  [3, '11:15', '12:15'],
+  [4, '12:15', '13:15'],
+  [5, '14:00', '15:00'],
+  [6, '15:00', '16:00'],
+  [7, '16:00', '17:00'],
+] as const;
+
+// Starting weekly teaching-hour bands (AICTE caps: 14 / 16 / 18 hours); the
+// Principal edits them in the app.
+const WORKLOAD_BANDS = [
+  ['Professor', 10, 14],
+  ['Associate Professor', 12, 16],
+  ['Assistant Professor', 14, 18],
+] as const;
+
 /**
- * Adds missing roles, permissions, default grants, departments and
- * designations. Never removes or overwrites anything, so changes made later
- * in the app are kept. Used by `npm run db:seed` and the database tests.
+ * Adds missing roles, permissions, default grants, departments,
+ * designations, timetable periods and workload bands. Never removes or
+ * overwrites anything, so changes made later in the app are kept. Used by
+ * `npm run db:seed` and the database tests.
  */
 export async function seedReferenceData(prisma: PrismaClient) {
   for (const name of ROLES) {
@@ -64,6 +85,25 @@ export async function seedReferenceData(prisma: PrismaClient) {
       where: { name },
       update: {},
       create: { name, level, category },
+    });
+  }
+  for (const [number, startTime, endTime] of PERIODS) {
+    await prisma.period.upsert({
+      where: { number },
+      update: {},
+      create: { number, startTime, endTime },
+    });
+  }
+  for (const [name, minHours, maxHours] of WORKLOAD_BANDS) {
+    // Skipped if HR has renamed the designation since.
+    const designation = await prisma.designation.findUnique({
+      where: { name },
+    });
+    if (!designation) continue;
+    await prisma.workloadThreshold.upsert({
+      where: { designationId: designation.id },
+      update: {},
+      create: { designationId: designation.id, minHours, maxHours },
     });
   }
 }

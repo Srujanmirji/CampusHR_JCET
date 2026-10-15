@@ -16,6 +16,12 @@ import { createDepartmentService } from './modules/departments/department.servic
 import { createEmployeeRepository } from './modules/employees/employee.repository.js';
 import { createEmployeeRouter } from './modules/employees/employee.routes.js';
 import { createEmployeeService } from './modules/employees/employee.service.js';
+import { createTimetableRepository } from './modules/timetable/timetable.repository.js';
+import { createTimetableRouter } from './modules/timetable/timetable.routes.js';
+import { createTimetableService } from './modules/timetable/timetable.service.js';
+import { createWorkloadRepository } from './modules/workload/workload.repository.js';
+import { createWorkloadRouter } from './modules/workload/workload.routes.js';
+import { createWorkloadService } from './modules/workload/workload.service.js';
 
 export function createApp(
   env: Env,
@@ -53,6 +59,20 @@ export function createApp(
   );
   app.use('/api/v1/departments', createDepartmentRouter(auth, departments));
   app.use('/api/v1/designations', createDesignationRouter(auth, departments));
+  app.use(
+    '/api/v1/timetable',
+    createTimetableRouter(
+      auth,
+      createTimetableService(createTimetableRepository(prisma)),
+    ),
+  );
+  app.use(
+    '/api/v1/workload',
+    createWorkloadRouter(
+      auth,
+      createWorkloadService(createWorkloadRepository(prisma)),
+    ),
+  );
   app.use((_req, res) => {
     res
       .status(404)

@@ -23,19 +23,19 @@ created by `npm run db:seed`.
 
 ## Modules
 
-| Module             | What works today                                                                                                     |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| Dashboard          | Key metrics, charts, recent leave requests, quick actions, campus updates                                            |
-| Employees          | **Live data.** Search, filters, pagination, profile; HR adds, edits and archives; staff update their own phone       |
-| Departments        | **Live data.** Staff strength per department; HR adds departments and assigns HODs                                   |
-| Attendance         | Daily metrics, monthly trend, department view, filterable log                                                        |
-| Leave              | Searchable/filterable request table; review drawer with balance, history, academic impact; approve, reject with note |
-| Smart Substitution | Ranked candidates per affected class, assignment, manual coverage, updated timetable                                 |
-| Timetable          | Weekly grid with department, semester, section and faculty filters                                                   |
-| Faculty Workload   | Weekly load table with status filters and per-faculty breakdown                                                      |
-| Reports            | Report catalogue, charts and report previews                                                                         |
-| Notifications      | Activity feed by category, mark all read                                                                             |
-| Settings           | Institutional rules (saved for the session); reset workflow data                                                     |
+| Module             | What works today                                                                                                                                     |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard          | Key metrics, charts, recent leave requests, quick actions, campus updates                                                                            |
+| Employees          | **Live data.** Search, filters, pagination, profile; HR adds, edits and archives; staff update their own phone                                       |
+| Departments        | **Live data.** Staff strength per department; HR adds departments and assigns HODs                                                                   |
+| Attendance         | Daily metrics, monthly trend, department view, filterable log                                                                                        |
+| Leave              | Searchable/filterable request table; review drawer with balance, history, academic impact; approve, reject with note                                 |
+| Smart Substitution | Ranked candidates per affected class, assignment, manual coverage, updated timetable                                                                 |
+| Timetable          | **Live data.** Weekly grid by department, semester and section; HODs add, edit and remove classes with clash checks; faculty see their own timetable |
+| Faculty Workload   | API data: weekly theory/lab hours, status against each designation's band, hours chart, per-faculty classes; Principal edits bands                   |
+| Reports            | Report catalogue, charts and report previews                                                                                                         |
+| Notifications      | Activity feed by category, mark all read                                                                                                             |
+| Settings           | Institutional rules (saved for the session); reset workflow data                                                                                     |
 
 Create, edit, export and print actions show "isn't available yet" until the API
 supports them. Documents and Helpdesk pages are not built yet. Other modules

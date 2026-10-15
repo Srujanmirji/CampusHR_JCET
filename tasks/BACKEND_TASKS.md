@@ -46,16 +46,16 @@
 
 ## BE-006 Timetable
 
-- [ ] Timetable schema
-- [ ] CRUD
-- [ ] Conflict detection
-- [ ] Faculty availability
+- [x] Timetable schema (periods, subjects, rooms, entries)
+- [x] CRUD
+- [x] Conflict detection (faculty, room, section; lab batches)
+- [ ] Faculty availability (who is free in a slot — with Smart Substitution)
 
 ## BE-007 Workload
 
-- [ ] Workload calculation
-- [ ] Threshold configuration
-- [ ] Reports
+- [x] Workload calculation (weekly theory and lab hours from the timetable)
+- [x] Threshold configuration (band per teaching designation, Principal)
+- [ ] Reports (workload report — with BE-012 Reports)
 
 ## BE-008 Smart Substitution
 

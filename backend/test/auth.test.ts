@@ -105,6 +105,7 @@ describe('auth API', () => {
       role: 'HOD',
       permissions: defaultGrants('HOD'),
       employeeId: null,
+      departmentId: null,
     });
     const { header } = refreshCookie(response);
     assert.match(header, /HttpOnly/);

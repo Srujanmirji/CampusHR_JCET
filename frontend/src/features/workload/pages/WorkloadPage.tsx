@@ -1,12 +1,20 @@
-import { useState, useMemo } from 'react';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { PageTransition } from '@/components/shared/PageTransition';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  ChartNoAxesCombined,
+  CheckCircle2,
+  Clock,
+  Flame,
+  SlidersHorizontal,
+} from 'lucide-react';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { MetricCard } from '@/components/shared/MetricCard';
-import { WorkloadDrawer } from '../components/WorkloadDrawer';
+import { PageHeader, SectionHeader } from '@/components/shared/PageHeader';
+import { PageTransition } from '@/components/shared/PageTransition';
+import { SearchInput } from '@/components/shared/SearchInput';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -14,341 +22,325 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { employees } from '@/data/mock/employees';
-import { facultyWorkloads } from '@/data/mock/workload';
-import type { WorkloadRecord } from '@/types/academic';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
-  ChartNoAxesCombined,
-  CheckCircle2,
-  Flame,
-  Search,
-  FilterX,
-  Clock,
-  Eye,
-  Download,
-} from 'lucide-react';
-import { toast } from 'sonner';
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { useScope } from '@/features/auth/hooks/useCan';
+import { listDepartments } from '@/features/departments/api/departments';
+import {
+  bandLabel,
+  listWorkload,
+  LOAD_LABEL,
+  type LoadStatus,
+} from '../api/workload';
+import { LoadBadge } from '../components/LoadBadge';
+import { ThresholdsDialog } from '../components/ThresholdsDialog';
+import { WorkloadBreakdown } from '../components/WorkloadBreakdown';
+import { WorkloadChart } from '../components/WorkloadChart';
+import { WorkloadDrawer } from '../components/WorkloadDrawer';
+
+const ALL = 'ALL';
 
 export default function WorkloadPage() {
+  const scopeOf = useScope();
+  const readScope = scopeOf('workload.read');
+  const canConfigure = scopeOf('workload.configure') !== undefined;
+  const ownView = readScope === 'own';
+
+  const [departmentId, setDepartmentId] = useState<number>();
+  const [status, setStatus] = useState<LoadStatus | typeof ALL>(ALL);
   const [search, setSearch] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [bandsOpen, setBandsOpen] = useState(false);
 
-  const [selectedRecord, setSelectedRecord] = useState<WorkloadRecord | null>(
-    null,
+  const departments = useQuery({
+    queryKey: ['departments'],
+    queryFn: listDepartments,
+    enabled: readScope === 'all',
+  });
+  const workload = useQuery({
+    queryKey: ['workload', 'list', departmentId],
+    queryFn: () => listWorkload(departmentId),
+  });
+
+  const all = workload.data ?? [];
+  const query = search.trim().toLowerCase();
+  const rows = all.filter(
+    (row) =>
+      (status === ALL || row.status === status) &&
+      (!query ||
+        row.faculty.name.toLowerCase().includes(query) ||
+        row.faculty.employeeCode.toLowerCase().includes(query)),
   );
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  const filteredWorkloads = useMemo(() => {
-    return facultyWorkloads
-      .map((w) => {
-        const emp = employees.find((e) => e.id === w.facultyId);
-        return { ...w, faculty: emp };
-      })
-      .filter((item) => {
-        if (!item.faculty) return false;
-
-        if (search.trim()) {
-          const q = search.toLowerCase();
-          const matchesName = item.faculty.name.toLowerCase().includes(q);
-          const matchesId = item.faculty.id.toLowerCase().includes(q);
-          if (!matchesName && !matchesId) return false;
-        }
-
-        if (
-          departmentFilter !== 'ALL' &&
-          item.department !== departmentFilter
-        ) {
-          return false;
-        }
-
-        if (statusFilter !== 'ALL' && item.status !== statusFilter) {
-          return false;
-        }
-
-        return true;
-      });
-  }, [search, departmentFilter, statusFilter]);
-
-  function handleViewDetails(record: WorkloadRecord) {
-    setSelectedRecord(record);
-    setDrawerOpen(true);
-  }
+  const count = (value: LoadStatus) =>
+    all.filter((row) => row.status === value).length;
 
   return (
     <PageTransition>
       <PageHeader
-        title="Faculty Teaching Workload"
-        description="Monitor weekly lecture loads, laboratory hours, and capacity limits across departments."
+        title={ownView ? 'My workload' : 'Faculty workload'}
+        description="Weekly teaching hours from the timetable, against each designation’s band."
         action={
-          <Button
-            variant="outline"
-            onClick={() =>
-              toast.info('Workload dossier export isn’t available yet.', {
-                id: 'exp-wl',
-              })
-            }
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Audit Report PDF
-          </Button>
+          canConfigure ? (
+            <Button variant="outline" onClick={() => setBandsOpen(true)}>
+              <SlidersHorizontal />
+              Workload bands
+            </Button>
+          ) : undefined
         }
       />
 
-      {/* Summary Cards */}
-      <section
-        aria-label="Faculty workload summary statistics"
-        className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-      >
-        <MetricCard
-          label="Faculty Tracked"
-          value={132}
-          detail="All full-time teaching faculty"
-          icon={ChartNoAxesCombined}
-          index={0}
-        />
-        <MetricCard
-          label="Normal Workload"
-          value={108}
-          detail="Within standard VTU 14–16h limit"
-          icon={CheckCircle2}
-          index={1}
-        />
-        <MetricCard
-          label="Underloaded"
-          value={14}
-          detail="Under 14h; eligible for extra duties"
-          icon={Clock}
-          index={2}
-        />
-        <MetricCard
-          label="Overloaded / Limit"
-          value={10}
-          detail="Near or exceeding 18h cap"
-          icon={Flame}
-          index={3}
-        />
-      </section>
-
-      {/* Filters and Search */}
-      <div className="mb-4 rounded-xl border bg-card p-4 shadow-xs">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search faculty name or ID..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
+      {workload.isPending ? (
+        <div
+          role="status"
+          aria-label="Loading workload"
+          className="flex flex-col gap-3"
+        >
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }, (_, index) => (
+              <Skeleton key={index} className="h-28" />
+            ))}
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              value={departmentFilter}
-              onValueChange={setDepartmentFilter}
+          <Skeleton className="h-64 w-full" />
+        </div>
+      ) : workload.isError ? (
+        <div className="rounded-xl border bg-card p-8">
+          <EmptyState
+            title="Couldn’t load workload"
+            description={workload.error.message}
+            actionLabel="Try again"
+            onAction={() => void workload.refetch()}
+          />
+        </div>
+      ) : (
+        <>
+          {!ownView && (
+            <section
+              aria-label="Workload summary"
+              className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
             >
-              <SelectTrigger className="w-[140px] text-xs">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Depts</SelectItem>
-                <SelectItem value="CSE">CSE</SelectItem>
-                <SelectItem value="ECE">ECE</SelectItem>
-                <SelectItem value="ME">Mechanical</SelectItem>
-                <SelectItem value="CE">Civil</SelectItem>
-                <SelectItem value="AI & ML">AI & ML</SelectItem>
-                <SelectItem value="MBA">MBA</SelectItem>
-              </SelectContent>
-            </Select>
+              <MetricCard
+                label="Faculty"
+                value={all.length}
+                detail="Active teaching staff"
+                icon={ChartNoAxesCombined}
+                index={0}
+              />
+              <MetricCard
+                label="Normal"
+                value={count('NORMAL')}
+                detail="Within their band"
+                icon={CheckCircle2}
+                index={1}
+              />
+              <MetricCard
+                label="Underloaded"
+                value={count('UNDERLOADED')}
+                detail="Below the minimum; free for more classes"
+                icon={Clock}
+                index={2}
+              />
+              <MetricCard
+                label="Overloaded"
+                value={count('OVERLOADED')}
+                detail="Above the maximum"
+                icon={Flame}
+                index={3}
+              />
+            </section>
+          )}
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px] text-xs">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Status</SelectItem>
-                <SelectItem value="Normal">Normal</SelectItem>
-                <SelectItem value="Underloaded">Underloaded</SelectItem>
-                <SelectItem value="Near Limit">Near Limit</SelectItem>
-                <SelectItem value="At Capacity">At Capacity</SelectItem>
-              </SelectContent>
-            </Select>
+          {all.length > 1 && (
+            <Card className="mb-6">
+              <CardHeader>
+                <SectionHeader
+                  title="Hours a week"
+                  description="How many faculty teach each weekly load"
+                />
+              </CardHeader>
+              <CardContent>
+                <WorkloadChart rows={all} />
+              </CardContent>
+            </Card>
+          )}
 
-            {(search ||
-              departmentFilter !== 'ALL' ||
-              statusFilter !== 'ALL') && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSearch('');
-                  setDepartmentFilter('ALL');
-                  setStatusFilter('ALL');
-                }}
-                className="h-9 px-2 text-xs"
-              >
-                <FilterX className="mr-1 h-3.5 w-3.5" />
-                Reset
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Workload Table */}
-      <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3">Faculty</th>
-                <th className="px-4 py-3">Dept</th>
-                <th className="px-3 py-3 text-center">Theory</th>
-                <th className="px-3 py-3 text-center">Lab</th>
-                <th className="px-3 py-3 text-center">Project</th>
-                <th className="px-3 py-3 text-center">Mentoring</th>
-                <th className="px-3 py-3 text-center">Other</th>
-                <th className="px-3 py-3 text-center font-bold text-foreground">
-                  Total
-                </th>
-                <th className="px-3 py-3 text-center">Cap</th>
-                <th className="px-4 py-3 min-w-[120px]">Workload Bar</th>
-                <th className="px-3 py-3 text-center">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredWorkloads.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={12}
-                    className="py-8 text-center text-muted-foreground"
-                  >
-                    No faculty found matching the current filters.
-                  </td>
-                </tr>
-              ) : (
-                filteredWorkloads.map((item) => {
-                  const emp = item.faculty!;
-                  const percent = Math.min(
-                    100,
-                    Math.round((item.total / item.capacity) * 100),
-                  );
-
-                  return (
-                    <tr
-                      key={item.facultyId}
-                      className="cursor-pointer transition-colors hover:bg-muted/30"
-                      onClick={() => handleViewDetails(item)}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <Avatar className="h-8 w-8">
-                            {emp.photo && (
-                              <AvatarImage src={emp.photo} alt={emp.name} />
-                            )}
-                            <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
-                              {emp.initials}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-semibold text-foreground">
-                              {emp.name}
-                            </div>
-                            <div className="text-[11px] font-mono text-muted-foreground">
-                              {emp.id}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline" className="text-xs">
-                          {item.department}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-3 text-center font-mono text-xs">
-                        {item.theory}h
-                      </td>
-                      <td className="px-3 py-3 text-center font-mono text-xs">
-                        {item.lab}h
-                      </td>
-                      <td className="px-3 py-3 text-center font-mono text-xs">
-                        {item.project}h
-                      </td>
-                      <td className="px-3 py-3 text-center font-mono text-xs">
-                        {item.mentoring}h
-                      </td>
-                      <td className="px-3 py-3 text-center font-mono text-xs">
-                        {item.other}h
-                      </td>
-                      <td className="px-3 py-3 text-center font-mono text-sm font-bold text-foreground">
-                        {item.total}h
-                      </td>
-                      <td className="px-3 py-3 text-center font-mono text-xs text-muted-foreground">
-                        {item.capacity}h
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="w-full">
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                            <div
-                              className={`h-full transition-all ${
-                                item.status === 'At Capacity'
-                                  ? 'bg-red-500'
-                                  : item.status === 'Near Limit'
-                                    ? 'bg-amber-500'
-                                    : 'bg-emerald-500'
-                              }`}
-                              style={{ width: `${percent}%` }}
-                            />
-                          </div>
-                          <span className="text-[10px] text-muted-foreground font-mono">
-                            {percent}% used
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        <Badge
-                          variant={
-                            item.status === 'At Capacity'
-                              ? 'destructive'
-                              : item.status === 'Near Limit'
-                                ? 'secondary'
-                                : 'outline'
-                          }
-                          className="text-[11px]"
-                        >
-                          {item.status}
-                        </Badge>
-                      </td>
-                      <td
-                        className="px-4 py-3 text-right"
-                        onClick={(e) => e.stopPropagation()}
+          {ownView ? (
+            <Card>
+              <CardContent>
+                {all[0] ? (
+                  <WorkloadBreakdown facultyId={all[0].faculty.id} />
+                ) : (
+                  <EmptyState
+                    title="No workload yet"
+                    description="Your workload appears once you have an active teaching designation."
+                  />
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                  <div className="flex flex-col gap-1.5 sm:min-w-56 sm:flex-1">
+                    <SearchInput
+                      id="workload-search"
+                      label="Search faculty"
+                      placeholder="Search name or employee ID"
+                      value={search}
+                      onChange={setSearch}
+                    />
+                  </div>
+                  {readScope === 'all' && (
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="workload-department">Department</Label>
+                      <Select
+                        value={departmentId ? String(departmentId) : ALL}
+                        onValueChange={(value) =>
+                          setDepartmentId(
+                            value === ALL ? undefined : Number(value),
+                          )
+                        }
                       >
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 gap-1 px-2 text-xs"
-                          onClick={() => handleViewDetails(item)}
+                        <SelectTrigger
+                          id="workload-department"
+                          className="w-full sm:w-56"
                         >
-                          <Eye className="h-3.5 w-3.5" />
-                          Free Slots
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={ALL}>All departments</SelectItem>
+                          {(departments.data ?? []).map((row) => (
+                            <SelectItem key={row.id} value={String(row.id)}>
+                              {row.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="workload-status">Status</Label>
+                    <Select
+                      value={status}
+                      onValueChange={(value) =>
+                        setStatus(value as LoadStatus | typeof ALL)
+                      }
+                    >
+                      <SelectTrigger
+                        id="workload-status"
+                        className="w-full sm:w-44"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ALL}>All statuses</SelectItem>
+                        {(Object.keys(LOAD_LABEL) as LoadStatus[]).map(
+                          (key) => (
+                            <SelectItem key={key} value={key}>
+                              {LOAD_LABEL[key]}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="px-0">
+                {rows.length === 0 ? (
+                  <EmptyState
+                    title={all.length ? 'No faculty match' : 'No faculty yet'}
+                    description={
+                      all.length
+                        ? 'Change the search or filters.'
+                        : 'Active teaching staff appear here with their timetable hours.'
+                    }
+                  />
+                ) : (
+                  <Table className="min-w-[44rem]">
+                    <TableCaption className="sr-only">
+                      Weekly teaching hours per faculty member
+                    </TableCaption>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead scope="col" className="pl-6">
+                          Faculty
+                        </TableHead>
+                        <TableHead scope="col">Department</TableHead>
+                        <TableHead scope="col" className="text-right">
+                          Theory
+                        </TableHead>
+                        <TableHead scope="col" className="text-right">
+                          Lab
+                        </TableHead>
+                        <TableHead scope="col" className="text-right">
+                          Total
+                        </TableHead>
+                        <TableHead scope="col">Band</TableHead>
+                        <TableHead scope="col">Status</TableHead>
+                        <TableHead scope="col" className="pr-6">
+                          <span className="sr-only">Details</span>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((row) => (
+                        <TableRow key={row.faculty.id}>
+                          <TableCell className="pl-6">
+                            <span className="block font-medium">
+                              {row.faculty.name}
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                              {row.faculty.designation.name} ·{' '}
+                              {row.faculty.employeeCode}
+                            </span>
+                          </TableCell>
+                          <TableCell>{row.faculty.department.code}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {row.theoryHours} h
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {row.labHours} h
+                          </TableCell>
+                          <TableCell className="text-right font-semibold tabular-nums">
+                            {row.totalHours} h
+                          </TableCell>
+                          <TableCell className="tabular-nums text-muted-foreground">
+                            {bandLabel(row.minHours, row.maxHours)}
+                          </TableCell>
+                          <TableCell>
+                            <LoadBadge status={row.status} />
+                          </TableCell>
+                          <TableCell className="pr-6 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setOpenId(row.faculty.id)}
+                              aria-label={`View classes for ${row.faculty.name}`}
+                            >
+                              Classes
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
 
-      <WorkloadDrawer
-        record={selectedRecord}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-      />
+      <WorkloadDrawer facultyId={openId} onClose={() => setOpenId(null)} />
+      {bandsOpen && <ThresholdsDialog onClose={() => setBandsOpen(false)} />}
     </PageTransition>
   );
 }
