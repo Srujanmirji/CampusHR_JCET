@@ -5,6 +5,8 @@ const history = [
   { date: '2026-08-21', type: 'Casual Leave', days: 1 },
   { date: '2026-07-06', type: 'Medical Leave', days: 2 },
 ];
+// Substitution demo data until Smart Substitution reads approved leave from
+// the API; leave itself is decided in the real leave module now.
 export const leaveRequests: LeaveRequest[] = [
   {
     id: 'LR001',
@@ -13,7 +15,7 @@ export const leaveRequests: LeaveRequest[] = [
     start: '2026-10-12',
     end: '2026-10-12',
     days: 1,
-    status: 'Pending',
+    status: 'Approved',
     reason:
       'A family commitment requires my presence in Dharwad. Lecture notes and lab exercises are prepared for the substitute faculty.',
     balance,
@@ -26,7 +28,7 @@ export const leaveRequests: LeaveRequest[] = [
     start: '2026-10-10',
     end: '2026-10-12',
     days: 3,
-    status: 'Pending',
+    status: 'Approved',
     reason:
       'Medical consultation and recovery as advised by my doctor. Teaching material is available with the department coordinator.',
     balance,

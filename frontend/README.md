@@ -29,7 +29,7 @@ created by `npm run db:seed`.
 | Employees          | **Live data.** Search, filters, pagination, profile; HR adds, edits and archives; staff update their own phone                                       |
 | Departments        | **Live data.** Staff strength per department; HR adds departments and assigns HODs                                                                   |
 | Attendance         | Daily metrics, monthly trend, department view, filterable log                                                                                        |
-| Leave              | Searchable/filterable request table; review drawer with balance, history, academic impact; approve, reject with note                                 |
+| Leave              | API data: my balances and requests, apply, approvals waiting for me, approval steps and timetable impact, leave types for HR                         |
 | Smart Substitution | Ranked candidates per affected class, assignment, manual coverage, updated timetable                                                                 |
 | Timetable          | **Live data.** Weekly grid by department, semester and section; HODs add, edit and remove classes with clash checks; faculty see their own timetable |
 | Faculty Workload   | API data: weekly theory/lab hours, status against each designation's band, hours chart, per-faculty classes; Principal edits bands                   |
@@ -41,13 +41,14 @@ Create, edit, export and print actions show "isn't available yet" until the API
 supports them. Documents and Helpdesk pages are not built yet. Other modules
 still show sample people until their APIs exist.
 
-## Leave → substitution workflow
+## Substitution demo
 
-1. Dashboard → click **Prof. Asha Patil** in recent leave requests.
-2. Review faculty details, leave balance/history and **Academic impact**.
-3. **Approve Leave** → **Approve & Find Substitute**.
-4. In each affected class, choose **Assign Faculty** → **Confirm Assignment**.
-5. Complete both classes, then **View Updated Timetable**.
+Leave is decided in the real leave module. Until Smart Substitution reads
+approved leave from the API, it runs on demo data: open **Smart Substitution**
+(e.g. `/substitution?leave=LR001`).
+
+1. In each affected class, choose **Assign Faculty** → **Confirm Assignment**.
+2. Complete both classes, then **View Updated Timetable**.
 
 Candidates are ranked by a visible 35/25/15/15/10 rubric: subject, experience,
 free slot, department and workload headroom (`src/lib/academic.ts`). Faculty who

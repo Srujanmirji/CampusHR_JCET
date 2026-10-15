@@ -156,6 +156,7 @@
 }
 @theme inline {
   --color-accent-hover: var(--accent-hover);
+  --color-warning-ink: var(--warning-ink);
 }
 [data-slot='input'],
 [data-slot='input-group'],

@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CalendarDays, RefreshCw } from 'lucide-react';
 import { metrics } from '@/data/mock/dashboard';
-import { leaveRequests } from '@/data/mock/leaveRequests';
-import { useAcademicWorkflow } from '@/features/leave/useAcademicWorkflow';
+import { useLeaveWaiting } from '@/features/leave/hooks/useLeaveWaiting';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageTransition } from '@/components/shared/PageTransition';
@@ -14,10 +13,7 @@ import { NotificationsPreview } from '../components/NotificationsPreview';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
 
 export default function DashboardPage() {
-  const workflow = useAcademicWorkflow();
-  const pending = leaveRequests.filter(
-    (request) => workflow.status(request.id) === 'Pending',
-  ).length;
+  const pending = useLeaveWaiting().data?.length ?? 0;
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     if (!loading) return;
