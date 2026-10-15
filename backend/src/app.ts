@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
@@ -32,12 +35,18 @@ import { createWorkloadRepository } from './modules/workload/workload.repository
 import { createWorkloadRouter } from './modules/workload/workload.routes.js';
 import { createWorkloadService } from './modules/workload/workload.service.js';
 
+// The built web app (`npm run build --workspace @campushr/web`). In production
+// the API serves it from the same address, so the SameSite=Strict refresh
+// cookie reaches /api/v1/auth without a shared custom domain (SETUP.md).
+const WEB_DIST = fileURLToPath(new URL('../../frontend/dist', import.meta.url));
+
 export function createApp(
   env: Env,
   {
     authRepository,
     prisma,
-  }: { authRepository: AuthRepository; prisma: PrismaClient },
+    webDir = WEB_DIST,
+  }: { authRepository: AuthRepository; prisma: PrismaClient; webDir?: string },
 ) {
   const auth = createAuthService(authRepository, env.JWT_ACCESS_SECRET);
   const departments = createDepartmentService(
@@ -45,6 +54,9 @@ export function createApp(
   );
   const app = express();
   app.disable('x-powered-by');
+  // Behind Railway's proxy: take the client address from X-Forwarded-For, so
+  // sign-in rate limits count people, not the proxy.
+  if (env.NODE_ENV === 'production') app.set('trust proxy', 1);
   app.use(helmet());
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
   app.use(express.json({ limit: '1mb' }));
@@ -97,6 +109,14 @@ export function createApp(
       createWorkloadService(createWorkloadRepository(prisma)),
     ),
   );
+  if (env.NODE_ENV === 'production' && existsSync(webDir)) {
+    app.use(express.static(webDir, { index: false, maxAge: '1h' }));
+    // Every other page is the single-page app; it routes in the browser.
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+      res.set('Cache-Control', 'no-cache').sendFile(join(webDir, 'index.html'));
+    });
+  }
   app.use((_req, res) => {
     res
       .status(404)

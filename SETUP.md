@@ -125,6 +125,32 @@ npx expo export --platform ios --platform android
 - Native runtime testing has been done on the iOS simulator only.
 - Auth follow-up: expired `refresh_sessions` rows need a periodic purge job.
 
+## Deployment (Railway)
+
+One Railway service runs the API and serves the built web app from the same
+address, next to the Railway PostgreSQL. Same address means the
+`SameSite=Strict` refresh cookie works without a custom domain.
+`.railway/railway.ts` (Railway infrastructure-as-code, `railway` package) holds
+the build (`npm run build`) and start (`npm start`: apply migrations, then
+start) commands and the health check (`/api/v1/health`). Preview a change with
+`railway config plan`, then `railway config apply`; deploy with
+`railway up -s campushr`. Variables stay managed in Railway, not in the file.
+
+Service variables:
+
+| Variable            | Value                                                     |
+| ------------------- | --------------------------------------------------------- |
+| `NODE_ENV`          | `production`                                              |
+| `DATABASE_URL`      | `${{Postgres.DATABASE_URL}}` (private network)            |
+| `JWT_ACCESS_SECRET` | a random value of at least 32 characters                  |
+| `CORS_ORIGIN`       | the service's public URL, e.g. `https://….up.railway.app` |
+| `VITE_API_URL`      | `/api/v1` (read when the web app is built)                |
+
+After the first deploy, create the Super Admin once from your machine, with
+`DATABASE_URL` in `backend/.env` set to the database's public (TCP proxy) URL:
+`SEED_ADMIN_EMAIL=… SEED_ADMIN_PASSWORD=… npm run db:seed --workspace @campushr/api`.
+The private `${{Postgres.DATABASE_URL}}` only resolves inside Railway.
+
 ## Decisions still required before connecting real data
 
 - **Database:** the schema spec lists fields but not types, constraints or deletion
@@ -136,9 +162,10 @@ npx expo export --platform ios --platform android
 - **Policies:** leave policies and approval chains, attendance policy and workload
   thresholds must be finalized before their services are built.
 - **Storage:** choose Supabase Storage or Cloudinary before document uploads.
-- **Auth:** the refresh cookie is `SameSite=Strict`, which assumes the web app and
-  API share a site (e.g. `app.` and `api.jcethbl.edu.in`). Confirm the deployment
-  domains. Choose an SMTP provider for password reset. The login rate limit is
+- **Auth:** the refresh cookie is `SameSite=Strict`. The Railway deployment
+  serves web and API from one address; a split deployment needs both on one
+  site (e.g. `app.` and `api.jcethbl.edu.in`). Choose an SMTP provider for
+  password reset by email. The login rate limit is
   in memory, so it needs Redis if the API runs as several instances.
 
 Sign-in is built. Next: connect the web and mobile apps to it, add permission

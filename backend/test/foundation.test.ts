@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { once } from 'node:events';
 import test from 'node:test';
 import { createApp } from '../src/app.js';
@@ -73,5 +76,46 @@ test('foundation validates configuration and handles HTTP requests safely', asyn
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
     );
+  }
+});
+
+test('in production the API also serves the web app, and API 404s stay JSON', async () => {
+  const webDir = mkdtempSync(join(tmpdir(), 'campushr-web-'));
+  mkdirSync(join(webDir, 'assets'));
+  writeFileSync(join(webDir, 'index.html'), '<div id="root"></div>');
+  writeFileSync(join(webDir, 'assets', 'app.js'), 'console.log(1)');
+  const server = createApp(
+    envSchema.parse({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://localhost/campushr_test',
+      JWT_ACCESS_SECRET: 'a'.repeat(32),
+      CORS_ORIGIN: 'https://campushr.example',
+    }),
+    {
+      authRepository: createMemoryAuthRepository().repo,
+      prisma: unusedPrisma,
+      webDir,
+    },
+  ).listen(0, '127.0.0.1');
+  try {
+    await once(server, 'listening');
+    const address = server.address();
+    assert.ok(address && typeof address === 'object');
+    const base = `http://127.0.0.1:${address.port}`;
+    const page = await fetch(`${base}/leave?tab=calendar`);
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), /id="root"/);
+    assert.equal(page.headers.get('cache-control'), 'no-cache');
+    assert.match(
+      page.headers.get('content-security-policy') ?? '',
+      /script-src 'self'/,
+    );
+    assert.equal((await fetch(`${base}/assets/app.js`)).status, 200);
+    const missing = await fetch(`${base}/api/v1/no-such-route`);
+    assert.equal(missing.status, 404);
+    assert.equal((await missing.json()).error.code, 'NOT_FOUND');
+  } finally {
+    server.close();
+    rmSync(webDir, { recursive: true, force: true });
   }
 });
