@@ -34,19 +34,19 @@ repository, schema — copy `employees/`) and
 - [x] Web: `/workload` on real data, plus the workload chart
 - [x] Tests for the calculation (unit) and endpoints (`test/db`)
 
-## 3. Leave — BE-005, FE-008 · waits for JCET leave rules
+## 3. Leave — BE-005, FE-008 · API done; web next
 
 Decided: calendar leave year; Faculty → HOD → HR, staff → HR, HOD →
 Principal (`features/LEAVE_MANAGEMENT.md`).
 
-- [ ] Leave types and yearly quotas as HR-editable data (`leave_type.manage`)
-- [ ] Balances per employee per year; carry-over per JCET rules
-- [ ] Apply (date range, half day if allowed, reason), cancel while pending
-- [ ] Approval steps with the next approver shown; reject with a note
-- [ ] Validation: no overlapping requests, no negative balance, valid ranges
-- [ ] Audit-log every approval (`backend/src/common/audit.ts`)
+- [x] Leave types and yearly quotas as HR-editable data (`leave_type.manage`)
+- [x] Balances per employee per year; carry-over capped per leave type
+- [x] Apply (date range, half day if allowed, reason), cancel while pending
+- [x] Approval steps with the next approver shown; reject with a note
+- [x] Validation: no overlapping requests, no negative balance, valid ranges
+- [x] Audit-log every approval (`backend/src/common/audit.ts`)
 - [ ] Web: apply form, approval list and drawer on real data, leave calendar
-- [ ] API for Arihant's mobile leave screens
+- [x] API for Arihant's mobile leave screens
 
 ## 4. Smart Substitution — BE-008, FE-011
 

@@ -45,21 +45,22 @@ enum UserStatus {
 }
 
 model User {
-  id           String           @id @default(uuid()) @db.Uuid
+  id             String           @id @default(uuid()) @db.Uuid
   // Stored lowercase; lookups lowercase their input.
-  email        String           @unique
-  passwordHash String           @map("password_hash")
-  roleId       Int              @map("role_id")
-  role         Role             @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  email          String           @unique
+  passwordHash   String           @map("password_hash")
+  roleId         Int              @map("role_id")
+  role           Role             @relation(fields: [roleId], references: [id], onDelete: Restrict)
   // Staff accounts link to their employee record; the Super Admin system
   // account has none.
-  employeeId   String?          @unique @map("employee_id") @db.Uuid
-  employee     Employee?        @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  status       UserStatus       @default(ACTIVE)
-  lastLoginAt  DateTime?        @map("last_login_at")
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
-  sessions     RefreshSession[]
+  employeeId     String?          @unique @map("employee_id") @db.Uuid
+  employee       Employee?        @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  status         UserStatus       @default(ACTIVE)
+  lastLoginAt    DateTime?        @map("last_login_at")
+  leaveDecisions LeaveDecision[]
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  sessions       RefreshSession[]
 
   @@map("users")
 }
@@ -118,6 +119,7 @@ model Department {
   employees     Employee[]       @relation("DepartmentEmployees")
   subjects      Subject[]
   timetable     TimetableEntry[]
+  leaveRequests LeaveRequest[]
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
@@ -160,6 +162,7 @@ model Employee {
   user            User?
   headOf          Department?      @relation("DepartmentHod")
   timetable       TimetableEntry[]
+  leaveRequests   LeaveRequest[]
 
   @@index([departmentId])
   @@index([status])
@@ -286,4 +289,90 @@ model WorkloadThreshold {
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
   @@map("workload_thresholds")
+}
+
+// Leave (features/LEAVE_MANAGEMENT.md). JCET's types, quotas, half-day and
+// carry-over rules are data HR enters; the approval chain is fixed by role.
+// Day counts are multiples of 0.5, which a float holds exactly.
+
+model LeaveType {
+  id              Int            @id @default(autoincrement())
+  // Short code, stored uppercase, e.g. CL.
+  code            String         @unique
+  name            String         @unique
+  // Days per calendar year; null means no limit (e.g. loss of pay).
+  yearlyQuota     Float?         @map("yearly_quota")
+  allowHalfDay    Boolean        @default(false) @map("allow_half_day")
+  // Most unused days that move into the next year; 0 means none.
+  carryForwardMax Float          @default(0) @map("carry_forward_max")
+  // Retired types stay for history but take no new requests.
+  active          Boolean        @default(true)
+  requests        LeaveRequest[]
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  @@map("leave_types")
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+
+  @@map("leave_status")
+}
+
+enum HalfDaySession {
+  FIRST
+  SECOND
+
+  @@map("half_day_session")
+}
+
+model LeaveRequest {
+  id            String          @id @default(uuid()) @db.Uuid
+  employeeId    String          @map("employee_id") @db.Uuid
+  employee      Employee        @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  // The applicant's department when they applied; scopes HOD access.
+  departmentId  Int             @map("department_id")
+  department    Department      @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  leaveTypeId   Int             @map("leave_type_id")
+  leaveType     LeaveType       @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+  startDate     DateTime        @map("start_date") @db.Date
+  endDate       DateTime        @map("end_date") @db.Date
+  // Set for a half-day request (one date only).
+  halfDay       HalfDaySession? @map("half_day")
+  // Working days taken (Sundays excluded).
+  days          Float
+  reason        String
+  status        LeaveStatus     @default(PENDING)
+  // Approver roles in order, fixed when the request is made.
+  approverRoles String[]        @map("approver_roles")
+  // Role that acts next; null once the request is decided or cancelled.
+  pendingRole   String?         @map("pending_role")
+  decisions     LeaveDecision[]
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  @@index([employeeId, startDate])
+  @@index([status, pendingRole, departmentId])
+  @@map("leave_requests")
+}
+
+// One approval or rejection, step by step.
+model LeaveDecision {
+  id            String       @id @default(uuid()) @db.Uuid
+  requestId     String       @map("request_id") @db.Uuid
+  request       LeaveRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  step          Int
+  role          String
+  deciderUserId String       @map("decider_user_id") @db.Uuid
+  decider       User         @relation(fields: [deciderUserId], references: [id], onDelete: Restrict)
+  approved      Boolean
+  note          String?
+  decidedAt     DateTime     @default(now()) @map("decided_at")
+
+  @@index([requestId])
+  @@map("leave_decisions")
 }

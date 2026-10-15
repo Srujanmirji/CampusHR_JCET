@@ -110,13 +110,46 @@ Implemented.
 
 ## Leave
 
-- GET /leave/requests
-- POST /leave/requests
-- GET /leave/requests/:id
-- PATCH /leave/requests/:id/approve
-- PATCH /leave/requests/:id/reject
-- PATCH /leave/requests/:id/cancel
-- GET /leave/balances
+Implemented. Leave types, quotas, half days and carry-over are data HR
+enters; nothing is seeded, so nobody can apply until HR adds a type.
+
+- `GET /leave/types` (`leave.read`) → every type, including retired ones
+  (`active: false`).
+- `POST /leave/types` (`leave_type.manage`) `{ code, name, yearlyQuota (days
+or null for no limit), allowHalfDay?, carryForwardMax?, active? }` → 201;
+  409 if the code or name exists. `PATCH /leave/types/:id` takes any of
+  those fields. Amounts are whole or half days. Audit-logged.
+- `GET /leave/balances?employeeId&year` (`leave.read`) → per type `{ leaveType,
+active, year, entitled, carriedIn, used, pending, remaining }`; `entitled` and
+  `remaining` are null for a type without a limit. Defaults: the caller and
+  this year. HODs see their department; faculty and staff themselves.
+- `GET /leave/requests?status&employeeId&year&awaitingMe` (`leave.read`) →
+  requests in the caller's scope, newest first (at most 500). With
+  `awaitingMe=true`: pending requests waiting for the caller's decision.
+- `GET /leave/requests/:id` → one request; 404 outside the caller's scope.
+- `POST /leave/requests` (`leave.apply`) `{ leaveTypeId, startDate, endDate,
+halfDay?: FIRST|SECOND, reason }` (dates `YYYY-MM-DD`) → 201 with `days`,
+  `approverRoles` and `pendingRole`. Refused: last day before first, a half
+  day over more than one date or on a type without half days, dates that
+  cross 31 December, only Sundays (400); overlap with the applicant's
+  pending or approved leave (409 `OVERLAP`); more days than remain (400
+  `INSUFFICIENT_BALANCE`, pending days count as used).
+- `PATCH /leave/requests/:id/approve` `{ note? }` and `/reject` `{ note }`
+  (`leave.approve`) → the request. Only the role in `pendingRole` acts (an
+  HOD only for their department), never on their own leave (403). Approving
+  the last step makes it APPROVED. 409 `ALREADY_DECIDED` if it changed
+  meanwhile. Audit-logged.
+- `PATCH /leave/requests/:id/cancel` (`leave.cancel`) → the applicant cancels
+  while PENDING; 409 `NOT_PENDING` otherwise.
+
+Request: `{ id, employee: { id, employeeCode, name }, department, leaveType,
+startDate, endDate, halfDay, days, reason, status, approverRoles, pendingRole,
+decisions: [{ step, role, approved, note, decidedAt, decidedBy }], createdAt }`.
+
+Approval chain by the applicant's role: Faculty → HOD → HR Admin;
+Non-Teaching Staff → HR Admin; HOD → Principal; Principal → Super Admin;
+HR Admin → Principal (not yet confirmed by JCET). Days count Monday–Saturday;
+holidays are not subtracted yet.
 
 ## Timetable
 

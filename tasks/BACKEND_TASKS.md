@@ -39,11 +39,12 @@
 
 ## BE-005 Leave
 
-- [ ] Leave types
-- [ ] Balances
-- [ ] Requests
-- [ ] Approval workflow
-- [ ] Validation
+- [x] Leave types (HR-editable: quota, half days, carry-over)
+- [x] Balances (computed per year, with capped carry-over)
+- [x] Requests (apply, cancel while pending)
+- [x] Approval workflow (chain by role; audit-logged)
+- [x] Validation (ranges, half days, overlap, balance)
+- [ ] Holiday calendar (days currently exclude Sundays only)
 
 ## BE-006 Timetable
 

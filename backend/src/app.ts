@@ -16,6 +16,9 @@ import { createDepartmentService } from './modules/departments/department.servic
 import { createEmployeeRepository } from './modules/employees/employee.repository.js';
 import { createEmployeeRouter } from './modules/employees/employee.routes.js';
 import { createEmployeeService } from './modules/employees/employee.service.js';
+import { createLeaveRepository } from './modules/leave/leave.repository.js';
+import { createLeaveRouter } from './modules/leave/leave.routes.js';
+import { createLeaveService } from './modules/leave/leave.service.js';
 import { createTimetableRepository } from './modules/timetable/timetable.repository.js';
 import { createTimetableRouter } from './modules/timetable/timetable.routes.js';
 import { createTimetableService } from './modules/timetable/timetable.service.js';
@@ -62,6 +65,10 @@ export function createApp(
   );
   app.use('/api/v1/departments', createDepartmentRouter(auth, departments));
   app.use('/api/v1/designations', createDesignationRouter(auth, departments));
+  app.use(
+    '/api/v1/leave',
+    createLeaveRouter(auth, createLeaveService(createLeaveRepository(prisma))),
+  );
   app.use(
     '/api/v1/timetable',
     createTimetableRouter(
