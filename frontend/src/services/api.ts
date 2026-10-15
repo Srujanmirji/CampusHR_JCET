@@ -54,6 +54,9 @@ async function send(
   }
 }
 
+// These manage the session itself, so they never trigger a renewal.
+const SESSION_PATHS = ['/auth/login', '/auth/refresh', '/auth/logout'];
+
 export async function apiRequest(
   path: string,
   { method = 'GET', body }: { method?: string; body?: unknown } = {},
@@ -63,7 +66,7 @@ export async function apiRequest(
   if (
     response.status === 401 &&
     accessToken &&
-    !path.startsWith('/auth/') &&
+    !SESSION_PATHS.includes(path) &&
     (await renewSession?.())
   ) {
     response = await send(path, method, body);

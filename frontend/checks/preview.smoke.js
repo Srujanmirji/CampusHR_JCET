@@ -358,6 +358,38 @@ try {
     'Rejected',
   );
   await page.keyboard.press('Escape');
+  // Change password from the profile menu.
+  await page.getByRole('button', profileMenu).click();
+  await page.getByRole('menuitem', { name: 'Change password' }).click();
+  const passwordDialog = page.getByRole('dialog', { name: 'Change password' });
+  await passwordDialog
+    .getByLabel('Current password', { exact: true })
+    .fill('wrong password');
+  await passwordDialog
+    .getByLabel('New password', { exact: true })
+    .fill('a-new-password-123');
+  await passwordDialog
+    .getByLabel('Repeat new password', { exact: true })
+    .fill('something else');
+  await passwordDialog.getByRole('button', { name: 'Change password' }).click();
+  await passwordDialog.getByText('The new passwords don’t match.').waitFor();
+  await passwordDialog
+    .getByLabel('Repeat new password', { exact: true })
+    .fill('a-new-password-123');
+  await passwordDialog.getByRole('button', { name: 'Change password' }).click();
+  await passwordDialog
+    .getByText('Your current password is not right.')
+    .waitFor();
+  await passwordDialog
+    .getByLabel('Current password', { exact: true })
+    .fill(checkPassword);
+  await passwordDialog.getByRole('button', { name: 'Change password' }).click();
+  await page
+    .getByText('Password changed. Your other devices are signed out.')
+    .waitFor();
+  await passwordDialog.waitFor({ state: 'hidden' });
+  assert.equal(api.passwordChanged, true);
+
   // Leave calendar: Asha's two pending days in November; month navigation.
   await page.goto(`${base}/leave?tab=calendar&month=2026-11`);
   await page.getByRole('heading', { name: 'November 2026' }).waitFor();
