@@ -193,19 +193,20 @@ try {
     .getByText('Approved Dr. Suresh Patil’s leave.', { exact: true })
     .waitFor();
   await drawer.waitFor({ state: 'hidden' });
-  // Substitution still runs on its demo leave until it moves to the API.
-  await page.goto(`${base}/substitution?leave=LR001`);
+  // Smart substitution: Asha's approved leave opens first.
+  await page.goto(`${base}/substitution`);
   await page.getByText('0 / 2 Covered', { exact: true }).waitFor();
-  const firstClass = page.locator('#class-TT001');
-  const secondClass = page.locator('#class-TT002');
-  assert.deepEqual(
-    await firstClass.locator('.match-score strong').allTextContents(),
-    ['94%', '86%', '74%'],
-  );
-  assert.deepEqual(
-    await secondClass.locator('.match-score strong').allTextContents(),
-    ['94%', '86%', '74%'],
-  );
+  const firstClass = page.locator('.affected-class-card').nth(0);
+  const secondClass = page.locator('.affected-class-card').nth(1);
+  for (const card of [firstClass, secondClass]) {
+    await card
+      .getByRole('button', { name: 'Assign Prof. Priya Kulkarni', exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await card.locator('.match-score strong').allTextContents(),
+      ['94/100', '86/100', '74/100'],
+    );
+  }
   assert.ok(
     await secondClass
       .getByRole('button', { name: 'Assign Dr. Rahul Deshpande', exact: true })
@@ -241,23 +242,16 @@ try {
     .click();
   await page.getByText('2 / 2 Covered', { exact: true }).waitFor();
   await page.getByText('No classes left uncovered', { exact: true }).waitFor();
-  await page
-    .getByRole('button', { name: 'View Updated Timetable', exact: true })
+  // Undo puts the class back in need of cover.
+  await secondClass.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.getByText('1 / 2 Covered', { exact: true }).waitFor();
+  await secondClass
+    .getByRole('button', { name: 'Assign Prof. Priya Kulkarni', exact: true })
     .click();
-  const timetable = page.getByRole('dialog', {
-    name: 'Updated timetable preview',
-  });
-  await timetable.waitFor();
-  assert.equal(
-    await timetable.getByText('Prof. Priya Kulkarni', { exact: true }).count(),
-    2,
-  );
-  assert.equal(
-    await timetable.getByText('Substitute', { exact: true }).count(),
-    2,
-  );
-  await page.keyboard.press('Escape');
-  await timetable.waitFor({ state: 'hidden' });
+  await page
+    .getByRole('button', { name: 'Confirm Assignment', exact: true })
+    .click();
+  await page.getByText('2 / 2 Covered', { exact: true }).waitFor();
   await page
     .getByRole('link', { name: 'Return to Leave Management', exact: true })
     .click();
@@ -296,11 +290,14 @@ try {
   );
   await page.keyboard.press('Escape');
   await drawer.waitFor({ state: 'hidden' });
-  await page.goto(`${base}/substitution?leave=LR002`);
+  await page.goto(
+    `${base}/substitution?leave=b0000000-0000-4000-8000-000000000002`,
+  );
   await page.getByText('0 / 2 Covered', { exact: true }).waitFor();
-  for (const classId of ['TT003', 'TT004']) {
+  for (const index of [0, 1]) {
     await page
-      .locator(`#class-${classId}`)
+      .locator('.affected-class-card')
+      .nth(index)
       .getByRole('button', { name: 'No substitute required', exact: true })
       .click();
     await page
@@ -363,7 +360,7 @@ try {
   await page.keyboard.press('Escape');
   for (const width of [1440, 1280, 768, 375]) {
     await page.setViewportSize({ width, height: 1000 });
-    for (const route of ['leave', 'substitution?leave=LR001']) {
+    for (const route of ['leave', 'substitution']) {
       await page.goto(`${base}/${route}`);
       await page
         .getByRole('heading', {
@@ -388,10 +385,8 @@ try {
     .getByRole('heading', { name: 'Leave management', exact: true })
     .waitFor();
   // A broken stored demo workflow falls back instead of breaking the app.
-  await page.goto(`${base}/substitution?leave=LR001`);
-  await page
-    .getByRole('heading', { name: 'Smart faculty substitution', exact: true })
-    .waitFor();
+  await page.goto(`${base}/notifications`);
+  await page.locator('main h1').waitFor();
   await dashboard();
   await page.getByRole('button', profileMenu).click();
   await page.getByRole('menuitem', { name: 'Logout' }).click();

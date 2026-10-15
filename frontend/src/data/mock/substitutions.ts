@@ -25,17 +25,6 @@ export const initialNotifications: AppNotification[] = [
 ];
 
 export const initialWorkflow: WorkflowState = {
-  version: 1,
-  statuses: {},
-  coverage: {},
-  rejectionReasons: {},
-  activeLeaveId: null,
+  version: 2,
   notifications: initialNotifications,
 };
-export const scoreCriteria = [
-  { key: 'subject', label: 'Subject Match', max: 35 },
-  { key: 'availability', label: 'Availability', max: 25 },
-  { key: 'department', label: 'Department Match', max: 15 },
-  { key: 'workload', label: 'Workload Availability', max: 15 },
-  { key: 'experience', label: 'Previous Experience', max: 10 },
-] as const;

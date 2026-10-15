@@ -49,14 +49,14 @@ Principal (`features/LEAVE_MANAGEMENT.md`).
 - [ ] Web: leave calendar
 - [x] API for Arihant's mobile leave screens
 
-## 4. Smart Substitution — BE-008, FE-011 · API done; web next
+## 4. Smart Substitution — BE-008, FE-011 · done except notifying
 
 - [x] Find classes affected by an approved leave (from the timetable)
 - [x] Candidates: free in that slot, under workload threshold; rank with the
       35/25/15/15/10 rubric in the API
 - [x] HOD assigns (or records no substitute needed), can undo
 - [ ] Substitute is notified (Zeeshan's Notifications service)
-- [ ] Web: `/substitution` on real data
+- [x] Web: `/substitution` on real data
 
 ## 5. Logins and password reset — BE-002
 

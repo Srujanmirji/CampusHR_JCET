@@ -95,9 +95,9 @@ try {
     'Room LH-203 must be listed',
   );
 
-  // 5. Substitution for an approved leave (demo data until it uses the API)
+  // 5. Smart Substitution for Asha's approved leave
   await page.keyboard.press('Escape');
-  await page.goto(`${base}/substitution?leave=LR001`);
+  await page.goto(`${base}/substitution`);
 
   // 6. Smart Substitution & Score Breakdown
   await page.getByText('0 / 2 Covered', { exact: true }).waitFor();
@@ -106,49 +106,35 @@ try {
     'Smart Recommendation terminology must be used (not AI)',
   );
 
-  const firstClass = page.locator('#class-TT001');
-  const secondClass = page.locator('#class-TT002');
+  const firstClass = page.locator('.affected-class-card').nth(0);
+  const secondClass = page.locator('.affected-class-card').nth(1);
+  await firstClass.getByText('Best Match').first().waitFor();
+  await secondClass.getByText('Workload Limit Reached').first().waitFor();
 
-  // Verify Best Match badge on top candidate (Prof. Priya Kulkarni)
-  assert.ok(
-    await firstClass.getByText('Best Match').first().isVisible(),
-    'Top candidate must display Best Match badge',
-  );
+  // The visible 35/25/15/15/10 rubric
+  for (const label of [
+    'Subject match',
+    'Availability',
+    'Department',
+    'Workload headroom',
+    'Experience',
+  ]) {
+    assert.ok(
+      await firstClass.getByText(label, { exact: true }).first().isVisible(),
+      `${label} must be part of the breakdown`,
+    );
+  }
 
-  // Verify compact score breakdown
+  // Disabled for Dr. Rahul Deshpande (over his weekly maximum)
   assert.ok(
-    await firstClass.getByText('Subject expertise').first().isVisible(),
-    'Subject expertise must be part of breakdown',
-  );
-  assert.ok(
-    await firstClass.getByText('Availability').first().isVisible(),
-    'Availability must be part of breakdown',
-  );
-  assert.ok(
-    await firstClass.getByText('Department match').first().isVisible(),
-    'Department match must be part of breakdown',
-  );
-  assert.ok(
-    await firstClass.getByText('Workload').first().isVisible(),
-    'Workload must be part of breakdown',
-  );
-  assert.ok(
-    await firstClass.getByText('Previous experience').first().isVisible(),
-    'Previous experience must be part of breakdown',
-  );
-
-  // Verify disabled state for Dr. Rahul Deshpande (Workload Limit Reached)
-  const disabledBtn = secondClass.getByRole('button', {
-    name: 'Assign Dr. Rahul Deshpande',
-    exact: true,
-  });
-  assert.ok(
-    await disabledBtn.isDisabled(),
+    await secondClass
+      .getByRole('button', { name: 'Assign Dr. Rahul Deshpande', exact: true })
+      .isDisabled(),
     'Dr. Rahul Deshpande assign button must be disabled due to workload',
   );
   assert.ok(
-    await secondClass.getByText('Workload Limit Reached').first().isVisible(),
-    'Workload Limit Reached badge must be shown',
+    await secondClass.getByText(/over the 18-hour maximum/).isVisible(),
+    'The reason must be shown in words, not only on hover',
   );
 
   // 7. Assign substitute for class 1
@@ -158,20 +144,17 @@ try {
   await page
     .getByRole('button', { name: 'Confirm Assignment', exact: true })
     .click();
-
   await page.getByText('1 / 2 Covered', { exact: true }).waitFor();
-
-  // Verify Assignment Success State on Class 1
   assert.ok(
     await firstClass.getByText('Substitute Assigned').first().isVisible(),
-    'Substitute Assigned banner must appear',
+    'Substitute Assigned badge must appear',
   );
   assert.ok(
     await firstClass.getByText('Prof. Priya Kulkarni').first().isVisible(),
     'Prof. Priya Kulkarni must be shown as substitute',
   );
   assert.ok(
-    await firstClass.getByText('Original Faculty:').first().isVisible(),
+    await firstClass.getByText('Original faculty:').first().isVisible(),
     'Original faculty label must be visible',
   );
   assert.ok(
@@ -186,66 +169,21 @@ try {
   await page
     .getByRole('button', { name: 'Confirm Assignment', exact: true })
     .click();
-
   await page.getByText('2 / 2 Covered', { exact: true }).waitFor();
-
-  // Verify Completion Screen
   assert.ok(
     await page.getByText('All Classes Covered', { exact: true }).isVisible(),
     'All Classes Covered header must be visible',
   );
   assert.ok(
-    await page.getByText('2 classes affected', { exact: true }).isVisible(),
-    '2 classes affected metric must be visible',
-  );
-  assert.ok(
-    await page.getByText('2 classes resolved', { exact: true }).isVisible(),
-    '2 classes resolved metric must be visible',
-  );
-  assert.ok(
-    await page.getByText('0 classes uncovered', { exact: true }).isVisible(),
-    '0 classes uncovered metric must be visible',
+    (await page.locator('.workflow-success').textContent()).includes(
+      '2 substitutes assigned',
+    ),
+    'Completion must count the substitutes',
   );
 
-  // 9. Updated Timetable Preview
-  await page
-    .getByRole('button', { name: 'View Updated Timetable', exact: true })
-    .click();
-  const timetable = page.getByRole('dialog', {
-    name: 'Updated timetable preview',
-  });
-  await timetable.waitFor();
-  assert.ok(
-    await timetable.getByText('Prof. Priya Kulkarni').first().isVisible(),
-    'Timetable preview must show substitute Prof. Priya Kulkarni',
-  );
-  assert.ok(
-    await timetable.getByText('Substitute').first().isVisible(),
-    'Timetable preview must show Substitute badge',
-  );
-  await page.keyboard.press('Escape');
-  await timetable.waitFor({ state: 'hidden' });
-
-  // 10. Notifications Update Check
-  const notifButton = page.getByRole('button', {
-    name: /notifications/i,
-  });
-  if (await notifButton.isVisible()) {
-    await notifButton.click();
-    assert.ok(
-      await page
-        .getByText(/Prof\. Asha Patil/i)
-        .first()
-        .isVisible(),
-      'Notification stream should mention Prof. Asha Patil',
-    );
-    await page.keyboard.press('Escape');
-  }
-
-  // 11. Workflow data reset (Settings)
+  // 11. Workflow data reset (Settings) restores the demo notifications
   await page.goto(`${base}/settings`);
   await page.getByRole('button', { name: 'Reset data', exact: true }).click();
-
   const resetModal = page.getByRole('dialog');
   await resetModal.waitFor();
   assert.ok(
@@ -255,10 +193,7 @@ try {
   await resetModal
     .getByRole('button', { name: 'Reset data', exact: true })
     .click();
-
-  // Reset clears the demo class coverage
-  await page.goto(`${base}/substitution?leave=LR001`);
-  await page.getByText('0 / 2 Covered', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Notifications, 3 unread' }).waitFor();
 
   // 12. Module pages carry no planned/prototype banners
   for (const route of ['workload', 'employees', 'settings']) {

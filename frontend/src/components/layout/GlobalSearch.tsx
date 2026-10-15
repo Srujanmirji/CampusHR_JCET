@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, UsersRound, LayoutGrid } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { leaveRequests } from '@/data/mock/dashboard';
+import { employees } from '@/data/mock/employees';
 import { navigation } from '@/data/navigation';
 import { SearchInput } from '@/components/shared/SearchInput';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -15,18 +15,18 @@ export function GlobalSearch() {
   const search = query.trim().toLocaleLowerCase();
   const results = search
     ? [
-        ...leaveRequests
+        ...employees
           .filter(
-            (request) =>
+            (employee) =>
               can('employee.read') &&
-              `${request.employee} ${request.department}`
+              `${employee.name} ${employee.department}`
                 .toLowerCase()
                 .includes(search),
           )
-          .map((request) => ({
-            id: request.id,
-            label: request.employee,
-            detail: `${request.department} · employee`,
+          .map((employee) => ({
+            id: employee.id,
+            label: employee.name,
+            detail: `${employee.department} · employee`,
             path: '/employees',
             icon: UsersRound,
           })),

@@ -213,11 +213,159 @@ const ashaClasses = [
   endPeriod,
 }));
 
+// Substitution: two approved leaves with two classes each on 12 Oct 2026.
+const me = { id: 3, code: 'ME', name: 'Mechanical Engineering' };
+const cover = (
+  id,
+  department,
+  subject,
+  kind,
+  room,
+  startPeriod,
+  endPeriod,
+) => ({
+  id,
+  department,
+  semester: 5,
+  section: 'A',
+  batch: kind === 'LAB' ? 'A1' : null,
+  subject: {
+    id: Number(id.at(-1)),
+    code: subject.slice(0, 6),
+    name: subject,
+    kind,
+  },
+  faculty: { id: 'x', employeeCode: 'x', name: 'x' },
+  room: { id: 1, name: room, kind: kind === 'LAB' ? 'LAB' : 'CLASSROOM' },
+  day: 'MON',
+  startPeriod,
+  endPeriod,
+});
+const approvedLeave = (id, employee, department) => ({
+  id,
+  employee,
+  department,
+  leaveType: casualLeave,
+  startDate: '2026-10-12',
+  endDate: '2026-10-12',
+  halfDay: null,
+  days: 1,
+});
+const substitutionLeave = [
+  {
+    leave: approvedLeave(
+      'b0000000-0000-4000-8000-000000000001',
+      {
+        id: facultyUser.employeeId,
+        employeeCode: 'JCET-CSE-021',
+        name: 'Prof. Asha Patil',
+      },
+      cse,
+    ),
+    classes: [
+      cover(
+        'd0000000-0000-4000-8000-000000000001',
+        cse,
+        'Database Management Systems',
+        'THEORY',
+        'LH-203',
+        1,
+        1,
+      ),
+      cover(
+        'd0000000-0000-4000-8000-000000000002',
+        cse,
+        'DBMS Lab',
+        'LAB',
+        'CS Lab 1',
+        2,
+        2,
+      ),
+    ],
+  },
+  {
+    leave: approvedLeave(
+      'b0000000-0000-4000-8000-000000000002',
+      {
+        id: 'e0000000-0000-4000-8000-000000000008',
+        employeeCode: 'JCET-ME-008',
+        name: 'Dr. Mahesh B',
+      },
+      me,
+    ),
+    classes: [
+      cover(
+        'd0000000-0000-4000-8000-000000000003',
+        me,
+        'Heat Transfer',
+        'THEORY',
+        'ME-101',
+        1,
+        1,
+      ),
+      cover(
+        'd0000000-0000-4000-8000-000000000004',
+        me,
+        'Applied Thermodynamics',
+        'THEORY',
+        'ME-102',
+        2,
+        2,
+      ),
+    ],
+  },
+];
+const candidate = (id, name, score, eligible) => ({
+  faculty: {
+    id,
+    employeeCode: `JCET-CSE-0${id.at(-1)}`,
+    name,
+    department: { id: 1, code: 'CSE' },
+    designation: 'Assistant Professor',
+  },
+  score,
+  points: {
+    subject: 35,
+    availability: 25,
+    department: 15,
+    workload: score - 85,
+    experience: 10,
+  },
+  hoursAfter: eligible ? 15 : 19,
+  maxHours: 18,
+  eligible,
+  reason: eligible
+    ? null
+    : 'Would teach 19 hours that week, over the 18-hour maximum.',
+});
+const candidatesFor = (entryId) => [
+  candidate(
+    'f0000000-0000-4000-8000-000000000001',
+    'Prof. Priya Kulkarni',
+    94,
+    true,
+  ),
+  candidate(
+    'f0000000-0000-4000-8000-000000000002',
+    'Prof. Ravi Hegde',
+    86,
+    true,
+  ),
+  candidate(
+    'f0000000-0000-4000-8000-000000000003',
+    'Dr. Rahul Deshpande',
+    74,
+    !entryId.endsWith('2'),
+  ),
+];
+
 export async function mockAuthApi(page, webOrigin) {
   const state = {
     user: undefined,
     lastLogin: undefined,
     leave: initialLeave(),
+    // Substitution coverage by timetable entry id.
+    coverage: {},
   };
   const cors = {
     'Access-Control-Allow-Origin': webOrigin,
@@ -319,6 +467,77 @@ export async function mockAuthApi(page, webOrigin) {
         data: facultyId === facultyUser.employeeId ? ashaClasses : [],
       });
     }
+    if (path === 'substitution/leave') {
+      return json(route, 200, {
+        data: substitutionLeave.map(({ leave, classes }) => ({
+          leave,
+          classes: classes.length,
+          covered: classes.filter((entry) => state.coverage[entry.id]).length,
+        })),
+      });
+    }
+    const subMatch = path.match(
+      /^substitution\/leave\/([^/]+)(\/candidates)?$/,
+    );
+    if (subMatch) {
+      const found = substitutionLeave.find(
+        (item) => item.leave.id === subMatch[1],
+      );
+      if (!found) {
+        return json(route, 404, {
+          error: { code: 'NOT_FOUND', message: 'Approved leave not found.' },
+        });
+      }
+      if (subMatch[2]) {
+        const entryId = new URL(request.url()).searchParams.get('entryId');
+        return json(route, 200, { data: candidatesFor(entryId) });
+      }
+      return json(route, 200, {
+        data: {
+          leave: found.leave,
+          classes: found.classes.map((entry) => ({
+            date: '2026-10-12',
+            hours: 1,
+            entry,
+            coverage: state.coverage[entry.id] ?? null,
+          })),
+        },
+      });
+    }
+    if (path === 'substitution/assignments') {
+      const body = request.postDataJSON();
+      if (state.coverage[body.timetableEntryId]) {
+        return json(route, 409, {
+          error: {
+            code: 'ALREADY_COVERED',
+            message: 'This class is already covered.',
+          },
+        });
+      }
+      const pick = candidatesFor(body.timetableEntryId).find(
+        (item) => item.faculty.id === body.substituteId,
+      );
+      state.coverage[body.timetableEntryId] = {
+        id: `cov-${body.timetableEntryId}`,
+        kind: pick ? 'SUBSTITUTE' : 'NOT_NEEDED',
+        substitute: pick
+          ? {
+              id: pick.faculty.id,
+              employeeCode: pick.faculty.employeeCode,
+              name: pick.faculty.name,
+            }
+          : null,
+        note: body.note ?? null,
+        assignedAt: '2026-10-15T10:00:00.000Z',
+      };
+      return json(route, 201, { data: state.coverage[body.timetableEntryId] });
+    }
+    if (path.startsWith('substitution/assignments/')) {
+      const entryId = path.replace('substitution/assignments/cov-', '');
+      delete state.coverage[entryId];
+      return route.fulfill({ status: 204, headers: cors });
+    }
+    if (path === 'substitution/mine') return json(route, 200, { data: [] });
     if (path === 'leave/types') return json(route, 200, { data: leaveTypes });
     if (path === 'leave/balances') {
       const pending = state.leave

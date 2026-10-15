@@ -23,7 +23,6 @@ import {
   Legend,
   CartesianGrid,
 } from 'recharts';
-import { useAcademicWorkflow } from '@/features/leave/useAcademicWorkflow';
 import { employees } from '@/data/mock/employees';
 import {
   mockDailyAttendance,
@@ -44,23 +43,16 @@ import {
 import { toast } from 'sonner';
 
 export default function AttendancePage() {
-  const workflow = useAcademicWorkflow();
   const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedDate, setSelectedDate] = useState<string>('2026-10-12');
-
-  const ashaLeaveStatus = workflow.status('LR001');
 
   // Filter attendance records
   const filteredRecords = useMemo(() => {
     return mockDailyAttendance
       .map((record) => {
         const emp = employees.find((e) => e.id === record.employeeId);
-        // Dynamic status if Prof. Asha Patil's leave approved
-        const effectiveStatus: AttendanceStatus =
-          record.employeeId === 'JCET-CSE-021' && ashaLeaveStatus === 'Approved'
-            ? 'On Leave'
-            : record.status;
+        const effectiveStatus: AttendanceStatus = record.status;
 
         const effectiveCheckIn =
           effectiveStatus === 'On Leave' ? '—' : record.checkIn;
@@ -91,7 +83,7 @@ export default function AttendancePage() {
         }
         return true;
       });
-  }, [departmentFilter, statusFilter, ashaLeaveStatus]);
+  }, [departmentFilter, statusFilter]);
 
   return (
     <PageTransition>

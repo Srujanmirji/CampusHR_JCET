@@ -92,11 +92,12 @@ Verification and launch steps: `frontend/README.md`.
 
 ## FE-011 Substitution
 
-- [x] Affected class list
-- [x] Candidate ranking (visible rule rubric; availability and workload checks)
-- [x] Assignment action (confirmation, coverage progress, completion, updated timetable)
+- [x] Affected class list (API data: approved leave × timetable)
+- [x] Candidate ranking (API rubric with per-part points; workload limit shown in words)
+- [x] Assignment action (confirmation, coverage progress, completion, undo)
 - [x] Manual no-substitute decision with academic arrangement
-- [x] Session persistence and interactive end-to-end check
+- [x] "Classes you are covering" for faculty
+- [ ] Updated timetable view with substitutes
 
 ## FE-013 Documents
 
