@@ -26,6 +26,28 @@ Access tokens are HS256 JWTs valid for 15 minutes. `user` includes
 `permissions`, the granted keys (e.g. `leave.approve.department`), so clients can
 hide what the user cannot do.
 
+## Logins
+
+Implemented. All need `user.manage` (Super Admin, HR Admin). A login signs in
+with the employee's college email or employee ID. Changes are audit-logged
+(never with the password hash).
+
+- `GET /users/roles` → `[{ id, name }]` the caller may give (HR Admin does not
+  see Super Admin).
+- `GET /users/employee/:employeeId` → the employee's login or `null`.
+- `POST /users` `{ employeeId, roleId, password }` (password 12–72 bytes) →
+  201 `{ id, email, status, employeeId, role: { id, name }, lastLoginAt,
+createdAt }`. 409 if the employee already has a login; 400 for an archived
+  employee.
+- `PATCH /users/:id` `{ roleId?, status?: ACTIVE|INACTIVE, password? }` →
+  the login. Turning it off or setting a new password signs the person out
+  everywhere. Nobody changes their own role or status; only a Super Admin
+  gives the Super Admin role or changes a Super Admin login (403). An
+  archived employee's login cannot be turned back on.
+
+Until password reset by email exists, HR sets a new password here and hands
+it over in person.
+
 ## Permissions
 
 Protected routes use `requirePermission(auth, 'resource.action')`
@@ -88,13 +110,46 @@ Implemented.
 
 ## Leave
 
-- GET /leave/requests
-- POST /leave/requests
-- GET /leave/requests/:id
-- PATCH /leave/requests/:id/approve
-- PATCH /leave/requests/:id/reject
-- PATCH /leave/requests/:id/cancel
-- GET /leave/balances
+Implemented. Leave types, quotas, half days and carry-over are data HR
+enters; nothing is seeded, so nobody can apply until HR adds a type.
+
+- `GET /leave/types` (`leave.read`) → every type, including retired ones
+  (`active: false`).
+- `POST /leave/types` (`leave_type.manage`) `{ code, name, yearlyQuota (days
+or null for no limit), allowHalfDay?, carryForwardMax?, active? }` → 201;
+  409 if the code or name exists. `PATCH /leave/types/:id` takes any of
+  those fields. Amounts are whole or half days. Audit-logged.
+- `GET /leave/balances?employeeId&year` (`leave.read`) → per type `{ leaveType,
+active, year, entitled, carriedIn, used, pending, remaining }`; `entitled` and
+  `remaining` are null for a type without a limit. Defaults: the caller and
+  this year. HODs see their department; faculty and staff themselves.
+- `GET /leave/requests?status&employeeId&year&awaitingMe` (`leave.read`) →
+  requests in the caller's scope, newest first (at most 500). With
+  `awaitingMe=true`: pending requests waiting for the caller's decision.
+- `GET /leave/requests/:id` → one request; 404 outside the caller's scope.
+- `POST /leave/requests` (`leave.apply`) `{ leaveTypeId, startDate, endDate,
+halfDay?: FIRST|SECOND, reason }` (dates `YYYY-MM-DD`) → 201 with `days`,
+  `approverRoles` and `pendingRole`. Refused: last day before first, a half
+  day over more than one date or on a type without half days, dates that
+  cross 31 December, only Sundays (400); overlap with the applicant's
+  pending or approved leave (409 `OVERLAP`); more days than remain (400
+  `INSUFFICIENT_BALANCE`, pending days count as used).
+- `PATCH /leave/requests/:id/approve` `{ note? }` and `/reject` `{ note }`
+  (`leave.approve`) → the request. Only the role in `pendingRole` acts (an
+  HOD only for their department), never on their own leave (403). Approving
+  the last step makes it APPROVED. 409 `ALREADY_DECIDED` if it changed
+  meanwhile. Audit-logged.
+- `PATCH /leave/requests/:id/cancel` (`leave.cancel`) → the applicant cancels
+  while PENDING; 409 `NOT_PENDING` otherwise.
+
+Request: `{ id, employee: { id, employeeCode, name }, department, leaveType,
+startDate, endDate, halfDay, days, reason, status, approverRoles, pendingRole,
+decisions: [{ step, role, approved, note, decidedAt, decidedBy }], createdAt }`.
+
+Approval chain by the applicant's role: Faculty → HOD → HR Admin;
+Non-Teaching Staff → HR Admin; HOD → Principal; Principal → Super Admin;
+HR Admin → Principal (not yet confirmed by JCET). Days count Monday–Saturday;
+holidays are not subtracted yet.
 
 ## Timetable
 
