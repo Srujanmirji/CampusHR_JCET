@@ -290,7 +290,7 @@ export function EmployeeProfileDrawer({
       </Sheet>
 
       <Dialog open={confirmArchive} onOpenChange={setConfirmArchive}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Archive {name}?</DialogTitle>
             <DialogDescription>

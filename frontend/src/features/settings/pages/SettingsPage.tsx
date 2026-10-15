@@ -361,7 +361,7 @@ export default function SettingsPage() {
 
       {/* Confirmation dialog for workflow data reset */}
       <Dialog open={resetModalOpen} onOpenChange={setResetModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Reset workflow data?</DialogTitle>
             <DialogDescription>

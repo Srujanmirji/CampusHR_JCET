@@ -29,7 +29,7 @@ export function ReportPreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader className="border-b pb-3">
           <div className="flex items-start justify-between gap-3">
             <div>

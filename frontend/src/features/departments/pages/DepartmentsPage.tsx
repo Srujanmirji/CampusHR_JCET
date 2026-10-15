@@ -72,7 +72,7 @@ function AddDepartmentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add department</DialogTitle>
           <DialogDescription>
@@ -177,7 +177,7 @@ function EditDepartmentDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Edit {department.code}</DialogTitle>
           <DialogDescription>
