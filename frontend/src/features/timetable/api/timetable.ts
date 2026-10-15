@@ -111,6 +111,7 @@ export async function listEntries(filters: {
   departmentId?: number;
   semester?: number;
   section?: string;
+  facultyId?: string;
 }) {
   return list(entrySchema).parse(
     await apiRequest(`/timetable/entries?${query(filters)}`),

@@ -68,9 +68,10 @@ Verification and launch steps: `frontend/README.md`.
 
 ## FE-008 Leave
 
-- [ ] Apply
-- [x] Approval list (summaries, search, status/department filters)
-- [x] Approval drawer (details, balance/history, academic impact, approve/reject)
+- [x] Apply (API data: balances, half days, working-day preview)
+- [x] Approval list (API data: waiting for me, status filters, search)
+- [x] Approval drawer (approval steps, timetable impact, approve/reject with note, cancel own)
+- [x] Leave types for HR (quota, half days, carry-over, retire)
 - [ ] Calendar
 
 ## FE-009 Timetable

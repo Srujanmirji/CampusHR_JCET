@@ -34,7 +34,7 @@ repository, schema — copy `employees/`) and
 - [x] Web: `/workload` on real data, plus the workload chart
 - [x] Tests for the calculation (unit) and endpoints (`test/db`)
 
-## 3. Leave — BE-005, FE-008 · API done; web next
+## 3. Leave — BE-005, FE-008 · done except the calendar
 
 Decided: calendar leave year; Faculty → HOD → HR, staff → HR, HOD →
 Principal (`features/LEAVE_MANAGEMENT.md`).
@@ -45,7 +45,8 @@ Principal (`features/LEAVE_MANAGEMENT.md`).
 - [x] Approval steps with the next approver shown; reject with a note
 - [x] Validation: no overlapping requests, no negative balance, valid ranges
 - [x] Audit-log every approval (`backend/src/common/audit.ts`)
-- [ ] Web: apply form, approval list and drawer on real data, leave calendar
+- [x] Web: apply form, approval list and drawer on real data
+- [ ] Web: leave calendar
 - [x] API for Arihant's mobile leave screens
 
 ## 4. Smart Substitution — BE-008, FE-011

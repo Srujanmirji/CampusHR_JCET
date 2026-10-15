@@ -110,8 +110,115 @@ const designations = [
   { id: 9, name: 'Lab Instructor', category: 'NON_TEACHING', level: 5 },
 ];
 
+// Leave: Super Admin decides the Principal's leave; Asha's waits for her HOD.
+const casualLeave = { id: 1, code: 'CL', name: 'Casual Leave' };
+const leaveTypes = [
+  {
+    ...casualLeave,
+    yearlyQuota: 12,
+    allowHalfDay: true,
+    carryForwardMax: 0,
+    active: true,
+  },
+];
+const principal = {
+  id: 'e0000000-0000-4000-8000-000000000009',
+  employeeCode: 'JCET-ADM-001',
+  name: 'Dr. Suresh Patil',
+};
+const leaveRequest = (id, employee, department, dates, roles, reason) => ({
+  id,
+  employee,
+  department,
+  leaveType: casualLeave,
+  startDate: dates[0],
+  endDate: dates[1],
+  halfDay: null,
+  days: dates[2],
+  reason,
+  status: 'PENDING',
+  approverRoles: roles,
+  pendingRole: roles[0],
+  decisions: [],
+  createdAt: '2026-10-14T09:00:00.000Z',
+});
+const initialLeave = () => [
+  leaveRequest(
+    'a0000000-0000-4000-8000-000000000001',
+    principal,
+    admin,
+    ['2026-11-05', '2026-11-05', 1],
+    ['Super Admin'],
+    'AICTE regional meeting in Bengaluru.',
+  ),
+  leaveRequest(
+    'a0000000-0000-4000-8000-000000000002',
+    {
+      id: facultyUser.employeeId,
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
+    cse,
+    ['2026-11-02', '2026-11-03', 2],
+    ['HOD', 'HR Admin'],
+    'A family commitment in Dharwad.',
+  ),
+  leaveRequest(
+    'a0000000-0000-4000-8000-000000000003',
+    principal,
+    admin,
+    ['2026-11-20', '2026-11-20', 1],
+    ['Super Admin'],
+    'Personal work.',
+  ),
+];
+// Asha teaches on the Monday and Tuesday of her leave.
+const ashaClasses = [
+  [
+    'MON',
+    2,
+    2,
+    {
+      id: 11,
+      code: 'BCS501',
+      name: 'Database Management Systems',
+      kind: 'THEORY',
+    },
+    { id: 1, name: 'LH-203', kind: 'CLASSROOM' },
+    null,
+  ],
+  [
+    'TUE',
+    5,
+    7,
+    { id: 12, code: 'BCSL504', name: 'DBMS Lab', kind: 'LAB' },
+    { id: 2, name: 'CS Lab 1', kind: 'LAB' },
+    'A1',
+  ],
+].map(([day, startPeriod, endPeriod, subject, room, batch], index) => ({
+  id: `c0000000-0000-4000-8000-00000000000${index + 1}`,
+  department: cse,
+  semester: 5,
+  section: 'A',
+  batch,
+  subject,
+  faculty: {
+    id: facultyUser.employeeId,
+    employeeCode: 'JCET-CSE-021',
+    name: 'Prof. Asha Patil',
+  },
+  room,
+  day,
+  startPeriod,
+  endPeriod,
+}));
+
 export async function mockAuthApi(page, webOrigin) {
-  const state = { user: undefined, lastLogin: undefined };
+  const state = {
+    user: undefined,
+    lastLogin: undefined,
+    leave: initialLeave(),
+  };
   const cors = {
     'Access-Control-Allow-Origin': webOrigin,
     'Access-Control-Allow-Credentials': 'true',
@@ -206,7 +313,89 @@ export async function mockAuthApi(page, webOrigin) {
         ],
       });
     }
-    if (path === 'timetable/entries') return json(route, 200, { data: [] });
+    if (path === 'timetable/entries') {
+      const facultyId = new URL(request.url()).searchParams.get('facultyId');
+      return json(route, 200, {
+        data: facultyId === facultyUser.employeeId ? ashaClasses : [],
+      });
+    }
+    if (path === 'leave/types') return json(route, 200, { data: leaveTypes });
+    if (path === 'leave/balances') {
+      const pending = state.leave
+        .filter(
+          (leave) =>
+            leave.employee.id === state.user.employeeId &&
+            leave.status === 'PENDING',
+        )
+        .reduce((sum, leave) => sum + leave.days, 0);
+      return json(route, 200, {
+        data: [
+          {
+            leaveType: casualLeave,
+            active: true,
+            year: 2026,
+            entitled: 12,
+            carriedIn: 0,
+            used: 0,
+            pending,
+            remaining: 12 - pending,
+          },
+        ],
+      });
+    }
+    if (path === 'leave/requests' && request.method() === 'GET') {
+      const query = new URL(request.url()).searchParams;
+      const user = state.user;
+      const data = state.leave.filter(
+        (leave) =>
+          (!user.employeeId || leave.employee.id === user.employeeId) &&
+          (query.get('awaitingMe') !== 'true' ||
+            (leave.status === 'PENDING' &&
+              leave.pendingRole === user.role &&
+              leave.employee.id !== user.employeeId)) &&
+          (!query.get('status') || leave.status === query.get('status')) &&
+          (!query.get('employeeId') ||
+            leave.employee.id === query.get('employeeId')),
+      );
+      return json(route, 200, { data });
+    }
+    const leaveMatch = path.match(
+      /^leave\/requests\/([^/]+)(?:\/(approve|reject|cancel))?$/,
+    );
+    if (leaveMatch) {
+      const leave = state.leave.find((item) => item.id === leaveMatch[1]);
+      if (!leave) {
+        return json(route, 404, {
+          error: { code: 'NOT_FOUND', message: 'Leave request not found.' },
+        });
+      }
+      const action = leaveMatch[2];
+      if (action) {
+        const note = request.postDataJSON()?.note ?? null;
+        if (action === 'cancel') {
+          Object.assign(leave, { status: 'CANCELLED', pendingRole: null });
+        } else {
+          leave.decisions.push({
+            step: leave.decisions.length,
+            role: leave.pendingRole,
+            approved: action === 'approve',
+            note,
+            decidedAt: '2026-10-15T10:00:00.000Z',
+            decidedBy: state.user.email,
+          });
+          const next =
+            action === 'approve'
+              ? (leave.approverRoles[leave.decisions.length] ?? null)
+              : null;
+          Object.assign(leave, {
+            pendingRole: next,
+            status:
+              action === 'reject' ? 'REJECTED' : next ? 'PENDING' : 'APPROVED',
+          });
+        }
+      }
+      return json(route, 200, { data: leave });
+    }
     if (path === 'timetable/subjects' || path === 'timetable/rooms') {
       return json(route, 200, { data: [] });
     }
