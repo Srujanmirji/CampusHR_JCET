@@ -175,12 +175,15 @@ Seeded: Professor 10–14, Associate Professor 12–16, Assistant Professor
 
 ### substitutions
 
-- id
-- original_faculty_id
-- substitute_faculty_id
-- timetable_entry_id
-- date
-- status
+Implemented. How each class missed through approved leave is covered.
+
+- id (uuid)
+- leave_request_id → leave_requests; timetable_entry_id → timetable_entries
+  (deleting the class deletes its coverage)
+- date; unique (timetable_entry_id, date)
+- kind (SUBSTITUTE | NOT_NEEDED); substitute_id → employees (SUBSTITUTE only);
+  note (the arrangement, required for NOT_NEEDED)
+- assigned_by_user_id → users, created_at
 
 ### documents
 

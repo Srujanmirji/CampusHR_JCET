@@ -19,7 +19,7 @@ repository, schema — copy `employees/`) and
       faculty, create / update / delete — `timetable.read`, `timetable.manage`
 - [x] Clash detection: same faculty, room or class section at overlapping
       periods is refused with a clear message
-- [ ] Faculty availability (who is free in a slot) — build with Substitution
+- [x] Faculty availability (who is free in a slot) — in substitution candidates
 - [x] Web: `/timetable` on API data; HOD adds, edits and removes classes;
       clashes shown in the dialog; faculty see "My timetable"
 - [x] Tests: clash rules (unit), endpoints (`test/db`, in-memory PostgreSQL)
@@ -49,12 +49,13 @@ Principal (`features/LEAVE_MANAGEMENT.md`).
 - [ ] Web: leave calendar
 - [x] API for Arihant's mobile leave screens
 
-## 4. Smart Substitution — BE-008, FE-011
+## 4. Smart Substitution — BE-008, FE-011 · API done; web next
 
-- [ ] Find classes affected by an approved leave (from the timetable)
-- [ ] Candidates: free in that slot, under workload threshold; rank with the
-      rubric in `frontend/src/lib/academic.ts` (move it to the API)
-- [ ] HOD assigns; substitute is notified (Zeeshan's Notifications service)
+- [x] Find classes affected by an approved leave (from the timetable)
+- [x] Candidates: free in that slot, under workload threshold; rank with the
+      35/25/15/15/10 rubric in the API
+- [x] HOD assigns (or records no substitute needed), can undo
+- [ ] Substitute is notified (Zeeshan's Notifications service)
 - [ ] Web: `/substitution` on real data
 
 ## 5. Logins and password reset — BE-002

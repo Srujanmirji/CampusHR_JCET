@@ -45,22 +45,23 @@ enum UserStatus {
 }
 
 model User {
-  id             String           @id @default(uuid()) @db.Uuid
+  id                    String           @id @default(uuid()) @db.Uuid
   // Stored lowercase; lookups lowercase their input.
-  email          String           @unique
-  passwordHash   String           @map("password_hash")
-  roleId         Int              @map("role_id")
-  role           Role             @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  email                 String           @unique
+  passwordHash          String           @map("password_hash")
+  roleId                Int              @map("role_id")
+  role                  Role             @relation(fields: [roleId], references: [id], onDelete: Restrict)
   // Staff accounts link to their employee record; the Super Admin system
   // account has none.
-  employeeId     String?          @unique @map("employee_id") @db.Uuid
-  employee       Employee?        @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  status         UserStatus       @default(ACTIVE)
-  lastLoginAt    DateTime?        @map("last_login_at")
-  leaveDecisions LeaveDecision[]
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
-  sessions       RefreshSession[]
+  employeeId            String?          @unique @map("employee_id") @db.Uuid
+  employee              Employee?        @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  status                UserStatus       @default(ACTIVE)
+  lastLoginAt           DateTime?        @map("last_login_at")
+  leaveDecisions        LeaveDecision[]
+  substitutionsAssigned Substitution[]
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+  sessions              RefreshSession[]
 
   @@map("users")
 }
@@ -163,6 +164,7 @@ model Employee {
   headOf          Department?      @relation("DepartmentHod")
   timetable       TimetableEntry[]
   leaveRequests   LeaveRequest[]
+  substitutions   Substitution[]
 
   @@index([departmentId])
   @@index([status])
@@ -250,25 +252,26 @@ model Room {
 // One class: a section (or a lab batch of it) on a day, over one or more
 // consecutive periods.
 model TimetableEntry {
-  id           String     @id @default(uuid()) @db.Uuid
-  departmentId Int        @map("department_id")
-  department   Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  semester     Int
+  id            String         @id @default(uuid()) @db.Uuid
+  departmentId  Int            @map("department_id")
+  department    Department     @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  semester      Int
   // Class section, e.g. A.
-  section      String
+  section       String
   // Lab batch within the section, e.g. A1; null for the whole section.
-  batch        String?
-  subjectId    Int        @map("subject_id")
-  subject      Subject    @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  facultyId    String     @map("faculty_id") @db.Uuid
-  faculty      Employee   @relation(fields: [facultyId], references: [id], onDelete: Restrict)
-  roomId       Int        @map("room_id")
-  room         Room       @relation(fields: [roomId], references: [id], onDelete: Restrict)
-  day          Weekday
-  startPeriod  Int        @map("start_period")
-  endPeriod    Int        @map("end_period")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  updatedAt    DateTime   @updatedAt @map("updated_at")
+  batch         String?
+  subjectId     Int            @map("subject_id")
+  subject       Subject        @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  facultyId     String         @map("faculty_id") @db.Uuid
+  faculty       Employee       @relation(fields: [facultyId], references: [id], onDelete: Restrict)
+  roomId        Int            @map("room_id")
+  room          Room           @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  day           Weekday
+  startPeriod   Int            @map("start_period")
+  endPeriod     Int            @map("end_period")
+  substitutions Substitution[]
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
 
   @@index([departmentId, semester, section, day])
   @@index([facultyId, day])
@@ -352,6 +355,7 @@ model LeaveRequest {
   // Role that acts next; null once the request is decided or cancelled.
   pendingRole   String?         @map("pending_role")
   decisions     LeaveDecision[]
+  substitutions Substitution[]
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
 
@@ -375,4 +379,40 @@ model LeaveDecision {
 
   @@index([requestId])
   @@map("leave_decisions")
+}
+
+// Smart substitution (features/SMART_SUBSTITUTION.md): how each class missed
+// through approved leave is covered, one row per class and date.
+
+enum CoverageKind {
+  // Another faculty member takes the class.
+  SUBSTITUTE
+  // Handled without a substitute (e.g. supervised self-study); see note.
+  NOT_NEEDED
+
+  @@map("coverage_kind")
+}
+
+model Substitution {
+  id               String         @id @default(uuid()) @db.Uuid
+  leaveRequestId   String         @map("leave_request_id") @db.Uuid
+  leaveRequest     LeaveRequest   @relation(fields: [leaveRequestId], references: [id], onDelete: Restrict)
+  // ponytail: a deleted class takes its coverage with it; keep a snapshot
+  // of the class if past coverage must survive timetable changes.
+  timetableEntryId String         @map("timetable_entry_id") @db.Uuid
+  timetableEntry   TimetableEntry @relation(fields: [timetableEntryId], references: [id], onDelete: Cascade)
+  date             DateTime       @db.Date
+  kind             CoverageKind
+  substituteId     String?        @map("substitute_id") @db.Uuid
+  substitute       Employee?      @relation(fields: [substituteId], references: [id], onDelete: Restrict)
+  // The arrangement when no substitute is needed.
+  note             String?
+  assignedByUserId String         @map("assigned_by_user_id") @db.Uuid
+  assignedBy       User           @relation(fields: [assignedByUserId], references: [id], onDelete: Restrict)
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  @@unique([timetableEntryId, date])
+  @@index([substituteId, date])
+  @@index([leaveRequestId])
+  @@map("substitutions")
 }
