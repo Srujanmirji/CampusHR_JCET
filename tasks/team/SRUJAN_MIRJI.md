@@ -62,6 +62,7 @@ Principal (`features/LEAVE_MANAGEMENT.md`).
 
 - [x] Create a CampusHR login for an employee (`user.manage`), choose role;
       change role, turn off/on, set a new password (HR, until email reset)
+- [x] Change own password (profile menu); other devices are signed out
 - [ ] Password reset by email. _Needs an SMTP provider._
 
 ## Lead duties

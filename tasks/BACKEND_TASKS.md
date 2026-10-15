@@ -17,6 +17,7 @@
 - [x] Refresh (rotation with replay detection)
 - [x] Logout
 - [x] Staff logins: HR creates a login for an employee, changes role, turns it off/on, sets a new password
+- [x] Change own password (keeps this session, ends the others)
 - [ ] Password reset (needs SMTP)
 
 ## BE-003 Employees

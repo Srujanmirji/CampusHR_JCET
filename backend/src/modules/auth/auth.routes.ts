@@ -12,5 +12,6 @@ export function createAuthRouter(
     .post('/login', controller.login)
     .post('/refresh', controller.refresh)
     .post('/logout', controller.logout)
+    .post('/password', requireAuth(auth), controller.changePassword)
     .get('/me', requireAuth(auth), controller.me);
 }
