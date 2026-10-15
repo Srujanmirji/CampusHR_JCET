@@ -123,9 +123,10 @@ or null for no limit), allowHalfDay?, carryForwardMax?, active? }` → 201;
 active, year, entitled, carriedIn, used, pending, remaining }`; `entitled` and
   `remaining` are null for a type without a limit. Defaults: the caller and
   this year. HODs see their department; faculty and staff themselves.
-- `GET /leave/requests?status&employeeId&year&awaitingMe` (`leave.read`) →
+- `GET /leave/requests?status&employeeId&year&month&awaitingMe` (`leave.read`) →
   requests in the caller's scope, newest first (at most 500). With
   `awaitingMe=true`: pending requests waiting for the caller's decision.
+  `month=YYYY-MM`: requests with a day in that month (the leave calendar).
 - `GET /leave/requests/:id` → one request; 404 outside the caller's scope.
 - `POST /leave/requests` (`leave.apply`) `{ leaveTypeId, startDate, endDate,
 halfDay?: FIRST|SECOND, reason }` (dates `YYYY-MM-DD`) → 201 with `days`,
