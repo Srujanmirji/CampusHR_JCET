@@ -26,6 +26,28 @@ Access tokens are HS256 JWTs valid for 15 minutes. `user` includes
 `permissions`, the granted keys (e.g. `leave.approve.department`), so clients can
 hide what the user cannot do.
 
+## Logins
+
+Implemented. All need `user.manage` (Super Admin, HR Admin). A login signs in
+with the employee's college email or employee ID. Changes are audit-logged
+(never with the password hash).
+
+- `GET /users/roles` → `[{ id, name }]` the caller may give (HR Admin does not
+  see Super Admin).
+- `GET /users/employee/:employeeId` → the employee's login or `null`.
+- `POST /users` `{ employeeId, roleId, password }` (password 12–72 bytes) →
+  201 `{ id, email, status, employeeId, role: { id, name }, lastLoginAt,
+createdAt }`. 409 if the employee already has a login; 400 for an archived
+  employee.
+- `PATCH /users/:id` `{ roleId?, status?: ACTIVE|INACTIVE, password? }` →
+  the login. Turning it off or setting a new password signs the person out
+  everywhere. Nobody changes their own role or status; only a Super Admin
+  gives the Super Admin role or changes a Super Admin login (403). An
+  archived employee's login cannot be turned back on.
+
+Until password reset by email exists, HR sets a new password here and hands
+it over in person.
+
 ## Permissions
 
 Protected routes use `requirePermission(auth, 'resource.action')`

@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 
 export interface AuthUser {
@@ -93,6 +94,8 @@ export function createPrismaAuthRepository(
       return user && toAuthUser(user);
     },
     async findUserById(id) {
+      // A token for a non-UUID subject is unknown, not a database error.
+      if (!z.uuid().safeParse(id).success) return null;
       const user = await prisma.user.findUnique({
         where: { id },
         select: userSelect,

@@ -58,7 +58,8 @@ Principal (`features/LEAVE_MANAGEMENT.md`).
 
 ## 5. Logins and password reset — BE-002
 
-- [ ] Create a CampusHR login for an employee (`user.manage`), choose role
+- [x] Create a CampusHR login for an employee (`user.manage`), choose role;
+      change role, turn off/on, set a new password (HR, until email reset)
 - [ ] Password reset by email. _Needs an SMTP provider._
 
 ## Lead duties

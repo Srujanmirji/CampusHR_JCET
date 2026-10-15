@@ -58,6 +58,7 @@ Verification and launch steps: `frontend/README.md`.
 - [x] Profile
 - [x] Edit employee; own phone update; archive
 - [x] Departments page: staff strength, add, rename, assign HOD
+- [x] CampusHR login on the profile (HR): create with role, change role, turn off/on, set new password
 
 ## FE-007 Attendance
 

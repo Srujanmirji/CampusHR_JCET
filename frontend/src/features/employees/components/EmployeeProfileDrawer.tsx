@@ -34,6 +34,7 @@ import {
   type Employee,
 } from '../api/employees';
 import { initialsOf } from '../utils/initials';
+import { LoginSection } from './LoginSection';
 
 const dateFormat = new Intl.DateTimeFormat('en-IN', {
   day: 'numeric',
@@ -285,6 +286,15 @@ export function EmployeeProfileDrawer({
                   : `${employee.experienceYears} ${employee.experienceYears === 1 ? 'year' : 'years'}`}
               </Detail>
             </Section>
+            {scopeOf('user.manage') && (
+              <LoginSection
+                key={employee.id}
+                employeeId={employee.id}
+                name={name}
+                active={active}
+                isSelf={isSelf}
+              />
+            )}
           </div>
         </SheetContent>
       </Sheet>

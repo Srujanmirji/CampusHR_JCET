@@ -19,6 +19,9 @@ import { createEmployeeService } from './modules/employees/employee.service.js';
 import { createTimetableRepository } from './modules/timetable/timetable.repository.js';
 import { createTimetableRouter } from './modules/timetable/timetable.routes.js';
 import { createTimetableService } from './modules/timetable/timetable.service.js';
+import { createUserRepository } from './modules/users/users.repository.js';
+import { createUserRouter } from './modules/users/users.routes.js';
+import { createUserService } from './modules/users/users.service.js';
 import { createWorkloadRepository } from './modules/workload/workload.repository.js';
 import { createWorkloadRouter } from './modules/workload/workload.routes.js';
 import { createWorkloadService } from './modules/workload/workload.service.js';
@@ -65,6 +68,10 @@ export function createApp(
       auth,
       createTimetableService(createTimetableRepository(prisma)),
     ),
+  );
+  app.use(
+    '/api/v1/users',
+    createUserRouter(auth, createUserService(createUserRepository(prisma))),
   );
   app.use(
     '/api/v1/workload',
