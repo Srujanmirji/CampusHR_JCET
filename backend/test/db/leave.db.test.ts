@@ -319,6 +319,32 @@ describe('leave (PostgreSQL)', () => {
     );
   });
 
+  test('the calendar lists requests overlapping a month', async () => {
+    const november = await t.request(
+      'GET',
+      '/leave/requests?month=2026-11',
+      asha.token,
+    );
+    assert.ok(november.data.length > 0);
+    assert.ok(
+      november.data.every(
+        (r: { startDate: string; endDate: string }) =>
+          r.startDate <= '2026-11-30' && r.endDate >= '2026-11-01',
+      ),
+    );
+    const october = await t.request(
+      'GET',
+      '/leave/requests?month=2026-10',
+      asha.token,
+    );
+    assert.equal(october.data.length, 0);
+    assert.equal(
+      (await t.request('GET', '/leave/requests?month=2026-13', asha.token))
+        .status,
+      400,
+    );
+  });
+
   test('unused earned leave carries into the next year, capped', async () => {
     // Joined 2020 with 10 EL a year and a carry cap of 5.
     const el = (

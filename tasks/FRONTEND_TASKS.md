@@ -72,7 +72,7 @@ Verification and launch steps: `frontend/README.md`.
 - [x] Approval list (API data: waiting for me, status filters, search)
 - [x] Approval drawer (approval steps, timetable impact, approve/reject with note, cancel own)
 - [x] Leave types for HR (quota, half days, carry-over, retire)
-- [ ] Calendar
+- [x] Calendar (month grid on desktop, day list on phones; approved and pending)
 
 ## FE-009 Timetable
 

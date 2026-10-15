@@ -76,6 +76,8 @@ export interface RequestFilters {
   status?: LeaveStatus;
   awaitingMe?: boolean;
   employeeId?: string;
+  /** Requests with a day in this month, YYYY-MM. */
+  month?: string;
 }
 
 const list = <T extends z.ZodType>(schema: T) =>
@@ -107,6 +109,7 @@ export async function listRequests(filters: RequestFilters) {
   if (filters.status) search.set('status', filters.status);
   if (filters.awaitingMe) search.set('awaitingMe', 'true');
   if (filters.employeeId) search.set('employeeId', filters.employeeId);
+  if (filters.month) search.set('month', filters.month);
   return list(requestSchema).parse(
     await apiRequest(`/leave/requests?${search}`),
   ).data;
