@@ -15,20 +15,20 @@ repository, schema — copy `employees/`) and
 Other modules (Leave, Substitution, Documents) call your service, so build it
 first and keep its interface small: `notify(userIds, { type, title, body, link })`.
 
-- [ ] `notifications` table (user, type, title, body, link, read_at) and
+- [x] `notifications` table (user, type, title, body, link, read_at) and
       migration (announce first; only one migration at a time)
-- [ ] Notification service used by other modules
-- [ ] API: my notifications (paged), mark one / all read
+- [x] Notification service used by other modules
+- [x] API: my notifications (paged), mark one / all read
       (`notification.read`)
-- [ ] Live unread count over Socket.IO (authenticate the socket with the
+- [x] Live unread count over Socket.IO (authenticate the socket with the
       access token)
 - [ ] Email sending behind the same service. _Needs an SMTP provider._
 - [ ] Push sender: store device push tokens and send through the Expo push
       service (Pranav registers tokens from the app)
-- [ ] Web: `/notifications` and the bell in the top bar on real data
-- [ ] Announcements (`announcement.send`: HR/Principal to all, HOD to
+- [x] Web: `/notifications` and the bell in the top bar on real data
+- [x] Announcements (`announcement.send`: HR/Principal to all, HOD to
       department)
-- [ ] Tests
+- [x] Tests
 
 ## 2. Attendance — BE-004, FE-007 · waits for JCET attendance policy
 

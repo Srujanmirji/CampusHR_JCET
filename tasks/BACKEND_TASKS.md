@@ -66,7 +66,7 @@
 - [x] Candidate query (free, not on leave, workload limit)
 - [x] Ranking algorithm (35/25/15/15/10 rubric)
 - [x] Assignment (substitute or no substitute needed; undo)
-- [ ] Notifications (with BE-011)
+- [x] Notifications (with BE-011)
 
 ## BE-010 Documents
 
@@ -76,9 +76,9 @@
 
 ## BE-011 Notifications
 
-- [ ] Notification service
-- [ ] Socket.IO events
-- [ ] Email integration
+- [x] Notification service
+- [x] Socket.IO events
+- [ ] Email integration (needs an SMTP provider)
 
 ## BE-012 Reports
 

@@ -59,6 +59,7 @@ model User {
   lastLoginAt           DateTime?        @map("last_login_at")
   leaveDecisions        LeaveDecision[]
   substitutionsAssigned Substitution[]
+  notifications         Notification[]
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt             DateTime         @updatedAt @map("updated_at")
   sessions              RefreshSession[]
@@ -415,4 +416,23 @@ model Substitution {
   @@index([substituteId, date])
   @@index([leaveRequestId])
   @@map("substitutions")
+}
+
+// In-app notifications (features/NOTIFICATIONS.md), one row per recipient.
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // What happened, e.g. leave.submitted; lets clients pick an icon.
+  kind      String
+  title     String
+  body      String
+  // In-app path to open, e.g. /leave?request=…
+  link      String?
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@map("notifications")
 }

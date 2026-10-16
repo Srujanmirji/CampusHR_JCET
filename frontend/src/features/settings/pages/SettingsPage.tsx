@@ -12,31 +12,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import { useAcademicWorkflow } from '@/features/leave/useAcademicWorkflow';
 import { initialSettings } from '@/data/mock/settings';
-import { Building2, Clock, Bell, RotateCcw, Save } from 'lucide-react';
+import { Building2, Clock, Bell, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
-  const workflow = useAcademicWorkflow();
-  const [resetModalOpen, setResetModalOpen] = useState(false);
   const [settings, setSettings] = useState(initialSettings);
 
   function handleSaveSettings(e: React.FormEvent) {
     e.preventDefault();
     toast.success('Settings saved for this session.');
-  }
-
-  function handleConfirmReset() {
-    workflow.resetDemoData();
-    setResetModalOpen(false);
   }
 
   return (
@@ -47,32 +32,6 @@ export default function SettingsPage() {
       />
 
       <form onSubmit={handleSaveSettings} className="space-y-6">
-        {/* Workflow data reset */}
-        <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-5 shadow-xs">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-base text-foreground">
-                  Reset workflow data
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed max-w-xl">
-                Restore leave requests, substitute assignments, notifications,
-                and counts to their starting state.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="destructive"
-              className="gap-2 self-start sm:self-auto"
-              onClick={() => setResetModalOpen(true)}
-            >
-              <RotateCcw className="h-4 w-4" />
-              Reset data
-            </Button>
-          </div>
-        </div>
-
         {/* Section 1: General Campus Configuration */}
         <Card>
           <CardHeader>
@@ -358,27 +317,6 @@ export default function SettingsPage() {
           </Button>
         </div>
       </form>
-
-      {/* Confirmation dialog for workflow data reset */}
-      <Dialog open={resetModalOpen} onOpenChange={setResetModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reset workflow data?</DialogTitle>
-            <DialogDescription>
-              This restores all leave requests to their starting state, removes
-              substitute assignments, and resets counts.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => setResetModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleConfirmReset}>
-              Reset data
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </PageTransition>
   );
 }

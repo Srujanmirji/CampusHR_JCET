@@ -424,14 +424,10 @@ try {
       );
     }
   }
-  await page.evaluate(() =>
-    sessionStorage.setItem('campushr-academic-demo-v1', '{invalid JSON'),
-  );
   await page.goto(`${base}/leave`);
   await page
     .getByRole('heading', { name: 'Leave management', exact: true })
     .waitFor();
-  // A broken stored demo workflow falls back instead of breaking the app.
   await page.goto(`${base}/notifications`);
   await page.locator('main h1').waitFor();
   await dashboard();

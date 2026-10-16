@@ -685,6 +685,9 @@
   font-size: var(--text-sm);
   font-weight: 600;
 }
+.notification-menu-item[data-unread='true'] strong {
+  color: var(--primary);
+}
 .notification-menu-item > span,
 .notification-menu-item small {
   font-size: var(--text-xs);
