@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider } from '../lib/auth-context';
 
 const queryClient = new QueryClient();
 void SplashScreen.preventAutoHideAsync();
@@ -21,8 +22,10 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
-        <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }} />
+        <AuthProvider>
+          <StatusBar style="dark" />
+          <Stack screenOptions={{ headerShown: false }} />
+        </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>
   );
