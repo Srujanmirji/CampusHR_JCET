@@ -10,8 +10,7 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useCan } from '@/features/auth/hooks/useCan';
-import { useAcademicWorkflow } from '@/features/leave/useAcademicWorkflow';
-import { leaveRequests } from '@/data/mock/leaveRequests';
+import { useLeaveWaiting } from '@/features/leave/hooks/useLeaveWaiting';
 
 export function Sidebar({
   collapsed = false,
@@ -27,10 +26,7 @@ export function Sidebar({
   const { pathname } = useLocation();
   const can = useCan();
   const items = navigation.filter((item) => can(item.permission));
-  const workflow = useAcademicWorkflow();
-  const pending = leaveRequests.filter(
-    (request) => workflow.status(request.id) === 'Pending',
-  ).length;
+  const pending = useLeaveWaiting().data?.length ?? 0;
   return (
     <div className="sidebar-content" data-collapsed={collapsed}>
       <div className="sidebar-brand">
@@ -91,8 +87,14 @@ export function Sidebar({
                           >
                             <Icon aria-hidden="true" />
                             {!collapsed && <span>{label}</span>}
-                            {!collapsed && path === '/leave' && (
-                              <span className="sidebar-count">{pending}</span>
+                            {!collapsed && path === '/leave' && pending > 0 && (
+                              <span className="sidebar-count">
+                                {pending}
+                                <span className="sr-only">
+                                  {' '}
+                                  waiting for you
+                                </span>
+                              </span>
                             )}
                           </NavLink>
                         </TooltipTrigger>

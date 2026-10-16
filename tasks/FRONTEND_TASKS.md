@@ -68,9 +68,10 @@ Verification and launch steps: `frontend/README.md`.
 
 ## FE-008 Leave
 
-- [ ] Apply
-- [x] Approval list (summaries, search, status/department filters)
-- [x] Approval drawer (details, balance/history, academic impact, approve/reject)
+- [x] Apply (API data: balances, half days, working-day preview)
+- [x] Approval list (API data: waiting for me, status filters, search)
+- [x] Approval drawer (approval steps, timetable impact, approve/reject with note, cancel own)
+- [x] Leave types for HR (quota, half days, carry-over, retire)
 - [ ] Calendar
 
 ## FE-009 Timetable
@@ -91,11 +92,12 @@ Verification and launch steps: `frontend/README.md`.
 
 ## FE-011 Substitution
 
-- [x] Affected class list
-- [x] Candidate ranking (visible rule rubric; availability and workload checks)
-- [x] Assignment action (confirmation, coverage progress, completion, updated timetable)
+- [x] Affected class list (API data: approved leave × timetable)
+- [x] Candidate ranking (API rubric with per-part points; workload limit shown in words)
+- [x] Assignment action (confirmation, coverage progress, completion, undo)
 - [x] Manual no-substitute decision with academic arrangement
-- [x] Session persistence and interactive end-to-end check
+- [x] "Classes you are covering" for faculty
+- [ ] Updated timetable view with substitutes
 
 ## FE-013 Documents
 

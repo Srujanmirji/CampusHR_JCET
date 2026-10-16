@@ -29,8 +29,8 @@ created by `npm run db:seed`.
 | Employees          | **Live data.** Search, filters, pagination, profile; HR adds, edits and archives; staff update their own phone                                       |
 | Departments        | **Live data.** Staff strength per department; HR adds departments and assigns HODs                                                                   |
 | Attendance         | Daily metrics, monthly trend, department view, filterable log                                                                                        |
-| Leave              | Searchable/filterable request table; review drawer with balance, history, academic impact; approve, reject with note                                 |
-| Smart Substitution | Ranked candidates per affected class, assignment, manual coverage, updated timetable                                                                 |
+| Leave              | API data: my balances and requests, apply, approvals waiting for me, approval steps and timetable impact, leave types for HR                         |
+| Smart Substitution | API data: classes affected by approved leave, ranked free faculty, assign or no-substitute, undo; faculty see classes they cover                     |
 | Timetable          | **Live data.** Weekly grid by department, semester and section; HODs add, edit and remove classes with clash checks; faculty see their own timetable |
 | Faculty Workload   | API data: weekly theory/lab hours, status against each designation's band, hours chart, per-faculty classes; Principal edits bands                   |
 | Reports            | Report catalogue, charts and report previews                                                                                                         |
@@ -41,23 +41,22 @@ Create, edit, export and print actions show "isn't available yet" until the API
 supports them. Documents and Helpdesk pages are not built yet. Other modules
 still show sample people until their APIs exist.
 
-## Leave → substitution workflow
+## Smart Substitution
 
-1. Dashboard → click **Prof. Asha Patil** in recent leave requests.
-2. Review faculty details, leave balance/history and **Academic impact**.
-3. **Approve Leave** → **Approve & Find Substitute**.
-4. In each affected class, choose **Assign Faculty** → **Confirm Assignment**.
-5. Complete both classes, then **View Updated Timetable**.
+Open **Smart Substitution** as an HOD (or Super Admin) after leave is approved.
 
-Candidates are ranked by a visible 35/25/15/15/10 rubric: subject, experience,
-free slot, department and workload headroom (`src/lib/academic.ts`). Faculty who
-are busy in that slot or would exceed their weekly limit cannot be assigned.
-Assignments consume workload in the same Monday–Sunday week. A class can instead
-be marked **No substitute required** with an academic arrangement.
+1. Pick the approved leave; each class it affects is listed.
+2. In each class, choose **Assign Faculty** → **Confirm Assignment**, or
+   **No substitute required** with the academic arrangement.
+3. **Undo** puts a class back in need of cover.
 
-Decisions are kept in `sessionStorage` under `campushr-academic-demo-v1`, so they
-survive navigation and reload in the current tab. A malformed saved value falls
-back to the starting data. **Settings → Reset data** restores the starting state.
+The API ranks faculty who are free in the slot and not on leave, out of 100:
+subject 35, availability 25, department 15, workload headroom 15, experience 10. Anyone the class would push over their weekly maximum is shown with the
+reason and cannot be chosen. Faculty see the classes they cover.
+
+Notifications are still demo data in `sessionStorage`
+(`campushr-academic-demo-v1`) until the Notifications service exists;
+**Settings → Reset data** restores them.
 
 The sample data uses 12 October 2026 as today. Portrait thumbnails are stock
 photos of fictional faculty, not JCET staff.

@@ -200,9 +200,42 @@ maxHours, updatedAt }]` for every teaching designation.
 
 ## Substitution
 
-- POST /substitution/recommend
-- GET /substitution/:id/candidates
-- PATCH /substitution/:id/assign
+Implemented. Reads need `substitution.read`, assigning `substitution.assign`
+(Super Admin; HODs for their department's classes). A class is affected
+when its teacher has approved leave on that date (Sundays skipped; a half
+day covers morning classes for FIRST, afternoon ones for SECOND).
+
+- `GET /substitution/rubric` → the score parts and their maximums.
+- `GET /substitution/leave?from=YYYY-MM-DD` → approved leave ending on or after
+  `from` (default today) that affects classes in the caller's scope:
+  `[{ leave: { id, employee, department, leaveType, startDate, endDate,
+halfDay, days }, classes, covered }]`. Faculty get an empty list.
+- `GET /substitution/leave/:leaveId` → `{ leave, classes: [{ date, hours, entry,
+coverage: null | { id, kind: SUBSTITUTE|NOT_NEEDED, substitute, note,
+assignedAt } }] }`; 404 when nothing is in scope.
+- `GET /substitution/leave/:leaveId/candidates?entryId&date`
+  (`substitution.assign`) → up to 25 faculty, best first:
+  `{ faculty: { id, employeeCode, name, department, designation }, score,
+points: { subject, availability, department, workload, experience },
+hoursAfter, maxHours, eligible, reason }`. Leaves out the absent teacher,
+  anyone on approved leave that day and anyone teaching or substituting in an
+  overlapping period. Someone the class would push over their weekly maximum
+  is listed last with `eligible: false` and a `reason`.
+- `POST /substitution/assignments` `{ leaveRequestId, timetableEntryId, date,
+substituteId (or null), note? }` → 201 coverage. With `substituteId: null`
+  the class runs without a substitute and `note` (the arrangement) is
+  required. 400 `NOT_AVAILABLE` for a substitute who is not free or would go
+  over their maximum; 409 `ALREADY_COVERED`. Audit-logged.
+- `DELETE /substitution/assignments/:id` → 204 (undo). Audit-logged.
+- `GET /substitution/mine` → classes the caller covers from today, each with
+  `date`, `entry` and `coveringFor`.
+
+Score out of 100: subject 35 (teaches this subject; 15 for another subject
+of the same kind in the department), availability 25 (12 if the class is
+back to back with one of theirs), department 15 (5 for another department),
+workload 15 (in proportion to hours left under the weekly maximum; 7 with no
+band), experience 10 (years of teaching, up to 10). Notifying the substitute
+waits for the Notifications service.
 
 ## Documents
 

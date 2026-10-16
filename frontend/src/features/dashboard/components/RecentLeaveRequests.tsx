@@ -1,65 +1,87 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
-import { leaveRequests } from '@/data/mock/dashboard';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { SectionHeader } from '@/components/shared/PageHeader';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
-  CardHeader,
   CardContent,
   CardFooter,
+  CardHeader,
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableCaption,
-} from '@/components/ui/table';
 import {
   Select,
-  SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectGroup,
   SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
-import { SectionHeader } from '@/components/shared/PageHeader';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { EmptyState } from '@/components/shared/EmptyState';
-import { useAcademicWorkflow } from '@/features/leave/useAcademicWorkflow';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { useSession } from '@/features/auth/hooks/useSession';
+import {
+  LEAVE_STATUS_LABEL,
+  listRequests,
+  type LeaveStatus,
+} from '@/features/leave/api/leave';
+import { isMyTurn, leaveDates } from '@/features/leave/utils/leave';
 
+const SHOWN = 5;
+
+/** The newest leave requests the user can see, linking into /leave. */
 export function RecentLeaveRequests() {
-  const navigate = useNavigate();
-  const workflow = useAcademicWorkflow();
-  const [status, setStatus] = useState('all');
-  const requests = leaveRequests.filter(
-    (request) => status === 'all' || workflow.status(request.id) === status,
-  );
+  const session = useSession();
+  const user = session.status === 'signedIn' ? session.user : null;
+  const [status, setStatus] = useState<LeaveStatus | 'all'>('all');
+  const filters = status === 'all' ? {} : { status };
+  const requests = useQuery({
+    queryKey: ['leave', 'requests', filters],
+    queryFn: () => listRequests(filters),
+  });
+  const rows = (requests.data ?? []).slice(0, SHOWN);
+
   return (
     <Card className="leave-card">
       <CardHeader>
         <SectionHeader
           title="Recent leave requests"
-          description="October 2026 · approval queue"
+          description="Newest first"
           action={
             <div>
               <label htmlFor="leave-status" className="sr-only">
                 Filter leave requests by status
               </label>
-              <Select value={status} onValueChange={setStatus}>
+              <Select
+                value={status}
+                onValueChange={(value) =>
+                  setStatus(value as LeaveStatus | 'all')
+                }
+              >
                 <SelectTrigger id="leave-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem value="all">All statuses</SelectItem>
-                    <SelectItem value="Pending">Pending</SelectItem>
-                    <SelectItem value="Approved">Approved</SelectItem>
-                    <SelectItem value="Rejected">Rejected</SelectItem>
+                    {(Object.keys(LEAVE_STATUS_LABEL) as LeaveStatus[]).map(
+                      (value) => (
+                        <SelectItem key={value} value={value}>
+                          {LEAVE_STATUS_LABEL[value]}
+                        </SelectItem>
+                      ),
+                    )}
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -68,10 +90,26 @@ export function RecentLeaveRequests() {
         />
       </CardHeader>
       <CardContent className="leave-table-content">
-        {requests.length ? (
+        {requests.isPending ? (
+          <div
+            role="status"
+            aria-label="Loading leave requests"
+            className="flex flex-col gap-2 px-4"
+          >
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : requests.isError ? (
+          <EmptyState
+            title="Couldn’t load leave requests"
+            description={requests.error.message}
+            actionLabel="Try again"
+            onAction={() => void requests.refetch()}
+          />
+        ) : rows.length ? (
           <Table>
             <TableCaption className="sr-only">
-              Leave requests for October 2026
+              Recent leave requests
             </TableCaption>
             <TableHeader>
               <TableRow>
@@ -79,8 +117,7 @@ export function RecentLeaveRequests() {
                   'Employee',
                   'Department',
                   'Leave type',
-                  'From',
-                  'To',
+                  'Dates',
                   'Status',
                   'Action',
                 ].map((label) => (
@@ -89,66 +126,52 @@ export function RecentLeaveRequests() {
                     key={label}
                     className={label === 'Action' ? 'text-right' : undefined}
                   >
-                    {label}
+                    {label === 'Action' ? (
+                      <span className="sr-only">{label}</span>
+                    ) : (
+                      label
+                    )}
                   </TableHead>
                 ))}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests.map((request) => {
-                const reqStatus = workflow.status(request.id);
-                const isPending = reqStatus === 'Pending';
+              {rows.map((request) => {
+                const review = user ? isMyTurn(request, user) : false;
+                const mine = user?.employeeId === request.employee.id;
+                const href = `/leave?tab=${mine ? 'mine' : 'requests'}&request=${request.id}`;
                 return (
-                  <TableRow
-                    key={request.id}
-                    className={`cursor-pointer transition-colors hover:bg-muted/60 ${
-                      isPending ? 'bg-primary/5 hover:bg-primary/10' : ''
-                    }`}
-                    onClick={() => navigate(`/leave?request=${request.id}`)}
-                    tabIndex={0}
-                    role="link"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        navigate(`/leave?request=${request.id}`);
-                      }
-                    }}
-                    aria-label={`${isPending ? 'Review' : 'View'} leave request for ${request.employee}`}
-                  >
+                  <TableRow key={request.id}>
                     <TableCell>
-                      <div className="employee-cell">
-                        <Avatar>
-                          <AvatarFallback>{request.initials}</AvatarFallback>
-                        </Avatar>
-                        <span>
-                          <Link
-                            to={`/leave?request=${request.id}`}
-                            className="dashboard-leave-link block text-sm font-semibold text-foreground hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {request.employee}
-                          </Link>
-                          <small>{request.id}</small>
-                        </span>
-                      </div>
+                      <span className="block text-sm font-semibold">
+                        {request.employee.name}
+                      </span>
+                      <small className="text-muted-foreground">
+                        {request.employee.employeeCode}
+                      </small>
                     </TableCell>
-                    <TableCell>{request.department}</TableCell>
-                    <TableCell>{request.type}</TableCell>
-                    <TableCell>{request.from}</TableCell>
-                    <TableCell>{request.to}</TableCell>
+                    <TableCell>{request.department.code}</TableCell>
+                    <TableCell>{request.leaveType.name}</TableCell>
+                    <TableCell>{leaveDates(request)}</TableCell>
                     <TableCell>
-                      <StatusBadge status={reqStatus} />
+                      <StatusBadge
+                        status={LEAVE_STATUS_LABEL[request.status]}
+                      />
                     </TableCell>
                     <TableCell className="text-right">
-                      {isPending ? (
-                        <span className="inline-flex items-center gap-1 text-sm font-semibold text-accent hover:text-accent/80">
-                          Review <ArrowRight className="w-3.5 h-3.5" />
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-                          View <ArrowRight className="w-3 h-3" />
-                        </span>
-                      )}
+                      <Button
+                        asChild
+                        variant={review ? 'default' : 'ghost'}
+                        size="sm"
+                      >
+                        <Link
+                          to={href}
+                          aria-label={`${review ? 'Review' : 'View'} ${request.employee.name}’s leave request`}
+                        >
+                          {review ? 'Review' : 'View'}
+                          <ArrowRight />
+                        </Link>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -157,16 +180,26 @@ export function RecentLeaveRequests() {
           </Table>
         ) : (
           <EmptyState
-            title="No requests in this status"
-            description="There are no rejected leave requests. Choose all statuses to see the full queue."
-            actionLabel="Reset filter"
-            onAction={() => setStatus('all')}
+            title={
+              status === 'all'
+                ? 'No leave requests yet'
+                : 'No requests in this status'
+            }
+            description="New requests show up here."
+            {...(status === 'all'
+              ? {}
+              : {
+                  actionLabel: 'Show all statuses',
+                  onAction: () => setStatus('all'),
+                })}
           />
         )}
       </CardContent>
       <CardFooter>
         <span className="text-sm text-muted-foreground">
-          {requests.length} {requests.length === 1 ? 'request' : 'requests'}
+          {requests.data
+            ? `${rows.length} of ${requests.data.length} ${requests.data.length === 1 ? 'request' : 'requests'}`
+            : ' '}
         </span>
         <Button asChild variant="link">
           <Link to="/leave">

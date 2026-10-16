@@ -51,7 +51,7 @@
 - [x] Timetable schema (periods, subjects, rooms, entries)
 - [x] CRUD
 - [x] Conflict detection (faculty, room, section; lab batches)
-- [ ] Faculty availability (who is free in a slot — with Smart Substitution)
+- [x] Faculty availability (who is free in a slot — substitution candidates)
 
 ## BE-007 Workload
 
@@ -61,11 +61,11 @@
 
 ## BE-008 Smart Substitution
 
-- [ ] Detect impacted class
-- [ ] Candidate query
-- [ ] Ranking algorithm
-- [ ] Assignment
-- [ ] Notifications
+- [x] Detect impacted class (approved leave × timetable, half days)
+- [x] Candidate query (free, not on leave, workload limit)
+- [x] Ranking algorithm (35/25/15/15/10 rubric)
+- [x] Assignment (substitute or no substitute needed; undo)
+- [ ] Notifications (with BE-011)
 
 ## BE-010 Documents
 

@@ -1,6 +1,3 @@
-import { leaveRequests as academicLeaves } from './leaveRequests';
-import { getEmployee } from './employees';
-import { formatDate } from '@/lib/academic';
 import {
   UsersRound,
   CalendarCheck2,
@@ -73,20 +70,6 @@ export const attendanceData = [
   { day: 'Fri', Present: 166, Absent: 9 },
   { day: 'Sat', Present: 159, Absent: 16 },
 ];
-
-export const leaveRequests = academicLeaves.slice(0, 3).map((request) => {
-  const employee = getEmployee(request.employeeId);
-  return {
-    id: request.id,
-    employee: employee.name,
-    initials: employee.initials,
-    department: employee.department,
-    type: request.type,
-    from: formatDate(request.start),
-    to: formatDate(request.end),
-    status: request.status,
-  };
-});
 
 export const notifications = [
   {
