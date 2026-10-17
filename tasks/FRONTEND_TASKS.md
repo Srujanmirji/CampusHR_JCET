@@ -115,4 +115,4 @@ Verification and launch steps: `frontend/README.md`.
 ## FE-015 Notifications
 
 - [x] Notification center
-- [ ] Realtime unread count
+- [x] Realtime unread count

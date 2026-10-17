@@ -1,38 +1,26 @@
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import {
-  ArrowUpRight,
-  Bell,
-  CalendarDays,
-  CheckCircle2,
-  Repeat2,
-  CalendarRange,
-  ChartNoAxesCombined,
-} from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import { SectionHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardContent } from '@/components/ui/card';
-import { useAcademicWorkflow } from '@/features/leave/useAcademicWorkflow';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { listNotifications } from '@/features/notifications/api/notifications';
+import { iconFor, timeAgo } from '@/features/notifications/utils/notifications';
 
 export function NotificationsPreview() {
-  const workflow = useAcademicWorkflow();
-  const displayList = workflow.notifications.slice(0, 4);
-
-  function getIcon(title: string) {
-    const t = title.toLowerCase();
-    if (t.includes('substitute')) return Repeat2;
-    if (t.includes('covered')) return CheckCircle2;
-    if (t.includes('approved') || t.includes('leave')) return CalendarDays;
-    if (t.includes('timetable')) return CalendarRange;
-    if (t.includes('workload')) return ChartNoAxesCombined;
-    return Bell;
-  }
+  const latest = useQuery({
+    queryKey: ['notifications', 'latest'],
+    queryFn: () => listNotifications(undefined, 5),
+  });
+  const shown = latest.data?.data.slice(0, 4) ?? [];
 
   return (
     <Card className="notifications-preview">
       <CardHeader>
         <SectionHeader
           title="Campus updates"
-          description="Real-time academic workflow and campus alerts"
+          description="Your latest notifications"
           action={
             <Button asChild variant="link">
               <Link to="/notifications">
@@ -44,24 +32,32 @@ export function NotificationsPreview() {
         />
       </CardHeader>
       <CardContent>
-        <ul>
-          {displayList.map((notification) => {
-            const Icon = getIcon(notification.title);
-            return (
-              <li key={notification.id}>
-                <span className="update-icon">
-                  <Icon aria-hidden="true" />
-                </span>
-                <div>
-                  <p>{notification.body}</p>
-                  <span>
-                    {notification.time} · {notification.title}
+        {latest.isPending ? (
+          <Skeleton className="h-32 w-full" />
+        ) : shown.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {latest.isError ? 'Couldn’t load updates.' : 'No updates yet.'}
+          </p>
+        ) : (
+          <ul>
+            {shown.map((notification) => {
+              const Icon = iconFor(notification.kind);
+              return (
+                <li key={notification.id}>
+                  <span className="update-icon">
+                    <Icon aria-hidden="true" />
                   </span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                  <div>
+                    <p>{notification.body}</p>
+                    <span>
+                      {timeAgo(notification.createdAt)} · {notification.title}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </CardContent>
     </Card>
   );

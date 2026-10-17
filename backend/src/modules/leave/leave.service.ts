@@ -2,6 +2,7 @@ import { HttpError } from '../../common/http-error.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 import type { Access } from '../auth/auth.service.js';
 import type { RoleName } from '../auth/permissions.js';
+import type { Notifier } from '../notifications/notifications.service.js';
 import { APPROVER_CHAIN, countLeaveDays, yearBalance } from './leave.rules.js';
 import type {
   LeaveRepository,
@@ -114,7 +115,28 @@ function readScope(access: Access): Prisma.LeaveRequestWhereInput | null {
   }
 }
 
-export function createLeaveService(repo: LeaveRepository) {
+type RequestDto = ReturnType<typeof toRequestDto>;
+
+const summary = (request: RequestDto) =>
+  `${request.leaveType.name} · ${request.startDate === request.endDate ? request.startDate : `${request.startDate} to ${request.endDate}`} · ${formatDays(request.days)}`;
+
+export function createLeaveService(repo: LeaveRepository, notifier: Notifier) {
+  /** Tells whoever acts next that a request waits for them. */
+  const notifyApprovers = (request: RequestDto) =>
+    request.pendingRole
+      ? notifier.notifyRole(
+          request.pendingRole,
+          request.department.id,
+          {
+            kind: 'leave.waiting',
+            title: `Leave request from ${request.employee.name}`,
+            body: summary(request),
+            link: `/leave?tab=requests&request=${request.id}`,
+          },
+          request.employee.id,
+        )
+      : Promise.resolve();
+
   async function roleOf(userId: string) {
     return (await repo.user(userId))?.role.name;
   }
@@ -239,7 +261,9 @@ export function createLeaveService(repo: LeaveRepository) {
           },
           { actorUserId: access.userId, action: 'leave.apply', ip },
         );
-        return toRequestDto(created);
+        const dto = toRequestDto(created);
+        await notifyApprovers(dto);
+        return dto;
       } catch (error) {
         if (isWriteConflict(error)) {
           throw new HttpError(
@@ -330,7 +354,26 @@ export function createLeaveService(repo: LeaveRepository) {
         },
       );
       if (!after) throw changed();
-      return toRequestDto(after);
+      const dto = toRequestDto(after);
+      const link = `/leave?tab=mine&request=${dto.id}`;
+      await notifier.notifyEmployee(dto.employee.id, {
+        kind: `leave.${dto.status === 'PENDING' ? 'progress' : dto.status.toLowerCase()}`,
+        title:
+          dto.status === 'APPROVED'
+            ? 'Leave approved'
+            : dto.status === 'REJECTED'
+              ? 'Leave rejected'
+              : `Leave approved by the ${role}`,
+        body:
+          dto.status === 'REJECTED'
+            ? `${summary(dto)}. ${note ?? ''}`.trim()
+            : dto.status === 'PENDING'
+              ? `${summary(dto)}. Now with the ${dto.pendingRole}.`
+              : summary(dto),
+        link,
+      });
+      await notifyApprovers(dto);
+      return dto;
     },
 
     async cancel(access: Access, id: string, ip?: string) {

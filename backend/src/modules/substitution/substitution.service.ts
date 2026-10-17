@@ -1,5 +1,6 @@
 import { HttpError } from '../../common/http-error.js';
 import type { Access } from '../auth/auth.service.js';
+import type { Notifier } from '../notifications/notifications.service.js';
 import type { EntryRecord } from '../timetable/timetable.repository.js';
 import { toEntryDto } from '../timetable/timetable.service.js';
 import { weeklyHours } from '../workload/workload.calc.js';
@@ -71,7 +72,10 @@ function inScope(access: Access, entry: EntryRecord) {
   );
 }
 
-export function createSubstitutionService(repo: SubstitutionRepository) {
+export function createSubstitutionService(
+  repo: SubstitutionRepository,
+  notifier: Notifier,
+) {
   /** Each class the leave takes the faculty member away from, by date. */
   function affected(
     leave: LeaveRecord,
@@ -300,6 +304,14 @@ export function createSubstitutionService(repo: SubstitutionRepository) {
           },
           { actorUserId: access.userId, action: 'substitution.assign', ip },
         );
+        if (input.substituteId) {
+          await notifier.notifyEmployee(input.substituteId, {
+            kind: 'substitution.assigned',
+            title: `You are covering ${entry.subject.name}`,
+            body: `${entry.department.code} ${entry.semester}${entry.section}${entry.batch ? ` (${entry.batch})` : ''} · ${input.date} · ${entry.startPeriod === entry.endPeriod ? `period ${entry.startPeriod}` : `periods ${entry.startPeriod}–${entry.endPeriod}`} · ${entry.room.name} · for ${nameOf(leave.employee)}`,
+            link: '/substitution',
+          });
+        }
         return toCoverageDto(created);
       } catch (error) {
         if ((error as { code?: string }).code === 'P2002') {

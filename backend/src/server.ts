@@ -3,6 +3,8 @@ import { createApp } from './app.js';
 import { envSchema } from './config/env.js';
 import { createPrismaClient } from './database/prisma.js';
 import { createPrismaAuthRepository } from './modules/auth/auth.repository.js';
+import { createAuthService } from './modules/auth/auth.service.js';
+import { createRealtime } from './modules/notifications/notifications.realtime.js';
 
 const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
@@ -14,11 +16,19 @@ if (!parsed.success) {
 }
 
 const prisma = createPrismaClient(parsed.data.DATABASE_URL);
+const authRepository = createPrismaAuthRepository(prisma);
+const realtime = createRealtime();
 const server = createApp(parsed.data, {
-  authRepository: createPrismaAuthRepository(prisma),
+  authRepository,
   prisma,
+  realtime,
 }).listen(parsed.data.PORT, () => {
   console.log(`CampusHR API listening on port ${parsed.data.PORT}`);
+});
+const auth = createAuthService(authRepository, parsed.data.JWT_ACCESS_SECRET);
+realtime.attach(server, {
+  origin: parsed.data.CORS_ORIGIN,
+  verify: (token) => auth.verifyAccessToken(token).userId,
 });
 server.on('error', (error) => {
   console.error('API failed to start:', error.message);

@@ -27,6 +27,7 @@ export const checkUser = {
       'substitution.assign',
       'report.read',
       'settings.manage',
+      'announcement.send',
     ]),
     'notification.read.own',
   ],
@@ -359,6 +360,38 @@ const candidatesFor = (entryId) => [
   ),
 ];
 
+const minutesAgo = (minutes) =>
+  new Date(Date.now() - minutes * 60_000).toISOString();
+const initialNotifications = () => [
+  {
+    id: 'a0000000-0000-4000-8000-000000000001',
+    kind: 'leave.waiting',
+    title: 'Leave request from Prof. Asha Patil',
+    body: 'Casual Leave, 2 days from 20 Oct. Waiting for your decision.',
+    link: '/leave?tab=requests',
+    readAt: null,
+    createdAt: minutesAgo(10),
+  },
+  {
+    id: 'a0000000-0000-4000-8000-000000000002',
+    kind: 'substitution.assigned',
+    title: 'You are covering Data Structures',
+    body: 'CSE 3A · 21 Oct · period 2 · Room 204 · for Prof. Ravi Hegde',
+    link: '/substitution',
+    readAt: null,
+    createdAt: minutesAgo(45),
+  },
+  {
+    id: 'a0000000-0000-4000-8000-000000000003',
+    kind: 'announcement',
+    title: 'Timetable revised',
+    body: 'The odd-semester timetable was revised for CSE.',
+    link: null,
+    readAt: minutesAgo(60),
+    createdAt: minutesAgo(180),
+  },
+];
+
 export async function mockAuthApi(page, webOrigin) {
   const state = {
     user: undefined,
@@ -366,6 +399,8 @@ export async function mockAuthApi(page, webOrigin) {
     leave: initialLeave(),
     // Substitution coverage by timetable entry id.
     coverage: {},
+    notifications: initialNotifications(),
+    announcements: [],
   };
   const cors = {
     'Access-Control-Allow-Origin': webOrigin,
@@ -651,6 +686,39 @@ export async function mockAuthApi(page, webOrigin) {
           },
         ],
       });
+    }
+    if (path === 'notifications') {
+      const query = new URL(request.url()).searchParams;
+      const limit = Number(query.get('limit') ?? 20);
+      const from = query.get('after')
+        ? state.notifications.findIndex(
+            (item) => item.id === query.get('after'),
+          ) + 1
+        : 0;
+      return json(route, 200, {
+        data: state.notifications.slice(from, from + limit),
+        hasMore: state.notifications.length > from + limit,
+      });
+    }
+    if (path === 'notifications/unread-count') {
+      return json(route, 200, {
+        data: {
+          count: state.notifications.filter((item) => !item.readAt).length,
+        },
+      });
+    }
+    if (path === 'notifications/read-all' || path.endsWith('/read')) {
+      const id = path.split('/')[1];
+      state.notifications = state.notifications.map((item) =>
+        id === 'read-all' || item.id === id
+          ? { ...item, readAt: item.readAt ?? new Date().toISOString() }
+          : item,
+      );
+      return route.fulfill({ status: 204, headers: cors });
+    }
+    if (path === 'notifications/announcements') {
+      state.announcements.push(request.postDataJSON());
+      return json(route, 201, { data: { recipients: 42 } });
     }
     if (path === 'designations') {
       return json(route, 200, { data: designations });

@@ -47,17 +47,3 @@ export interface AttendanceRecord {
   shift: string;
   biometricTerminal: string;
 }
-
-export interface AppNotification {
-  id: string;
-  title: string;
-  body: string;
-  time: string;
-  unread?: boolean;
-  category?: 'Leave' | 'Timetable' | 'Attendance' | 'System';
-}
-
-export interface WorkflowState {
-  version: 2;
-  notifications: AppNotification[];
-}

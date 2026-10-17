@@ -22,6 +22,9 @@ let accessToken: string | undefined;
 // Renews the token from the refresh cookie; resolves false if signed out.
 let renewSession: (() => Promise<boolean>) | undefined;
 
+/** The current access token, e.g. to authenticate the notification socket. */
+export const getAccessToken = () => accessToken;
+
 export function setAccessToken(token: string | undefined) {
   accessToken = token;
 }
