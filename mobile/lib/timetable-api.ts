@@ -51,6 +51,50 @@ export const JCET_PERIODS: PeriodDto[] = [
   { number: 7, startTime: '16:00', endTime: '17:00' },
 ];
 
+export function getSystemDayOfWeek(date: Date = new Date()): { day: DayOfWeek | null; isSunday: boolean } {
+  const dayIndex = date.getDay();
+  switch (dayIndex) {
+    case 1:
+      return { day: 'MON', isSunday: false };
+    case 2:
+      return { day: 'TUE', isSunday: false };
+    case 3:
+      return { day: 'WED', isSunday: false };
+    case 4:
+      return { day: 'THU', isSunday: false };
+    case 5:
+      return { day: 'FRI', isSunday: false };
+    case 6:
+      return { day: 'SAT', isSunday: false };
+    default:
+      return { day: null, isSunday: true };
+  }
+}
+
+export function getCurrentTimeMinutes(): number {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+}
+
+export function parseTimeToMinutes(timeStr: string): number {
+  const [h, m] = timeStr.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+export function formatPeriodTime(startStr?: string, endStr?: string): string {
+  if (!startStr) return '';
+  const format12 = (t: string) => {
+    const [hStr, mStr] = t.split(':');
+    let h = parseInt(hStr, 10);
+    const m = mStr || '00';
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${m} ${ampm}`;
+  };
+  if (!endStr) return format12(startStr);
+  return `${format12(startStr)} – ${format12(endStr)}`;
+}
+
 export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
   // =================== MONDAY ===================
   {
