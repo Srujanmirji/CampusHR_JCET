@@ -32,11 +32,11 @@
 
 ## BE-004 Attendance
 
-- [ ] Attendance schema
-- [ ] Check-in/out
-- [ ] Manual records
-- [ ] Corrections
-- [ ] Reports
+- [x] Attendance schema
+- [x] Check-in/out
+- [x] Manual records
+- [x] Corrections
+- [ ] Reports (with BE-012 Reports)
 
 ## BE-005 Leave
 
