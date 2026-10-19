@@ -108,12 +108,24 @@ Implemented.
 
 ## Attendance
 
-- GET /attendance
-- POST /attendance/check-in
-- POST /attendance/check-out
-- POST /attendance/manual
-- POST /attendance/corrections
-- PATCH /attendance/corrections/:id
+Implemented. Role-scoped (Faculty/Staff see own, HOD sees department, HR/Super Admin see all).
+
+- `POST /attendance/punch` (`attendance.check_in`) `{ source?: WEB|MOBILE|BIOMETRIC|MANUAL, notes? }` →
+  records Check-in (first punch of the day, marked LATE if after work start + grace period) or Check-out (subsequent punch; marked HALF_DAY if worked hours < threshold).
+- `GET /attendance/today` (`attendance.read`) → today's attendance record for the caller or `null`.
+- `GET /attendance?date=&startDate=&endDate=&departmentId=&employeeId=&status=&page=&limit=` (`attendance.read`) →
+  paged attendance records with employee and department details, scoped to caller.
+- `POST /attendance/record` (`attendance.record`) `{ employeeId, date, checkIn?, checkOut?, status, notes? }` →
+  201; manual attendance entry by HR Admin or Super Admin.
+- `POST /attendance/corrections` (`attendance_correction.request`) `{ date, requestedCheckIn?, requestedCheckOut?, requestedStatus, reason }` →
+  201; requests punch correction. Notifies the department HOD.
+- `GET /attendance/corrections?status=&page=&limit=` (`attendance.read`) →
+  paged correction requests, filtered by status and scoped by role.
+- `PATCH /attendance/corrections/:id` (`attendance_correction.approve`) `{ status: APPROVED|REJECTED, reviewNote? }` →
+  approves or rejects a correction request (HOD for their department, HR for all). If approved, automatically updates the daily attendance record. Notifies the employee.
+- `GET /attendance/settings` (`attendance.read`) → `{ workDayStart, workDayEnd, gracePeriodMinutes, halfDayHours, fullDayHours }`.
+- `PUT /attendance/settings` (`settings.manage`) → updates attendance policy settings.
+
 
 ## Leave
 

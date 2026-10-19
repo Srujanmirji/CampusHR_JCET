@@ -65,7 +65,8 @@ Verification and launch steps: `frontend/README.md`.
 
 - [x] Daily view
 - [x] Monthly view
-- [ ] Corrections
+- [x] Corrections
+
 
 ## FE-008 Leave
 

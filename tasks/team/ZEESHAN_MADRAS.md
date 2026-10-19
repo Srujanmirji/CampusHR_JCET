@@ -35,15 +35,15 @@ first and keep its interface small: `notify(userIds, { type, title, body, link }
 Needed from JCET: how attendance is recorded (biometric export, register, or
 check-in), working hours and late rule, working days and holidays.
 
-- [ ] `attendance` (one row per employee per date: check-in, check-out,
+- [x] `attendance` (one row per employee per date: check-in, check-out,
       status, source) and `attendance_corrections`
-- [ ] Policy as settings: hours, grace minutes, half-day rule, working days,
+- [x] Policy as settings: hours, grace minutes, half-day rule, working days,
       holidays
-- [ ] Capture per JCET's method (import file, HR entry, or self check-in)
-- [ ] Corrections: request (own), approve (HOD department / HR all)
-- [ ] API: daily and monthly views, scoped by role
-- [ ] Web: `/attendance` on real data, corrections queue
-- [ ] API for Arihant's mobile attendance screens
+- [x] Capture per JCET's method (import file, HR entry, or self check-in)
+- [x] Corrections: request (own), approve (HOD department / HR all)
+- [x] API: daily and monthly views, scoped by role
+- [x] Web: `/attendance` on real data, corrections queue
+- [x] API for Arihant's mobile attendance screens
 
 ## 3. Documents — BE-010, FE-013 · needs storage chosen
 

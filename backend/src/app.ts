@@ -10,6 +10,9 @@ import { errorHandler } from './middleware/error.js';
 import type { AuthRepository } from './modules/auth/auth.repository.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createAuthService } from './modules/auth/auth.service.js';
+import { createAttendanceRepository } from './modules/attendance/attendance.repository.js';
+import { createAttendanceRouter } from './modules/attendance/attendance.routes.js';
+import { createAttendanceService } from './modules/attendance/attendance.service.js';
 import { createDepartmentRepository } from './modules/departments/department.repository.js';
 import {
   createDepartmentRouter,
@@ -91,6 +94,13 @@ export function createApp(
     createEmployeeRouter(
       auth,
       createEmployeeService(createEmployeeRepository(prisma)),
+    ),
+  );
+  app.use(
+    '/api/v1/attendance',
+    createAttendanceRouter(
+      auth,
+      createAttendanceService(createAttendanceRepository(prisma), notifications.notifier),
     ),
   );
   app.use('/api/v1/departments', createDepartmentRouter(auth, departments));
