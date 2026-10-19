@@ -4,7 +4,8 @@ Base path: `/api/v1`
 
 ## Auth
 
-Implemented: login, refresh, logout, me. Forgot/reset password wait for SMTP.
+Implemented: login, refresh, logout, me, change own password. Forgot/reset
+password by email waits for SMTP.
 
 - `POST /auth/login` `{ identifier, password, remember? }` — identifier is the
   college email or employee ID (case-insensitive) → `{ accessToken, expiresIn, user }`;
@@ -21,6 +22,12 @@ Implemented: login, refresh, logout, me. Forgot/reset password wait for SMTP.
   `CORS_ORIGIN` with 403 `FORBIDDEN_ORIGIN`.
 - `GET /auth/me` (`Authorization: Bearer <accessToken>`) → `{ user }`.
   Error: 401 `UNAUTHENTICATED`.
+- `POST /auth/password` (Bearer, plus the refresh cookie) `{ currentPassword,
+newPassword }` (12–72 bytes) → 204. Every other session of the user ends;
+  the one whose cookie came with the request stays. Errors: 400
+  `WRONG_PASSWORD`, `SAME_PASSWORD`, `VALIDATION_ERROR`; 429
+  `TOO_MANY_ATTEMPTS` (5 wrong passwords per account per 15 minutes).
+  Audit-logged without the hash.
 
 Access tokens are HS256 JWTs valid for 15 minutes. `user` includes
 `permissions`, the granted keys (e.g. `leave.approve.department`), so clients can
@@ -123,9 +130,10 @@ or null for no limit), allowHalfDay?, carryForwardMax?, active? }` → 201;
 active, year, entitled, carriedIn, used, pending, remaining }`; `entitled` and
   `remaining` are null for a type without a limit. Defaults: the caller and
   this year. HODs see their department; faculty and staff themselves.
-- `GET /leave/requests?status&employeeId&year&awaitingMe` (`leave.read`) →
+- `GET /leave/requests?status&employeeId&year&month&awaitingMe` (`leave.read`) →
   requests in the caller's scope, newest first (at most 500). With
   `awaitingMe=true`: pending requests waiting for the caller's decision.
+  `month=YYYY-MM`: requests with a day in that month (the leave calendar).
 - `GET /leave/requests/:id` → one request; 404 outside the caller's scope.
 - `POST /leave/requests` (`leave.apply`) `{ leaveTypeId, startDate, endDate,
 halfDay?: FIRST|SECOND, reason }` (dates `YYYY-MM-DD`) → 201 with `days`,
@@ -200,9 +208,42 @@ maxHours, updatedAt }]` for every teaching designation.
 
 ## Substitution
 
-- POST /substitution/recommend
-- GET /substitution/:id/candidates
-- PATCH /substitution/:id/assign
+Implemented. Reads need `substitution.read`, assigning `substitution.assign`
+(Super Admin; HODs for their department's classes). A class is affected
+when its teacher has approved leave on that date (Sundays skipped; a half
+day covers morning classes for FIRST, afternoon ones for SECOND).
+
+- `GET /substitution/rubric` → the score parts and their maximums.
+- `GET /substitution/leave?from=YYYY-MM-DD` → approved leave ending on or after
+  `from` (default today) that affects classes in the caller's scope:
+  `[{ leave: { id, employee, department, leaveType, startDate, endDate,
+halfDay, days }, classes, covered }]`. Faculty get an empty list.
+- `GET /substitution/leave/:leaveId` → `{ leave, classes: [{ date, hours, entry,
+coverage: null | { id, kind: SUBSTITUTE|NOT_NEEDED, substitute, note,
+assignedAt } }] }`; 404 when nothing is in scope.
+- `GET /substitution/leave/:leaveId/candidates?entryId&date`
+  (`substitution.assign`) → up to 25 faculty, best first:
+  `{ faculty: { id, employeeCode, name, department, designation }, score,
+points: { subject, availability, department, workload, experience },
+hoursAfter, maxHours, eligible, reason }`. Leaves out the absent teacher,
+  anyone on approved leave that day and anyone teaching or substituting in an
+  overlapping period. Someone the class would push over their weekly maximum
+  is listed last with `eligible: false` and a `reason`.
+- `POST /substitution/assignments` `{ leaveRequestId, timetableEntryId, date,
+substituteId (or null), note? }` → 201 coverage. With `substituteId: null`
+  the class runs without a substitute and `note` (the arrangement) is
+  required. 400 `NOT_AVAILABLE` for a substitute who is not free or would go
+  over their maximum; 409 `ALREADY_COVERED`. Audit-logged.
+- `DELETE /substitution/assignments/:id` → 204 (undo). Audit-logged.
+- `GET /substitution/mine` → classes the caller covers from today, each with
+  `date`, `entry` and `coveringFor`.
+
+Score out of 100: subject 35 (teaches this subject; 15 for another subject
+of the same kind in the department), availability 25 (12 if the class is
+back to back with one of theirs), department 15 (5 for another department),
+workload 15 (in proportion to hours left under the weekly maximum; 7 with no
+band), experience 10 (years of teaching, up to 10). Notifying the substitute
+waits for the Notifications service.
 
 ## Documents
 

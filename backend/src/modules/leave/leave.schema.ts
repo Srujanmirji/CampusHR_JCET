@@ -59,6 +59,11 @@ export const leaveListSchema = z.object({
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']).optional(),
   employeeId: z.uuid().optional(),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
+  // Requests overlapping this month, e.g. 2026-11 (the leave calendar).
+  month: z
+    .string()
+    .regex(/^20\d{2}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM.')
+    .optional(),
   // Requests waiting for the caller's decision.
   awaitingMe: z
     .enum(['true', 'false'])

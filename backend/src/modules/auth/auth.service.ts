@@ -193,6 +193,44 @@ export function createAuthService(
       };
     },
 
+    /**
+     * Changes the user's own password after checking the current one, and
+     * signs out every other session; `refreshToken` (this browser) stays.
+     */
+    async changePassword(
+      userId: string,
+      currentPassword: string,
+      newPassword: string,
+      refreshToken: string | undefined,
+    ) {
+      const user = await repo.findUserById(userId);
+      const hash = await repo.findPasswordHash(userId);
+      if (!user || user.status !== 'ACTIVE' || !hash) throw invalidSession();
+      if (!(await bcrypt.compare(currentPassword, hash))) {
+        throw new HttpError(
+          400,
+          'WRONG_PASSWORD',
+          'Your current password is not right.',
+        );
+      }
+      if (currentPassword === newPassword) {
+        throw new HttpError(
+          400,
+          'SAME_PASSWORD',
+          'Choose a password different from your current one.',
+        );
+      }
+      const session = refreshToken
+        ? await repo.findSessionByHash(hashToken(refreshToken))
+        : null;
+      await repo.changePassword(
+        userId,
+        await bcrypt.hash(newPassword, BCRYPT_COST),
+        session?.userId === userId ? session.id : null,
+        now(),
+      );
+    },
+
     async me(userId: string) {
       const user = await repo.findUserById(userId);
       if (!user || user.status !== 'ACTIVE') throw invalidSession();

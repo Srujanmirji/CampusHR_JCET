@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, UsersRound, FileText, LayoutGrid } from 'lucide-react';
+import { ArrowUpRight, UsersRound, LayoutGrid } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { leaveRequests } from '@/data/mock/dashboard';
+import { employees } from '@/data/mock/employees';
 import { navigation } from '@/data/navigation';
 import { SearchInput } from '@/components/shared/SearchInput';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -15,35 +15,20 @@ export function GlobalSearch() {
   const search = query.trim().toLocaleLowerCase();
   const results = search
     ? [
-        ...leaveRequests
+        ...employees
           .filter(
-            (request) =>
+            (employee) =>
               can('employee.read') &&
-              `${request.employee} ${request.department}`
+              `${employee.name} ${employee.department}`
                 .toLowerCase()
                 .includes(search),
           )
-          .map((request) => ({
-            id: request.id,
-            label: request.employee,
-            detail: `${request.department} · employee`,
+          .map((employee) => ({
+            id: employee.id,
+            label: employee.name,
+            detail: `${employee.department} · employee`,
             path: '/employees',
             icon: UsersRound,
-          })),
-        ...leaveRequests
-          .filter(
-            (request) =>
-              can('leave.read') &&
-              `${request.id} ${request.type} ${request.employee} leave`
-                .toLowerCase()
-                .includes(search),
-          )
-          .map((request) => ({
-            id: `leave-${request.id}`,
-            label: `${request.type} (${request.id})`,
-            detail: `${request.employee} · ${request.department}`,
-            path: `/leave?request=${request.id}`,
-            icon: FileText,
           })),
         ...navigation
           .filter(
@@ -76,8 +61,8 @@ export function GlobalSearch() {
     >
       <SearchInput
         id="global-search"
-        label="Search employees and leave requests"
-        placeholder="Search employees, leave requests..."
+        label="Search employees and modules"
+        placeholder="Search employees and modules..."
         value={query}
         onChange={setQuery}
       />
@@ -118,7 +103,7 @@ export function GlobalSearch() {
             ) : (
               <EmptyState
                 title="No matching results"
-                description="Try Asha, leave, or a module name."
+                description="Try a name or a module, e.g. Leave."
                 actionLabel="Clear search"
                 onAction={() => setQuery('')}
               />

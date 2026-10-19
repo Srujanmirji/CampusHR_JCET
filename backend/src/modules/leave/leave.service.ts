@@ -70,6 +70,15 @@ export function toRequestDto(request: RequestRecord) {
   };
 }
 
+/** Requests with at least one day in `month` (YYYY-MM). */
+function overlapsMonth(month: string): Prisma.LeaveRequestWhereInput {
+  const first = toDate(`${month}-01`);
+  const last = new Date(
+    Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0),
+  );
+  return { startDate: { lte: last }, endDate: { gte: first } };
+}
+
 /** Approved and pending days per year for one leave type. */
 function daysByYear(taken: TakenRecord[], leaveTypeId: number) {
   const approved = new Map<number, number>();
@@ -259,6 +268,7 @@ export function createLeaveService(repo: LeaveRepository) {
                 },
               }
             : {},
+          query.month ? overlapsMonth(query.month) : {},
         ],
       });
       return rows.map(toRequestDto);

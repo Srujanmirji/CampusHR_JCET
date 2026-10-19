@@ -8,6 +8,7 @@ export type Status =
   | 'Pending'
   | 'Approved'
   | 'Rejected'
+  | 'Cancelled'
   | 'Overloaded'
   | 'Underloaded'
   | 'Normal'
@@ -25,6 +26,7 @@ const tones: Record<Status, string> = {
   Available: 'positive',
   Normal: 'positive',
   Inactive: 'neutral',
+  Cancelled: 'neutral',
   'On Leave': 'warning',
   'Half Day': 'warning',
   Late: 'warning',

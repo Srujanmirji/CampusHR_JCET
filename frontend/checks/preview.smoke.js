@@ -64,7 +64,7 @@ try {
     '186',
     '162',
     '11',
-    '8',
+    '2', // leave waiting for this Super Admin (mock API)
     '6',
     '6',
   ]);
@@ -102,7 +102,9 @@ try {
   await page.getByLabel('Filter leave requests by status').click();
   await page.getByRole('option', { name: 'Rejected', exact: true }).click();
   await page.getByText('No requests in this status', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Reset filter', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Show all statuses', exact: true })
+    .click();
   assert.equal(await page.locator('.leave-card tbody tr').count(), 3);
   const profileButton = page.getByRole('button', profileMenu);
   await profileButton.click();
@@ -130,7 +132,7 @@ try {
     'true',
   );
   await page.getByRole('button', { name: 'Expand sidebar' }).click();
-  await page.getByLabel('Search employees and leave requests').fill('Asha');
+  await page.getByLabel('Search employees and modules').fill('Asha');
   await page
     .locator('.search-results')
     .getByRole('link', { name: /Prof. Asha Patil.*employee/ })
@@ -174,43 +176,37 @@ try {
     .getByRole('heading', { name: 'Leave management', exact: true })
     .waitFor();
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await dashboard();
+  // Leave waiting for the Super Admin opens first; approving it decides it.
+  await page.goto(`${base}/leave`);
   await page
-    .locator('.leave-card')
-    .getByRole('link', { name: 'Prof. Asha Patil', exact: true })
+    .getByRole('button', {
+      name: 'View Dr. Suresh Patil’s Casual Leave request',
+    })
+    .first()
     .click();
   const drawer = page.getByRole('dialog', { name: 'Leave request details' });
   await drawer.waitFor();
   await drawer
-    .getByText('Database Management Systems', { exact: true })
-    .waitFor();
-  await drawer.getByText('DBMS Lab', { exact: true }).waitFor();
-  await drawer
-    .getByRole('button', { name: 'Approve Leave', exact: true })
-    .click();
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  assert.equal(
-    await drawer.locator('.status-badge').first().textContent(),
-    'Pending',
-  );
-  await drawer
     .getByRole('button', { name: 'Approve Leave', exact: true })
     .click();
   await page
-    .getByRole('button', { name: 'Approve & Find Substitute', exact: true })
-    .click();
-  await page.waitForURL('**/substitution?leave=LR001');
+    .getByText('Approved Dr. Suresh Patil’s leave.', { exact: true })
+    .waitFor();
+  await drawer.waitFor({ state: 'hidden' });
+  // Smart substitution: Asha's approved leave opens first.
+  await page.goto(`${base}/substitution`);
   await page.getByText('0 / 2 Covered', { exact: true }).waitFor();
-  const firstClass = page.locator('#class-TT001');
-  const secondClass = page.locator('#class-TT002');
-  assert.deepEqual(
-    await firstClass.locator('.match-score strong').allTextContents(),
-    ['94%', '86%', '74%'],
-  );
-  assert.deepEqual(
-    await secondClass.locator('.match-score strong').allTextContents(),
-    ['94%', '86%', '74%'],
-  );
+  const firstClass = page.locator('.affected-class-card').nth(0);
+  const secondClass = page.locator('.affected-class-card').nth(1);
+  for (const card of [firstClass, secondClass]) {
+    await card
+      .getByRole('button', { name: 'Assign Prof. Priya Kulkarni', exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await card.locator('.match-score strong').allTextContents(),
+      ['94/100', '86/100', '74/100'],
+    );
+  }
   assert.ok(
     await secondClass
       .getByRole('button', { name: 'Assign Dr. Rahul Deshpande', exact: true })
@@ -246,75 +242,62 @@ try {
     .click();
   await page.getByText('2 / 2 Covered', { exact: true }).waitFor();
   await page.getByText('No classes left uncovered', { exact: true }).waitFor();
-  await page
-    .getByRole('button', { name: 'View Updated Timetable', exact: true })
+  // Undo puts the class back in need of cover.
+  await secondClass.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.getByText('1 / 2 Covered', { exact: true }).waitFor();
+  await secondClass
+    .getByRole('button', { name: 'Assign Prof. Priya Kulkarni', exact: true })
     .click();
-  const timetable = page.getByRole('dialog', {
-    name: 'Updated timetable preview',
-  });
-  await timetable.waitFor();
-  assert.equal(
-    await timetable.getByText('Prof. Priya Kulkarni', { exact: true }).count(),
-    2,
-  );
-  assert.equal(
-    await timetable.getByText('Substitute', { exact: true }).count(),
-    2,
-  );
-  await page.keyboard.press('Escape');
-  await timetable.waitFor({ state: 'hidden' });
+  await page
+    .getByRole('button', { name: 'Confirm Assignment', exact: true })
+    .click();
+  await page.getByText('2 / 2 Covered', { exact: true }).waitFor();
   await page
     .getByRole('link', { name: 'Return to Leave Management', exact: true })
     .click();
+  await page
+    .getByRole('heading', { name: 'Leave management', exact: true })
+    .waitFor();
+  await page.getByLabel('Show', { exact: true }).click();
+  await page.getByRole('option', { name: 'All requests', exact: true }).click();
   await page.getByLabel('Search leave requests', { exact: true }).fill('Asha');
+  await page
+    .getByRole('button', {
+      name: 'View Prof. Asha Patil’s Casual Leave request',
+    })
+    .waitFor();
+  assert.equal(await page.locator('main tbody tr').count(), 1);
   assert.equal(
-    await page.locator('.leave-management-card tbody tr').count(),
-    1,
-  );
-  assert.equal(
-    await page
-      .locator('.leave-management-card tbody .status-badge')
-      .textContent(),
-    'Approved',
+    await page.locator('main tbody .status-badge').textContent(),
+    'Pending',
   );
   await page
     .getByLabel('Search leave requests', { exact: true })
     .fill('No faculty by this name');
   await page.getByText('No leave requests match', { exact: true }).waitFor();
-  await page
-    .getByRole('button', { name: 'Clear filters', exact: true })
-    .click();
-  await page.getByLabel('Department', { exact: true }).click();
-  await page
-    .getByRole('option', { name: 'Mechanical Engineering', exact: true })
-    .click();
-  assert.equal(
-    await page.locator('.leave-management-card tbody tr').count(),
-    1,
-  );
+  await page.getByLabel('Search leave requests', { exact: true }).fill('');
+  // Asha's leave waits for her HOD: the Super Admin reads it and its classes.
   await page
     .getByRole('button', {
-      name: 'View Dr. Mahesh B leave request',
-      exact: true,
+      name: 'View Prof. Asha Patil’s Casual Leave request',
     })
     .click();
-  await drawer
-    .getByRole('button', { name: 'Approve Leave', exact: true })
-    .click();
-  await page
-    .getByRole('button', { name: 'Approve Without Substitute', exact: true })
-    .click();
+  await drawer.getByText('2 classes affected').waitFor();
+  await drawer.getByText('Database Management Systems').waitFor();
   assert.equal(
-    await drawer.locator('.status-badge').first().textContent(),
-    'Approved',
+    await drawer.getByRole('button', { name: 'Approve Leave' }).count(),
+    0,
   );
-  await drawer
-    .getByRole('button', { name: 'Review class coverage', exact: true })
-    .click();
+  await page.keyboard.press('Escape');
+  await drawer.waitFor({ state: 'hidden' });
+  await page.goto(
+    `${base}/substitution?leave=b0000000-0000-4000-8000-000000000002`,
+  );
   await page.getByText('0 / 2 Covered', { exact: true }).waitFor();
-  for (const classId of ['TT003', 'TT004']) {
+  for (const index of [0, 1]) {
     await page
-      .locator(`#class-${classId}`)
+      .locator('.affected-class-card')
+      .nth(index)
       .getByRole('button', { name: 'No substitute required', exact: true })
       .click();
     await page
@@ -347,33 +330,84 @@ try {
   );
   await page.reload();
   await page.getByText('No classes left uncovered', { exact: true }).waitFor();
-  await page.goto(`${base}/leave?request=LR004`);
-  await drawer.getByRole('button', { name: 'Reject', exact: true }).click();
-  await page.getByRole('button', { name: 'Reject Leave', exact: true }).click();
-  await page
-    .getByText('Enter a reason for rejection.', { exact: true })
-    .waitFor();
-  await page
-    .getByLabel('Reason for rejection', { exact: true })
-    .fill('Department assessment duty on the requested date.');
-  await page.getByRole('button', { name: 'Reject Leave', exact: true }).click();
-  await page.reload();
-  await drawer.getByText('Decision note', { exact: true }).waitFor();
-  assert.equal(
-    await drawer.locator('.status-badge').first().textContent(),
-    'Rejected',
-  );
+  const secondRequest = 'a0000000-0000-4000-8000-000000000003';
+  await page.goto(`${base}/leave?tab=requests&request=${secondRequest}`);
   await drawer
-    .getByText('Department assessment duty on the requested date.', {
+    .getByRole('button', { name: 'Reject Leave', exact: true })
+    .click();
+  await drawer
+    .getByText('Say why you are rejecting it, in a few words.', {
       exact: true,
     })
     .waitFor();
   await drawer
-    .getByRole('button', { name: 'Close leave details', exact: true })
+    .getByLabel('Note', { exact: true })
+    .fill('Department assessment duty on the requested date.');
+  await drawer
+    .getByRole('button', { name: 'Reject Leave', exact: true })
     .click();
+  await drawer.waitFor({ state: 'hidden' });
+  await page.goto(
+    `${base}/leave?tab=requests&show=ALL&request=${secondRequest}`,
+  );
+  await drawer
+    .getByText('Department assessment duty on the requested date.')
+    .waitFor();
+  assert.equal(
+    await drawer.locator('.status-badge').first().textContent(),
+    'Rejected',
+  );
+  await page.keyboard.press('Escape');
+  // Change password from the profile menu.
+  await page.getByRole('button', profileMenu).click();
+  await page.getByRole('menuitem', { name: 'Change password' }).click();
+  const passwordDialog = page.getByRole('dialog', { name: 'Change password' });
+  await passwordDialog
+    .getByLabel('Current password', { exact: true })
+    .fill('wrong password');
+  await passwordDialog
+    .getByLabel('New password', { exact: true })
+    .fill('a-new-password-123');
+  await passwordDialog
+    .getByLabel('Repeat new password', { exact: true })
+    .fill('something else');
+  await passwordDialog.getByRole('button', { name: 'Change password' }).click();
+  await passwordDialog.getByText('The new passwords don’t match.').waitFor();
+  await passwordDialog
+    .getByLabel('Repeat new password', { exact: true })
+    .fill('a-new-password-123');
+  await passwordDialog.getByRole('button', { name: 'Change password' }).click();
+  await passwordDialog
+    .getByText('Your current password is not right.')
+    .waitFor();
+  await passwordDialog
+    .getByLabel('Current password', { exact: true })
+    .fill(checkPassword);
+  await passwordDialog.getByRole('button', { name: 'Change password' }).click();
+  await page
+    .getByText('Password changed. Your other devices are signed out.')
+    .waitFor();
+  await passwordDialog.waitFor({ state: 'hidden' });
+  assert.equal(api.passwordChanged, true);
+
+  // Leave calendar: Asha's two pending days in November; month navigation.
+  await page.goto(`${base}/leave?tab=calendar&month=2026-11`);
+  await page.getByRole('heading', { name: 'November 2026' }).waitFor();
+  const ashaChip = page.getByRole('button', {
+    name: 'Prof. Asha Patil, Casual Leave, waiting for approval',
+  });
+  await ashaChip.first().waitFor();
+  assert.equal(
+    await ashaChip.count(),
+    2,
+    'Asha is on leave on 2 and 3 November',
+  );
+  await page.getByRole('button', { name: 'Previous month' }).click();
+  await page.getByRole('heading', { name: 'October 2026' }).waitFor();
+  await page.getByText('Nobody is on leave in October 2026.').waitFor();
   for (const width of [1440, 1280, 768, 375]) {
     await page.setViewportSize({ width, height: 1000 });
-    for (const route of ['leave', 'substitution?leave=LR001']) {
+    for (const route of ['leave', 'substitution']) {
       await page.goto(`${base}/${route}`);
       await page
         .getByRole('heading', {
@@ -397,10 +431,9 @@ try {
   await page
     .getByRole('heading', { name: 'Leave management', exact: true })
     .waitFor();
-  assert.deepEqual(
-    await page.locator('.workflow-metrics .metric-value').allTextContents(),
-    ['8', '2', '1', '1'],
-  );
+  // A broken stored demo workflow falls back instead of breaking the app.
+  await page.goto(`${base}/notifications`);
+  await page.locator('main h1').waitFor();
   await dashboard();
   await page.getByRole('button', profileMenu).click();
   await page.getByRole('menuitem', { name: 'Logout' }).click();
