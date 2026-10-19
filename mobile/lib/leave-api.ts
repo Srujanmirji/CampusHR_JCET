@@ -209,10 +209,16 @@ export async function getLeaveTypes(token: string | null): Promise<LeaveTypeDto[
   return INITIAL_DEMO_TYPES;
 }
 
-export async function getLeaveBalances(token: string | null): Promise<LeaveBalanceDto[]> {
+export async function getLeaveBalances(
+  token: string | null,
+  employeeId?: string
+): Promise<LeaveBalanceDto[]> {
   if (token && !token.startsWith('demo-')) {
     try {
-      const res = await fetch(`${API_BASE_URL}/leave/balances`, {
+      const params = new URLSearchParams();
+      if (employeeId) params.set('employeeId', employeeId);
+      const url = `${API_BASE_URL}/leave/balances${params.toString() ? `?${params.toString()}` : ''}`;
+      const res = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',

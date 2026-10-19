@@ -63,7 +63,7 @@ export default function LeaveScreen() {
     try {
       const [fetchedTypes, fetchedBalances, allRequests] = await Promise.all([
         getLeaveTypes(accessToken),
-        getLeaveBalances(accessToken),
+        getLeaveBalances(accessToken, user?.employeeId || undefined),
         getLeaveRequests(accessToken),
       ]);
 
@@ -72,11 +72,24 @@ export default function LeaveScreen() {
 
       // Separate personal requests and HOD department approvals
       if (isHod) {
+        const myEmpId = user?.employeeId || user?.id;
         const pendingForHod = allRequests.filter(
-          (r) => r.status === 'PENDING' && r.pendingRole === 'HOD'
+          (r) =>
+            r.status === 'PENDING' &&
+            r.pendingRole === 'HOD' &&
+            r.employee.id !== myEmpId &&
+            r.employee.id !== user?.id
         );
         setHodPendingRequests(pendingForHod);
-        setMyRequests(allRequests.filter((r) => r.employee.id === user?.id || r.employee.employeeCode === user?.employeeCode));
+        setMyRequests(
+          allRequests.filter(
+            (r) =>
+              r.employee.id === myEmpId ||
+              r.employee.id === user?.id ||
+              (!!user?.employeeCode &&
+                r.employee.employeeCode.trim().toLowerCase() === user.employeeCode.trim().toLowerCase())
+          )
+        );
       } else {
         setMyRequests(allRequests);
       }
@@ -389,7 +402,7 @@ export default function LeaveScreen() {
         onSuccess={loadData}
         token={accessToken}
         currentUser={{
-          id: user?.id || 'demo-faculty-021',
+          id: user?.employeeId || user?.id || 'demo-faculty-021',
           name: user?.name || 'Prof. Asha Patil',
           employeeCode: user?.employeeCode || 'JCET-CSE-021',
           role: user?.role || 'FACULTY',
