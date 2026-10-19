@@ -20,3 +20,10 @@ export const newPasswordSchema = z
     (password) => Buffer.byteLength(password) <= 72,
     'Use at most 72 bytes.',
   );
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Enter your current password.').max(256),
+    newPassword: newPasswordSchema,
+  })
+  .strict();

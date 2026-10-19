@@ -73,6 +73,22 @@ export function createMemoryAuthRepository(users: StoredUser[] = []) {
         }
       }
     },
+    async findPasswordHash(userId) {
+      return users.find((user) => user.id === userId)?.passwordHash ?? null;
+    },
+    async changePassword(userId, passwordHash, keepSessionId, at) {
+      const user = users.find((candidate) => candidate.id === userId);
+      if (user) user.passwordHash = passwordHash;
+      for (const session of sessions) {
+        if (
+          session.userId === userId &&
+          session.id !== keepSessionId &&
+          session.expiresAt > at
+        ) {
+          Object.assign(session, { revokedAt: at, expiresAt: at });
+        }
+      }
+    },
   };
   return { repo, sessions };
 }

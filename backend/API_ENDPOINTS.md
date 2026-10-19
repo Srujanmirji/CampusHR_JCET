@@ -4,7 +4,8 @@ Base path: `/api/v1`
 
 ## Auth
 
-Implemented: login, refresh, logout, me. Forgot/reset password wait for SMTP.
+Implemented: login, refresh, logout, me, change own password. Forgot/reset
+password by email waits for SMTP.
 
 - `POST /auth/login` `{ identifier, password, remember? }` — identifier is the
   college email or employee ID (case-insensitive) → `{ accessToken, expiresIn, user }`;
@@ -21,6 +22,12 @@ Implemented: login, refresh, logout, me. Forgot/reset password wait for SMTP.
   `CORS_ORIGIN` with 403 `FORBIDDEN_ORIGIN`.
 - `GET /auth/me` (`Authorization: Bearer <accessToken>`) → `{ user }`.
   Error: 401 `UNAUTHENTICATED`.
+- `POST /auth/password` (Bearer, plus the refresh cookie) `{ currentPassword,
+newPassword }` (12–72 bytes) → 204. Every other session of the user ends;
+  the one whose cookie came with the request stays. Errors: 400
+  `WRONG_PASSWORD`, `SAME_PASSWORD`, `VALIDATION_ERROR`; 429
+  `TOO_MANY_ATTEMPTS` (5 wrong passwords per account per 15 minutes).
+  Audit-logged without the hash.
 
 Access tokens are HS256 JWTs valid for 15 minutes. `user` includes
 `permissions`, the granted keys (e.g. `leave.approve.department`), so clients can

@@ -1,7 +1,7 @@
 import type { CookieOptions, Request, RequestHandler, Response } from 'express';
 import { HttpError } from '../../common/http-error.js';
 import { createFailureLimiter } from '../../middleware/rate-limit.js';
-import { loginSchema } from './auth.schema.js';
+import { changePasswordSchema, loginSchema } from './auth.schema.js';
 import {
   REFRESH_TOKEN_TTL_MS,
   type AuthResult,
@@ -145,9 +145,47 @@ export function createAuthController(
     res.clearCookie(REFRESH_COOKIE, cookieOptions).status(204).end();
   };
 
+  // Wrong current passwords count per account, like sign-in attempts.
+  const perUser = createFailureLimiter(5, LIMIT_WINDOW_MS);
+  const changePassword: RequestHandler = async (req, res) => {
+    const userId: string = res.locals.auth.userId;
+    const parsed = changePasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new HttpError(
+        400,
+        'VALIDATION_ERROR',
+        parsed.error.issues[0]?.message ?? 'Check the passwords.',
+      );
+    }
+    if (perUser.isBlocked(userId)) {
+      res.set('Retry-After', String(LIMIT_WINDOW_MS / 1000));
+      throw new HttpError(
+        429,
+        'TOO_MANY_ATTEMPTS',
+        'Too many attempts. Try again in 15 minutes.',
+      );
+    }
+    perUser.hit(userId);
+    try {
+      await auth.changePassword(
+        userId,
+        parsed.data.currentPassword,
+        parsed.data.newPassword,
+        readCookie(req, REFRESH_COOKIE),
+      );
+      perUser.reset(userId);
+      res.status(204).end();
+    } catch (error) {
+      if (!(error instanceof HttpError && error.code === 'WRONG_PASSWORD')) {
+        perUser.forgive(userId);
+      }
+      throw error;
+    }
+  };
+
   const me: RequestHandler = async (_req, res) => {
     res.json({ user: await auth.me(res.locals.auth.userId) });
   };
 
-  return { login, refresh, logout, me };
+  return { login, refresh, logout, changePassword, me };
 }

@@ -433,6 +433,19 @@ export async function mockAuthApi(page, webOrigin) {
         error: { code: 'UNAUTHENTICATED', message: 'Sign in to continue.' },
       });
     }
+    if (path === 'auth/password') {
+      const body = request.postDataJSON();
+      if (body.currentPassword !== checkPassword) {
+        return json(route, 400, {
+          error: {
+            code: 'WRONG_PASSWORD',
+            message: 'Your current password is not right.',
+          },
+        });
+      }
+      state.passwordChanged = true;
+      return route.fulfill({ status: 204, headers: cors });
+    }
     if (path === 'employees/next-code') {
       return json(route, 200, { data: { employeeCode: 'JCET-CSE-022' } });
     }

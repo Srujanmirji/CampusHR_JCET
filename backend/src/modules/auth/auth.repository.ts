@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { writeAudit } from '../../common/audit.js';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 
 export interface AuthUser {
@@ -46,6 +47,18 @@ export interface AuthRepository {
   endSession(id: string, at: Date): Promise<void>;
   /** Ends every session of a user (suspected token theft). */
   revokeAllSessions(userId: string, at: Date): Promise<void>;
+  /** The stored hash, to check the current password. */
+  findPasswordHash(userId: string): Promise<string | null>;
+  /**
+   * Saves a new password hash and ends every other session of the user;
+   * `keepSessionId` (the one making the change) stays signed in.
+   */
+  changePassword(
+    userId: string,
+    passwordHash: string,
+    keepSessionId: string | null,
+    at: Date,
+  ): Promise<void>;
 }
 
 const userSelect = {
@@ -141,6 +154,34 @@ export function createPrismaAuthRepository(
       await prisma.refreshSession.updateMany({
         where: { userId, expiresAt: { gt: at } },
         data: { revokedAt: at, expiresAt: at },
+      });
+    },
+    async findPasswordHash(userId) {
+      if (!z.uuid().safeParse(userId).success) return null;
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { passwordHash: true },
+      });
+      return user?.passwordHash ?? null;
+    },
+    async changePassword(userId, passwordHash, keepSessionId, at) {
+      await prisma.$transaction(async (tx) => {
+        await tx.user.update({ where: { id: userId }, data: { passwordHash } });
+        await tx.refreshSession.updateMany({
+          where: {
+            userId,
+            expiresAt: { gt: at },
+            ...(keepSessionId ? { NOT: { id: keepSessionId } } : {}),
+          },
+          data: { revokedAt: at, expiresAt: at },
+        });
+        await writeAudit(tx, {
+          actorUserId: userId,
+          action: 'user.password_change',
+          resource: 'user',
+          resourceId: userId,
+          after: { passwordChanged: true },
+        });
       });
     },
   };

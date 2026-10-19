@@ -40,6 +40,7 @@ Verification and launch steps: `frontend/README.md`.
 - [x] Forgot password help dialog (no recovery service yet)
 - [x] Remember me and logout
 - [x] Sign-in against the auth API (session restore, return to requested page)
+- [x] Change password from the profile menu
 
 ## FE-005 Dashboard
 

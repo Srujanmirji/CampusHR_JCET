@@ -8,8 +8,10 @@ import {
   Menu,
   Settings,
   UserRound,
+  KeyRound,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ChangePasswordDialog } from '@/features/auth/components/ChangePasswordDialog';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -58,6 +60,7 @@ export function Topbar({
   const workflow = useAcademicWorkflow();
   const profileMenuTrigger = useRef<HTMLButtonElement>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const label =
     navigation.find((item) => item.path === pathname)?.label ?? 'CampusHR';
 
@@ -169,6 +172,10 @@ export function Topbar({
                   <UserRound />
                   My profile
                 </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPasswordOpen(true)}>
+                  <KeyRound />
+                  Change password
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/settings">
                     <Settings />
@@ -193,6 +200,14 @@ export function Topbar({
           </DropdownMenu>
         </div>
       </header>
+      <ChangePasswordDialog
+        open={passwordOpen}
+        onOpenChange={setPasswordOpen}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          profileMenuTrigger.current?.focus();
+        }}
+      />
       <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
         <DialogContent
           onCloseAutoFocus={(event) => {

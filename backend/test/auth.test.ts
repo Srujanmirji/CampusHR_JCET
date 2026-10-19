@@ -304,3 +304,51 @@ test('replaying a rotated token after the grace period ends every session', asyn
   await assert.rejects(auth.refresh(stolen, {}), { code: 'SESSION_EXPIRED' });
   await assert.rejects(auth.refresh(current, {}), { code: 'SESSION_EXPIRED' });
 });
+
+test('changing your password keeps this session and ends the others', async () => {
+  const passwordHash = await bcrypt.hash(password, 4);
+  const { repo, sessions } = createMemoryAuthRepository([
+    {
+      id: '44444444-4444-4444-8444-444444444444',
+      email: 'c@jcet.test',
+      passwordHash,
+      status: 'ACTIVE',
+      role: 'Faculty',
+      permissions: defaultGrants('Faculty'),
+    },
+  ]);
+  const auth = createAuthService(repo, env.JWT_ACCESS_SECRET);
+  const here = await auth.login('c@jcet.test', password, {});
+  const phone = await auth.login('c@jcet.test', password, {});
+  const userId = here.user.id;
+
+  await assert.rejects(
+    auth.changePassword(
+      userId,
+      'not-my-password',
+      'brand-new-password-1',
+      here.refreshToken,
+    ),
+    { code: 'WRONG_PASSWORD' },
+  );
+  await assert.rejects(
+    auth.changePassword(userId, password, password, here.refreshToken),
+    { code: 'SAME_PASSWORD' },
+  );
+  await auth.changePassword(
+    userId,
+    password,
+    'brand-new-password-1',
+    here.refreshToken,
+  );
+
+  await assert.rejects(auth.login('c@jcet.test', password, {}), {
+    code: 'INVALID_CREDENTIALS',
+  });
+  assert.ok(await auth.login('c@jcet.test', 'brand-new-password-1', {}));
+  assert.ok(await auth.refresh(here.refreshToken, {}), 'this session stays');
+  await assert.rejects(auth.refresh(phone.refreshToken, {}), {
+    code: 'SESSION_EXPIRED',
+  });
+  assert.ok(sessions.length >= 3);
+});
