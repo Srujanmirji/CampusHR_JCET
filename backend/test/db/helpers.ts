@@ -8,6 +8,8 @@ import { envSchema } from '../../src/config/env.js';
 import { createPrismaClient } from '../../src/database/prisma.js';
 import { seedReferenceData } from '../../src/database/reference-data.js';
 import { createPrismaAuthRepository } from '../../src/modules/auth/auth.repository.js';
+import { createAuthService } from '../../src/modules/auth/auth.service.js';
+import { createRealtime } from '../../src/modules/notifications/notifications.realtime.js';
 import type { RoleName } from '../../src/modules/auth/permissions.js';
 
 export const password = 'db-test-password';
@@ -21,11 +23,23 @@ export async function startTestApp() {
     JWT_ACCESS_SECRET: 'a'.repeat(32),
     CORS_ORIGIN: 'http://localhost:5173',
   });
+  const authRepository = createPrismaAuthRepository(prisma);
+  const realtime = createRealtime();
   const server: Server = createApp(env, {
-    authRepository: createPrismaAuthRepository(prisma),
+    authRepository,
     prisma,
+    realtime,
   }).listen(0, '127.0.0.1');
   await once(server, 'listening');
+  // As in server.ts: sockets authenticate with the access token.
+  const io = realtime.attach(server, {
+    origin: env.CORS_ORIGIN,
+    verify: (token) =>
+      createAuthService(
+        authRepository,
+        env.JWT_ACCESS_SECRET,
+      ).verifyAccessToken(token).userId,
+  });
   const address = server.address();
   assert.ok(address && typeof address === 'object');
   const base = `http://127.0.0.1:${address.port}/api/v1`;
@@ -103,6 +117,7 @@ export async function startTestApp() {
   }
 
   async function stop() {
+    await io.close();
     server.close();
     await prisma.$disconnect();
   }

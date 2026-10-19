@@ -242,8 +242,8 @@ Score out of 100: subject 35 (teaches this subject; 15 for another subject
 of the same kind in the department), availability 25 (12 if the class is
 back to back with one of theirs), department 15 (5 for another department),
 workload 15 (in proportion to hours left under the weekly maximum; 7 with no
-band), experience 10 (years of teaching, up to 10). Notifying the substitute
-waits for the Notifications service.
+band), experience 10 (years of teaching, up to 10). The substitute gets a
+notification when assigned.
 
 ## Documents
 
@@ -254,8 +254,26 @@ waits for the Notifications service.
 
 ## Notifications
 
-- GET /notifications
-- PATCH /notifications/:id/read
+Implemented. Each person sees only their own (`notification.read`, own).
+
+- `GET /notifications?after=&limit=` → newest first, `{ data, hasMore }`;
+  `limit` 1–50 (default 20), `after` is the last id of the previous page.
+  Each has `id`, `kind`, `title`, `body`, `link`, `readAt`, `createdAt`.
+- `GET /notifications/unread-count` → `{ data: { count } }`
+- `PATCH /notifications/:id/read` → 204; 404 for someone else's
+- `PATCH /notifications/read-all` → 204
+- `POST /notifications/announcements` (`announcement.send`) with
+  `{ title, body, departmentId? }` → 201 `{ data: { recipients } }`. Scope
+  all sends to everyone or one department; a HOD's always go to their own
+  department. The sender is left out; audited as `announcement.send`.
+
+Sent automatically: leave waiting for your step (`leave.waiting`), your leave
+moved on, approved or rejected (`leave.progress|approved|rejected`), and a
+class you cover (`substitution.assigned`).
+
+Live: Socket.IO at path `/api/v1/socket.io` on the API's origin, with
+`auth: { token: <access token> }`; refused without a valid token. The server
+emits `notifications:changed` to the user whenever theirs change; refetch.
 
 ## Reports
 

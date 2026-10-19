@@ -181,19 +181,20 @@ try {
     'Completion must count the substitutes',
   );
 
-  // 11. Workflow data reset (Settings) restores the demo notifications
-  await page.goto(`${base}/settings`);
-  await page.getByRole('button', { name: 'Reset data', exact: true }).click();
-  const resetModal = page.getByRole('dialog');
-  await resetModal.waitFor();
-  assert.ok(
-    await resetModal.getByText('Reset workflow data?').isVisible(),
-    'Confirmation dialog title must match',
-  );
-  await resetModal
-    .getByRole('button', { name: 'Reset data', exact: true })
+  // 11. Notifications: the bell counts unread, the page marks all read
+  await page.goto(`${base}/notifications`);
+  await page.getByRole('button', { name: 'Notifications, 2 unread' }).waitFor();
+  await page.getByText('You are covering Data Structures').waitFor();
+  await page
+    .getByRole('button', { name: 'Mark all as read', exact: true })
     .click();
-  await page.getByRole('button', { name: 'Notifications, 3 unread' }).waitFor();
+  await page.getByRole('button', { name: 'Notifications, 0 unread' }).waitFor();
+  await page.getByLabel('Title').fill('Holiday on Friday');
+  await page.getByLabel('Message').fill('The college is closed this Friday.');
+  await page
+    .getByRole('button', { name: 'Send announcement', exact: true })
+    .click();
+  await page.getByText('Announcement sent to 42 people.').waitFor();
 
   // 12. Module pages carry no planned/prototype banners
   for (const route of ['workload', 'employees', 'settings']) {

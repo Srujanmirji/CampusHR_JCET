@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
@@ -19,6 +22,10 @@ import { createEmployeeService } from './modules/employees/employee.service.js';
 import { createLeaveRepository } from './modules/leave/leave.repository.js';
 import { createLeaveRouter } from './modules/leave/leave.routes.js';
 import { createLeaveService } from './modules/leave/leave.service.js';
+import { createNotificationRepository } from './modules/notifications/notifications.repository.js';
+import type { Realtime } from './modules/notifications/notifications.realtime.js';
+import { createNotificationRouter } from './modules/notifications/notifications.routes.js';
+import { createNotificationService } from './modules/notifications/notifications.service.js';
 import { createSubstitutionRepository } from './modules/substitution/substitution.repository.js';
 import { createSubstitutionRouter } from './modules/substitution/substitution.routes.js';
 import { createSubstitutionService } from './modules/substitution/substitution.service.js';
@@ -32,19 +39,39 @@ import { createWorkloadRepository } from './modules/workload/workload.repository
 import { createWorkloadRouter } from './modules/workload/workload.routes.js';
 import { createWorkloadService } from './modules/workload/workload.service.js';
 
+// The built web app (`npm run build --workspace @campushr/web`). In production
+// the API serves it from the same address, so the SameSite=Strict refresh
+// cookie reaches /api/v1/auth without a shared custom domain (SETUP.md).
+const WEB_DIST = fileURLToPath(new URL('../../frontend/dist', import.meta.url));
+
 export function createApp(
   env: Env,
   {
     authRepository,
     prisma,
-  }: { authRepository: AuthRepository; prisma: PrismaClient },
+    webDir = WEB_DIST,
+    realtime,
+  }: {
+    authRepository: AuthRepository;
+    prisma: PrismaClient;
+    webDir?: string;
+    /** Live unread counts; absent in tests that need no sockets. */
+    realtime?: Pick<Realtime, 'publish'>;
+  },
 ) {
   const auth = createAuthService(authRepository, env.JWT_ACCESS_SECRET);
+  const notifications = createNotificationService(
+    createNotificationRepository(prisma),
+    realtime,
+  );
   const departments = createDepartmentService(
     createDepartmentRepository(prisma),
   );
   const app = express();
   app.disable('x-powered-by');
+  // Behind Railway's proxy: take the client address from X-Forwarded-For, so
+  // sign-in rate limits count people, not the proxy.
+  if (env.NODE_ENV === 'production') app.set('trust proxy', 1);
   app.use(helmet());
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
   app.use(express.json({ limit: '1mb' }));
@@ -70,13 +97,23 @@ export function createApp(
   app.use('/api/v1/designations', createDesignationRouter(auth, departments));
   app.use(
     '/api/v1/leave',
-    createLeaveRouter(auth, createLeaveService(createLeaveRepository(prisma))),
+    createLeaveRouter(
+      auth,
+      createLeaveService(createLeaveRepository(prisma), notifications.notifier),
+    ),
+  );
+  app.use(
+    '/api/v1/notifications',
+    createNotificationRouter(auth, notifications),
   );
   app.use(
     '/api/v1/substitution',
     createSubstitutionRouter(
       auth,
-      createSubstitutionService(createSubstitutionRepository(prisma)),
+      createSubstitutionService(
+        createSubstitutionRepository(prisma),
+        notifications.notifier,
+      ),
     ),
   );
   app.use(
@@ -97,6 +134,14 @@ export function createApp(
       createWorkloadService(createWorkloadRepository(prisma)),
     ),
   );
+  if (env.NODE_ENV === 'production' && existsSync(webDir)) {
+    app.use(express.static(webDir, { index: false, maxAge: '1h' }));
+    // Every other page is the single-page app; it routes in the browser.
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+      res.set('Cache-Control', 'no-cache').sendFile(join(webDir, 'index.html'));
+    });
+  }
   app.use((_req, res) => {
     res
       .status(404)
