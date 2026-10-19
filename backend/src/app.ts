@@ -22,6 +22,10 @@ import { createEmployeeService } from './modules/employees/employee.service.js';
 import { createLeaveRepository } from './modules/leave/leave.repository.js';
 import { createLeaveRouter } from './modules/leave/leave.routes.js';
 import { createLeaveService } from './modules/leave/leave.service.js';
+import { createNotificationRepository } from './modules/notifications/notifications.repository.js';
+import type { Realtime } from './modules/notifications/notifications.realtime.js';
+import { createNotificationRouter } from './modules/notifications/notifications.routes.js';
+import { createNotificationService } from './modules/notifications/notifications.service.js';
 import { createSubstitutionRepository } from './modules/substitution/substitution.repository.js';
 import { createSubstitutionRouter } from './modules/substitution/substitution.routes.js';
 import { createSubstitutionService } from './modules/substitution/substitution.service.js';
@@ -46,9 +50,20 @@ export function createApp(
     authRepository,
     prisma,
     webDir = WEB_DIST,
-  }: { authRepository: AuthRepository; prisma: PrismaClient; webDir?: string },
+    realtime,
+  }: {
+    authRepository: AuthRepository;
+    prisma: PrismaClient;
+    webDir?: string;
+    /** Live unread counts; absent in tests that need no sockets. */
+    realtime?: Pick<Realtime, 'publish'>;
+  },
 ) {
   const auth = createAuthService(authRepository, env.JWT_ACCESS_SECRET);
+  const notifications = createNotificationService(
+    createNotificationRepository(prisma),
+    realtime,
+  );
   const departments = createDepartmentService(
     createDepartmentRepository(prisma),
   );
@@ -82,13 +97,23 @@ export function createApp(
   app.use('/api/v1/designations', createDesignationRouter(auth, departments));
   app.use(
     '/api/v1/leave',
-    createLeaveRouter(auth, createLeaveService(createLeaveRepository(prisma))),
+    createLeaveRouter(
+      auth,
+      createLeaveService(createLeaveRepository(prisma), notifications.notifier),
+    ),
+  );
+  app.use(
+    '/api/v1/notifications',
+    createNotificationRouter(auth, notifications),
   );
   app.use(
     '/api/v1/substitution',
     createSubstitutionRouter(
       auth,
-      createSubstitutionService(createSubstitutionRepository(prisma)),
+      createSubstitutionService(
+        createSubstitutionRepository(prisma),
+        notifications.notifier,
+      ),
     ),
   );
   app.use(

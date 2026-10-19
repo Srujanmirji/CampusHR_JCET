@@ -10,7 +10,15 @@ import {
   UserRound,
   KeyRound,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import {
+  listNotifications,
+  unreadCount,
+} from '@/features/notifications/api/notifications';
+import { useLiveNotifications } from '@/features/notifications/hooks/useLiveNotifications';
+import { useNotificationActions } from '@/features/notifications/hooks/useNotificationActions';
+import { timeAgo } from '@/features/notifications/utils/notifications';
 import { ChangePasswordDialog } from '@/features/auth/components/ChangePasswordDialog';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -33,7 +41,6 @@ import {
 import { navigation } from '@/data/navigation';
 import type { SessionUser } from '@/features/auth/api/auth';
 import { useSession } from '@/features/auth/hooks/useSession';
-import { useAcademicWorkflow } from '@/features/leave/useAcademicWorkflow';
 import { GlobalSearch } from './GlobalSearch';
 
 // "hod.cse@…" → "HC"; "admin@…" → "AD".
@@ -57,7 +64,17 @@ export function Topbar({
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const session = useSession();
-  const workflow = useAcademicWorkflow();
+  useLiveNotifications();
+  const notifications = useNotificationActions();
+  const unread = useQuery({
+    queryKey: ['notifications', 'unread'],
+    queryFn: unreadCount,
+  });
+  const latest = useQuery({
+    queryKey: ['notifications', 'latest'],
+    queryFn: () => listNotifications(undefined, 5),
+  });
+  const unreadTotal = unread.data ?? 0;
   const profileMenuTrigger = useRef<HTMLButtonElement>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -91,12 +108,12 @@ export function Topbar({
                 variant="ghost"
                 size="icon"
                 className="notification-trigger"
-                aria-label={`Notifications, ${workflow.unreadCount} unread`}
+                aria-label={`Notifications, ${unreadTotal} unread`}
               >
                 <Bell />
-                {workflow.unreadCount > 0 && (
+                {unreadTotal > 0 && (
                   <span className="notification-count">
-                    {workflow.unreadCount}
+                    {unreadTotal > 99 ? '99+' : unreadTotal}
                   </span>
                 )}
               </Button>
@@ -104,31 +121,52 @@ export function Topbar({
             <DropdownMenuContent align="end" className="notification-menu">
               <DropdownMenuLabel className="flex items-center justify-between">
                 <span>Campus updates</span>
-                {workflow.unreadCount > 0 && (
+                {unreadTotal > 0 && (
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-auto px-1 py-0.5 text-xs text-muted-foreground hover:text-foreground font-normal"
-                    onClick={workflow.markAllNotificationsRead}
+                    disabled={notifications.readingAll}
+                    onClick={notifications.readAll}
                   >
-                    Mark read
+                    Mark all read
                   </Button>
                 )}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                {workflow.notifications.slice(0, 5).map((notification) => (
-                  <DropdownMenuItem
-                    key={notification.id}
-                    onSelect={() => navigate('/notifications')}
-                  >
-                    <span className="notification-menu-item">
-                      <strong>{notification.title}</strong>
-                      <span>{notification.body}</span>
-                      <small>{notification.time}</small>
-                    </span>
-                  </DropdownMenuItem>
-                ))}
+                {latest.data?.data.length ? (
+                  latest.data.data.map((notification) => (
+                    <DropdownMenuItem
+                      key={notification.id}
+                      onSelect={() =>
+                        notification.link
+                          ? notifications.open(notification)
+                          : navigate('/notifications')
+                      }
+                    >
+                      <span
+                        className="notification-menu-item"
+                        data-unread={!notification.readAt}
+                      >
+                        <strong>
+                          {!notification.readAt && (
+                            <span className="sr-only">Unread: </span>
+                          )}
+                          {notification.title}
+                        </strong>
+                        <span>{notification.body}</span>
+                        <small>{timeAgo(notification.createdAt)}</small>
+                      </span>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <p className="px-2 py-3 text-sm text-muted-foreground">
+                    {latest.isError
+                      ? 'Couldn’t load notifications.'
+                      : 'No notifications yet.'}
+                  </p>
+                )}
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>

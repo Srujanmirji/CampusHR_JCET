@@ -196,12 +196,19 @@ Implemented. How each class missed through approved leave is covered.
 
 ### notifications
 
+Implemented. Deleted with the user.
+
 - id
 - user_id
-- type
+- kind (`leave.waiting`, `leave.approved`, `substitution.assigned`,
+  `announcement`, …)
 - title
 - body
+- link (web path to open, optional)
 - read_at
+- created_at
+
+Indexed on (user_id, created_at) and (user_id, read_at).
 
 ### audit_logs
 
