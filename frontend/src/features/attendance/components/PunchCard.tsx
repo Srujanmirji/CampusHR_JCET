@@ -5,10 +5,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { LogIn, LogOut, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useCan } from '@/features/auth/hooks/useCan';
 import { getTodayAttendance, punchAttendance } from '../api/attendance';
 import { CorrectionRequestDialog } from './CorrectionRequestDialog';
 
 export function PunchCard() {
+  const can = useCan();
+  const canCheckIn = can('attendance.check_in');
   const queryClient = useQueryClient();
   const [correctionOpen, setCorrectionOpen] = useState(false);
 
@@ -75,38 +78,44 @@ export function PunchCard() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCorrectionOpen(true)}
-              className="text-xs"
-            >
-              <AlertCircle className="mr-1.5 h-3.5 w-3.5" />
-              Request Correction
-            </Button>
-
-            {!isCheckedOut && (
+          {!canCheckIn ? (
+            <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground border border-border/50">
+              <span className="font-semibold text-foreground">Admin Account:</span> Self-punch is for faculty & staff. Log in as <code className="font-mono text-primary">zeeshan.faculty@jcethbl.edu.in</code> to test punch-in.
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
               <Button
+                variant="outline"
                 size="sm"
-                onClick={() => punchMutation.mutate()}
-                disabled={punchMutation.isPending || isLoading}
-                className={isCheckedIn ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-primary'}
+                onClick={() => setCorrectionOpen(true)}
+                className="text-xs"
               >
-                {isCheckedIn ? (
-                  <>
-                    <LogOut className="mr-1.5 h-4 w-4" />
-                    Punch Out
-                  </>
-                ) : (
-                  <>
-                    <LogIn className="mr-1.5 h-4 w-4" />
-                    Punch In
-                  </>
-                )}
+                <AlertCircle className="mr-1.5 h-3.5 w-3.5" />
+                Request Correction
               </Button>
-            )}
-          </div>
+
+              {!isCheckedOut && (
+                <Button
+                  size="sm"
+                  onClick={() => punchMutation.mutate()}
+                  disabled={punchMutation.isPending || isLoading}
+                  className={isCheckedIn ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-primary'}
+                >
+                  {isCheckedIn ? (
+                    <>
+                      <LogOut className="mr-1.5 h-4 w-4" />
+                      Punch Out
+                    </>
+                  ) : (
+                    <>
+                      <LogIn className="mr-1.5 h-4 w-4" />
+                      Punch In
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
