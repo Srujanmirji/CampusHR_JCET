@@ -60,3 +60,12 @@ export function isMyTurn(
     (user.role !== 'HOD' || request.department.id === user.departmentId)
   );
 }
+
+export const thisMonth = () => new Date().toISOString().slice(0, 7);
+
+/** YYYY-MM moved by `delta` months. */
+export function shiftMonth(month: string, delta: number) {
+  const date = new Date(`${month}-01T00:00:00Z`);
+  date.setUTCMonth(date.getUTCMonth() + delta);
+  return date.toISOString().slice(0, 7);
+}

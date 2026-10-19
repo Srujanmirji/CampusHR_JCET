@@ -29,7 +29,7 @@ created by `npm run db:seed`.
 | Employees          | **Live data.** Search, filters, pagination, profile; HR adds, edits and archives; staff update their own phone                                       |
 | Departments        | **Live data.** Staff strength per department; HR adds departments and assigns HODs                                                                   |
 | Attendance         | Daily metrics, monthly trend, department view, filterable log                                                                                        |
-| Leave              | API data: my balances and requests, apply, approvals waiting for me, approval steps and timetable impact, leave types for HR                         |
+| Leave              | API data: my balances and requests, apply, approvals waiting for me, approval steps and timetable impact, month calendar, leave types for HR         |
 | Smart Substitution | API data: classes affected by approved leave, ranked free faculty, assign or no-substitute, undo; faculty see classes they cover                     |
 | Timetable          | **Live data.** Weekly grid by department, semester and section; HODs add, edit and remove classes with clash checks; faculty see their own timetable |
 | Faculty Workload   | API data: weekly theory/lab hours, status against each designation's band, hours chart, per-faculty classes; Principal edits bands                   |

@@ -18,14 +18,14 @@
 ## Phase 2 — Daily HR
 
 - [ ] Attendance
-- [ ] Leave
+- [x] Leave
 - [ ] Notifications
 
 ## Phase 3 — Academic HR
 
 - [x] Timetable
 - [x] Faculty workload
-- [ ] Smart substitution
+- [x] Smart substitution (notifying the substitute waits for Notifications)
 
 ## Phase 4 — HR Operations
 

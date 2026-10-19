@@ -43,3 +43,11 @@ export function refresh() {
 export async function logout() {
   await apiRequest('/auth/logout', { method: 'POST' });
 }
+
+/** Changes the signed-in user's password; other devices are signed out. */
+export async function changePassword(input: {
+  currentPassword: string;
+  newPassword: string;
+}) {
+  await apiRequest('/auth/password', { method: 'POST', body: input });
+}

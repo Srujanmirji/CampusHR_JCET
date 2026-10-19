@@ -4,7 +4,8 @@ Base path: `/api/v1`
 
 ## Auth
 
-Implemented: login, refresh, logout, me. Forgot/reset password wait for SMTP.
+Implemented: login, refresh, logout, me, change own password. Forgot/reset
+password by email waits for SMTP.
 
 - `POST /auth/login` `{ identifier, password, remember? }` — identifier is the
   college email or employee ID (case-insensitive) → `{ accessToken, expiresIn, user }`;
@@ -21,6 +22,12 @@ Implemented: login, refresh, logout, me. Forgot/reset password wait for SMTP.
   `CORS_ORIGIN` with 403 `FORBIDDEN_ORIGIN`.
 - `GET /auth/me` (`Authorization: Bearer <accessToken>`) → `{ user }`.
   Error: 401 `UNAUTHENTICATED`.
+- `POST /auth/password` (Bearer, plus the refresh cookie) `{ currentPassword,
+newPassword }` (12–72 bytes) → 204. Every other session of the user ends;
+  the one whose cookie came with the request stays. Errors: 400
+  `WRONG_PASSWORD`, `SAME_PASSWORD`, `VALIDATION_ERROR`; 429
+  `TOO_MANY_ATTEMPTS` (5 wrong passwords per account per 15 minutes).
+  Audit-logged without the hash.
 
 Access tokens are HS256 JWTs valid for 15 minutes. `user` includes
 `permissions`, the granted keys (e.g. `leave.approve.department`), so clients can
@@ -123,9 +130,10 @@ or null for no limit), allowHalfDay?, carryForwardMax?, active? }` → 201;
 active, year, entitled, carriedIn, used, pending, remaining }`; `entitled` and
   `remaining` are null for a type without a limit. Defaults: the caller and
   this year. HODs see their department; faculty and staff themselves.
-- `GET /leave/requests?status&employeeId&year&awaitingMe` (`leave.read`) →
+- `GET /leave/requests?status&employeeId&year&month&awaitingMe` (`leave.read`) →
   requests in the caller's scope, newest first (at most 500). With
   `awaitingMe=true`: pending requests waiting for the caller's decision.
+  `month=YYYY-MM`: requests with a day in that month (the leave calendar).
 - `GET /leave/requests/:id` → one request; 404 outside the caller's scope.
 - `POST /leave/requests` (`leave.apply`) `{ leaveTypeId, startDate, endDate,
 halfDay?: FIRST|SECOND, reason }` (dates `YYYY-MM-DD`) → 201 with `days`,

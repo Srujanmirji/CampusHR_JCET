@@ -4,12 +4,14 @@ import { PageTransition } from '@/components/shared/PageTransition';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useScope } from '@/features/auth/hooks/useCan';
 import { useLeaveWaiting } from '../hooks/useLeaveWaiting';
+import { LeaveCalendar } from '../components/LeaveCalendar';
+import { thisMonth } from '../utils/leave';
 import { LeaveRequestDrawer } from '../components/LeaveRequestDrawer';
 import { LeaveTypesPanel } from '../components/LeaveTypesPanel';
 import { MyLeave } from '../components/MyLeave';
 import { RequestsPanel, type RequestsView } from '../components/RequestsPanel';
 
-type Tab = 'mine' | 'requests' | 'types';
+type Tab = 'mine' | 'requests' | 'calendar' | 'types';
 
 export default function LeavePage() {
   const scopeOf = useScope();
@@ -25,6 +27,7 @@ export default function LeavePage() {
   const tabs = [
     ...(canApply ? (['mine'] as const) : []),
     ...(canSeeOthers ? (['requests'] as const) : []),
+    ...(readScope ? (['calendar'] as const) : []),
     ...(canManageTypes ? (['types'] as const) : []),
   ];
   // Approvers land on requests; everyone else on their own leave.
@@ -34,6 +37,9 @@ export default function LeavePage() {
     (params.get('show') as RequestsView | null) ??
     (canDecide ? 'MINE_TO_DECIDE' : 'PENDING');
   const openId = params.get('request');
+  const month = /^\d{4}-\d{2}$/.test(params.get('month') ?? '')
+    ? params.get('month')!
+    : thisMonth();
 
   const update = (changes: Record<string, string | null>) =>
     setParams(
@@ -70,6 +76,7 @@ export default function LeavePage() {
                 ) : null}
               </TabsTrigger>
             )}
+            {readScope && <TabsTrigger value="calendar">Calendar</TabsTrigger>}
             {canManageTypes && (
               <TabsTrigger value="types">Leave types</TabsTrigger>
             )}
@@ -86,6 +93,15 @@ export default function LeavePage() {
               view={view}
               onViewChange={(next) => update({ show: next })}
               canDecide={canDecide}
+              onOpen={open}
+            />
+          </TabsContent>
+        )}
+        {readScope && (
+          <TabsContent value="calendar">
+            <LeaveCalendar
+              month={month}
+              onMonthChange={(next) => update({ month: next })}
               onOpen={open}
             />
           </TabsContent>
