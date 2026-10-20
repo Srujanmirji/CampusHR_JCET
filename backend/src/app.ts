@@ -19,6 +19,9 @@ import {
   createDesignationRouter,
 } from './modules/departments/department.routes.js';
 import { createDepartmentService } from './modules/departments/department.service.js';
+import { createDocumentsRepository } from './modules/documents/documents.repository.js';
+import { createDocumentsRouter } from './modules/documents/documents.routes.js';
+import { createDocumentsService } from './modules/documents/documents.service.js';
 import { createEmployeeRepository } from './modules/employees/employee.repository.js';
 import { createEmployeeRouter } from './modules/employees/employee.routes.js';
 import { createEmployeeService } from './modules/employees/employee.service.js';
@@ -102,6 +105,17 @@ export function createApp(
       auth,
       createAttendanceService(createAttendanceRepository(prisma), notifications.notifier),
     ),
+  );
+  app.use(
+    '/api/v1/documents',
+    createDocumentsRouter(
+      auth,
+      createDocumentsService(createDocumentsRepository(prisma), notifications.notifier),
+    ),
+  );
+  app.use(
+    '/uploads/documents',
+    express.static(join(process.cwd(), 'uploads', 'documents')),
   );
   app.use('/api/v1/departments', createDepartmentRouter(auth, departments));
   app.use('/api/v1/designations', createDesignationRouter(auth, departments));

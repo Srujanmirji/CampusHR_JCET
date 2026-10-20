@@ -10,6 +10,7 @@ import {
   ChartColumn,
   Bell,
   Settings,
+  Files,
 } from 'lucide-react';
 
 // `permission` (product/USER_ROLES.md) decides who sees each page; the
@@ -46,6 +47,13 @@ export const navigation: {
     permission: 'attendance.read',
     label: 'Attendance',
     icon: CalendarCheck2,
+    group: 'People & academics',
+  },
+  {
+    path: '/documents',
+    permission: 'document.read',
+    label: 'Documents',
+    icon: Files,
     group: 'People & academics',
   },
   {

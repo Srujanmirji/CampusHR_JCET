@@ -61,6 +61,7 @@ model User {
   substitutionsAssigned Substitution[]
   notifications         Notification[]
   attendanceReviewed    AttendanceCorrection[] @relation("AttendanceReviewed")
+  documentsReviewed     Document[]             @relation("DocumentReviewed")
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt             DateTime         @updatedAt @map("updated_at")
   sessions              RefreshSession[]
@@ -169,6 +170,7 @@ model Employee {
   substitutions         Substitution[]
   attendance            Attendance[]
   attendanceCorrections AttendanceCorrection[]
+  documents             Document[]
 
   @@index([departmentId])
   @@index([status])
@@ -525,4 +527,51 @@ model AttendanceSettings {
 
   @@map("attendance_settings")
 }
+
+// Digital Document Management (features/DOCUMENTS.md, tasks/team/ZEESHAN_MADRAS.md).
+
+enum DocumentCategory {
+  IDENTITY
+  ACADEMIC
+  EMPLOYMENT
+  CERTIFICATION
+  OTHER
+
+  @@map("document_category")
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+
+  @@map("document_status")
+}
+
+model Document {
+  id               String           @id @default(uuid()) @db.Uuid
+  employeeId       String           @map("employee_id") @db.Uuid
+  employee         Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  category         DocumentCategory
+  title            String
+  documentType     String           @map("document_type")
+  fileUrl          String           @map("file_url")
+  fileName         String           @map("file_name")
+  fileSize         Int              @map("file_size")
+  mimeType         String           @map("mime_type")
+  status           DocumentStatus   @default(PENDING)
+  expiryDate       DateTime?        @map("expiry_date") @db.Date
+  reviewedByUserId String?          @map("reviewed_by_user_id") @db.Uuid
+  reviewedByUser   User?            @relation("DocumentReviewed", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?        @map("reviewed_at")
+  reviewNote       String?          @map("review_note")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([category])
+  @@map("documents")
+}
+
 

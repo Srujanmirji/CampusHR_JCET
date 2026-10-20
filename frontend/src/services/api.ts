@@ -37,16 +37,23 @@ async function send(
   method: string,
   body: unknown,
 ): Promise<Response> {
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
   try {
     return await fetch(`${baseUrl}${path}`, {
       method,
       // Sends the HttpOnly refresh cookie on /auth routes.
       credentials: 'include',
       headers: {
-        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...(body === undefined || isFormData
+          ? {}
+          : { 'Content-Type': 'application/json' }),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: isFormData
+        ? body
+        : body === undefined
+          ? undefined
+          : JSON.stringify(body),
     });
   } catch {
     throw new ApiError(

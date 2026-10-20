@@ -259,10 +259,26 @@ notification when assigned.
 
 ## Documents
 
-- POST /documents
-- GET /documents
-- PATCH /documents/:id/verify
-- PATCH /documents/:id/reject
+Implemented (`document.upload`, `document.read`, `document.verify`). Supports PDF, JPEG, PNG, WEBP files up to 10MB.
+Physical files are served statically from `/uploads/documents/<filename>`.
+
+- `POST /documents` (`document.upload`, multipart/form-data)
+  - Fields: `category` (IDENTITY | ACADEMIC | EMPLOYMENT | CERTIFICATION | OTHER), `documentType` (e.g. 'Aadhaar Card', 'Ph.D. Degree'), `title`, `expiryDate?` (YYYY-MM-DD), `file`
+  - Uploads document, sets status to `PENDING`, and triggers in-app notification to HR Admin.
+  - Returns: 201 `{ data: Document }`
+- `GET /documents?category=&status=&search=&page=&limit=` (`document.read`)
+  - Scope `own` (Faculty/Staff): returns own documents.
+  - Scope `all` (HR Admin/Super Admin): returns all documents across college with uploader details.
+  - Returns: `{ data: Document[], total, page, totalPages }`
+- `GET /documents/pending-count` (`document.read`) → `{ data: { count } }`
+- `GET /documents/:id` (`document.read`) → `{ data: Document }`
+- `PUT /documents/:id/verify` (`document.verify`, HR Admin / Super Admin)
+  - Body: `{ status: 'VERIFIED' | 'REJECTED', reviewNote?: string }`
+  - Updates verification status and dispatches in-app notification to the employee.
+  - Returns: 200 `{ data: Document }`
+- `DELETE /documents/:id` (`document.upload`)
+  - Deletes document and cleans up disk file. Verified documents cannot be deleted by faculty.
+  - Returns: 200 `{ data: { success: true } }`
 
 ## Notifications
 
