@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -16,6 +16,10 @@ import { Card } from '../../components/ui/Card';
 import { ScreenContainer } from '../../components/ui/ScreenContainer';
 import { useAuth } from '../../lib/auth-context';
 import { sendTestNotification } from '../../lib/notifications';
+import {
+  mergeSubstitutionsIntoTimetable,
+  subscribeToSubstitutionStore,
+} from '../../lib/substitution-store';
 import { theme } from '../../lib/theme';
 import {
   formatPeriodTime,
@@ -76,12 +80,43 @@ export default function DashboardScreen() {
       : 'Unable to load today’s schedule.'
     : null;
 
+  // Listen for smart substitution assignments updates
+  const [subVersion, setSubVersion] = useState(0);
+
+  useEffect(() => {
+    return subscribeToSubstitutionStore(() => {
+      setSubVersion((v) => v + 1);
+    });
+  }, []);
+
+  const todayDateStr = useMemo(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }, []);
+
+  // Merge any assigned substitution duties for the authenticated faculty member for today
+  const mergedEntries = useMemo(() => {
+    return mergeSubstitutionsIntoTimetable(
+      entries,
+      {
+        id: user?.id,
+        employeeId: user?.employeeId,
+        employeeCode: user?.employeeCode,
+      },
+      todayDay,
+      todayDateStr
+    );
+  }, [entries, user?.id, user?.employeeId, user?.employeeCode, todayDay, todayDateStr, subVersion]);
+
   // Enrich timetable entries with period timings, formatted times, and live status
   const enrichedEntries = useMemo(() => {
     if (isSunday || !todayDay) return [];
 
     const currentMinutes = getCurrentTimeMinutes();
-    const sorted = [...entries].sort((a, b) => a.startPeriod - b.startPeriod);
+    const sorted = [...mergedEntries].sort((a, b) => a.startPeriod - b.startPeriod);
 
     return sorted.map((entry) => {
       const startPeriodObj = periods.find((p) => p.number === entry.startPeriod);
@@ -122,7 +157,7 @@ export default function DashboardScreen() {
         isCompleted,
       };
     });
-  }, [entries, periods, todayDay, isSunday]);
+  }, [mergedEntries, periods, todayDay, isSunday]);
 
   // Find active or next upcoming class for key metric teasers
   const classStatus = useMemo(() => {
@@ -144,8 +179,12 @@ export default function DashboardScreen() {
   async function handleTestNotification() {
     try {
       setNotificationStatus('Sending notification…');
-      await sendTestNotification();
-      setNotificationStatus('✓ Notification sent! Check your device tray.');
+      const result = await sendTestNotification();
+      if (result.type === 'preview-simulated') {
+        setNotificationStatus('✓ Notification preview simulated (Expo Go: native push unavailable)');
+      } else {
+        setNotificationStatus('✓ Notification sent! Check your device tray.');
+      }
       setTimeout(() => setNotificationStatus(null), 4000);
     } catch {
       setNotificationStatus('Failed to send notification.');

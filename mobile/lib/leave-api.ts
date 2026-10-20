@@ -1,3 +1,5 @@
+import { API_BASE_URL } from './api-config';
+
 export interface LeaveTypeDto {
   id: number;
   code: string;
@@ -70,7 +72,6 @@ export interface LeaveApplyPayload {
   reason: string;
 }
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 // Initial state for demo sessions when backend is offline
 const INITIAL_DEMO_TYPES: LeaveTypeDto[] = [

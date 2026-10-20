@@ -1,3 +1,5 @@
+import { API_BASE_URL } from './api-config';
+
 export type DayOfWeek = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT';
 
 export interface PeriodDto {
@@ -39,7 +41,6 @@ export interface TimetableEntryDto {
   substituteNote?: string;
 }
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 export const JCET_PERIODS: PeriodDto[] = [
   { number: 1, startTime: '09:00', endTime: '10:00' },

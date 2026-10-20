@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -14,6 +14,10 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { ScreenContainer } from '../../components/ui/ScreenContainer';
 import { useAuth } from '../../lib/auth-context';
+import {
+  mergeSubstitutionsIntoTimetable,
+  subscribeToSubstitutionStore,
+} from '../../lib/substitution-store';
 import {
   getPeriods,
   getTimetableEntries,
@@ -116,12 +120,34 @@ export default function TimetableScreen() {
     }
   };
 
+  // Listen for smart substitution assignments updates
+  const [subVersion, setSubVersion] = useState(0);
+
+  useEffect(() => {
+    return subscribeToSubstitutionStore(() => {
+      setSubVersion((v) => v + 1);
+    });
+  }, []);
+
+  // Merge any assigned substitution duties for the authenticated faculty member
+  const mergedEntries = useMemo(() => {
+    return mergeSubstitutionsIntoTimetable(
+      entries,
+      {
+        id: user?.id,
+        employeeId: user?.employeeId,
+        employeeCode: user?.employeeCode,
+      },
+      activeDay
+    );
+  }, [entries, user?.id, user?.employeeId, user?.employeeCode, activeDay, subVersion]);
+
   // Map entries with period times
   const enrichedEntries = useMemo(() => {
     const currentMinutes = getCurrentTimeMinutes();
     const isToday = activeDay !== null && activeDay === todayDay;
 
-    return entries.map((entry) => {
+    return mergedEntries.map((entry) => {
       const startPeriodObj = periods.find((p) => p.number === entry.startPeriod);
       const endPeriodObj = periods.find((p) => p.number === entry.endPeriod);
 
@@ -144,13 +170,13 @@ export default function TimetableScreen() {
         isCompleted,
       };
     });
-  }, [entries, periods, activeDay, todayDay]);
+  }, [mergedEntries, periods, activeDay, todayDay]);
 
   // Calculate day summary
   const { theoryCount, labCount } = useMemo(() => {
     let theory = 0;
     let lab = 0;
-    for (const entry of entries) {
+    for (const entry of mergedEntries) {
       if (entry.subject.kind === 'THEORY') {
         theory++;
       } else if (entry.subject.kind === 'LAB') {
@@ -158,7 +184,7 @@ export default function TimetableScreen() {
       }
     }
     return { theoryCount: theory, labCount: lab };
-  }, [entries]);
+  }, [mergedEntries]);
 
   const isSundayHoliday = viewMode === 'TODAY' && isSunday;
 
