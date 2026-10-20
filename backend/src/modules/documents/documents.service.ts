@@ -41,21 +41,29 @@ export function createDocumentsService(
         throw new HttpError(400, 'BAD_REQUEST', 'No file uploaded');
       }
 
+      const ext = file.originalname ? path.extname(file.originalname).toLowerCase() : '';
+      const validExts = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'];
       const allowedMimes = [
         'application/pdf',
         'image/jpeg',
+        'image/jpg',
+        'image/pjpeg',
         'image/png',
+        'image/x-png',
         'image/webp',
       ];
 
-      if (!allowedMimes.includes(file.mimetype)) {
+      const isAllowedMime = allowedMimes.includes(file.mimetype);
+      const isOctetWithValidExt = file.mimetype === 'application/octet-stream' && validExts.includes(ext);
+
+      if (!isAllowedMime && !isOctetWithValidExt) {
         if (file.path && fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
         }
         throw new HttpError(
           400,
           'INVALID_FILE_TYPE',
-          `Invalid file format: ${file.mimetype}. Allowed formats: PDF, JPEG, PNG, WEBP.`,
+          `Invalid file format: ${file.mimetype || ext}. Allowed formats: PDF, JPEG, PNG, WEBP.`,
         );
       }
 
@@ -90,14 +98,18 @@ export function createDocumentsService(
         expiryDate: metadata.expiryDate ? new Date(metadata.expiryDate) : null,
       });
 
-      // Notify HR Admin of new document submission
+      // Notify HR Admin of new document submission (non-blocking)
       if (notifier) {
-        await notifier.notifyRole('HR Admin', null, {
-          kind: 'document.uploaded',
-          title: 'New Document Awaiting Verification',
-          body: `New ${metadata.documentType} ("${metadata.title}") uploaded for verification.`,
-          link: '/documents',
-        });
+        try {
+          await notifier.notifyRole('HR Admin', null, {
+            kind: 'document.uploaded',
+            title: 'New Document Awaiting Verification',
+            body: `New ${metadata.documentType} ("${metadata.title}") uploaded for verification.`,
+            link: '/documents',
+          });
+        } catch (notifErr) {
+          console.error('Failed to notify HR Admin:', notifErr);
+        }
       }
 
       return doc;

@@ -4,7 +4,11 @@ export const uploadDocumentSchema = z.object({
   category: z.enum(['IDENTITY', 'ACADEMIC', 'EMPLOYMENT', 'CERTIFICATION', 'OTHER']),
   documentType: z.string().min(2).max(100),
   title: z.string().min(2).max(150),
-  expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expiry date must be YYYY-MM-DD').optional().nullable(),
+  expiryDate: z
+    .preprocess(
+      (val) => (typeof val === 'string' && val.trim() === '' ? null : val),
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expiry date must be YYYY-MM-DD').optional().nullable(),
+    ),
 });
 
 export const reviewDocumentSchema = z.object({

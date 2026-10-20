@@ -3,6 +3,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Router, type Response } from 'express';
 import multer from 'multer';
+import { HttpError } from '../../common/http-error.js';
 import { parse } from '../../common/validate.js';
 import { requirePermission } from '../../middleware/auth.js';
 import type { Access, AuthService } from '../auth/auth.service.js';
@@ -50,7 +51,32 @@ export function createDocumentsRouter(
     .post(
       '/',
       ...canUpload,
-      upload.single('file'),
+      (req, res, next) => {
+        upload.single('file')(req, res, (err) => {
+          if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+              return next(
+                new HttpError(
+                  400,
+                  'FILE_TOO_LARGE',
+                  'File size exceeds maximum allowed size of 10MB.',
+                ),
+              );
+            }
+            return next(new HttpError(400, 'UPLOAD_ERROR', err.message));
+          }
+          if (err) {
+            return next(
+              new HttpError(
+                400,
+                'UPLOAD_ERROR',
+                err instanceof Error ? err.message : 'File upload failed.',
+              ),
+            );
+          }
+          next();
+        });
+      },
       async (req, res, next) => {
         try {
           const metadata = parse(uploadDocumentSchema, req.body);

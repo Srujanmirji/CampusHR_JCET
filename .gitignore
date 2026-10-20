@@ -12,3 +12,5 @@ backend/src/generated/
 mobile/expo-env.d.ts
 mobile/android/
 mobile/ios/
+uploads/
+backend/uploads/
