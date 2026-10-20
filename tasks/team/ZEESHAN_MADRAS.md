@@ -45,14 +45,14 @@ check-in), working hours and late rule, working days and holidays.
 - [x] Web: `/attendance` on real data, corrections queue
 - [x] API for Arihant's mobile attendance screens
 
-## 3. Documents — BE-010, FE-013 · needs storage chosen
+## 3. Documents — BE-010, FE-013
 
-- [ ] Upload with file type and size checks; store metadata (type, file URL,
+- [x] Upload with file type and size checks; store metadata (type, file URL,
       verification status, expiry)
-- [ ] Verification queue for HR (`document.verify`); HODs never see documents
-- [ ] Expiry reminders through Notifications
-- [ ] Decide with Srujan how Aadhaar and PAN are stored (UIDAI rules)
-- [ ] Web: upload, preview, verification queue
+- [x] Verification queue for HR (`document.verify`); HODs never see documents
+- [x] Expiry reminders through Notifications
+- [x] Decide with Srujan how Aadhaar and PAN are stored (UIDAI rules)
+- [x] Web: upload, preview, verification queue
 
 ## 4. Reports — BE-012, FE-014
 
