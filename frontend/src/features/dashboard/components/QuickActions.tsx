@@ -1,10 +1,12 @@
 import {
   UserRoundPlus,
   CalendarCheck2,
+  CalendarDays,
   CheckCheck,
   CalendarRange,
   ChartNoAxesCombined,
   ChartColumn,
+  Files,
   Send,
   ArrowUpRight,
 } from 'lucide-react';
@@ -30,6 +32,12 @@ const actions = [
     permission: 'attendance.read',
   },
   {
+    label: 'Apply Leave',
+    icon: CalendarDays,
+    path: '/leave',
+    permission: 'leave.apply',
+  },
+  {
     label: 'Approve Leave',
     icon: CheckCheck,
     path: '/leave',
@@ -46,6 +54,12 @@ const actions = [
     icon: ChartNoAxesCombined,
     path: '/workload',
     permission: 'workload.read',
+  },
+  {
+    label: 'My Documents',
+    icon: Files,
+    path: '/documents',
+    permission: 'document.read',
   },
   {
     label: 'Reports',

@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PanelLeftClose, PanelLeftOpen, X, GraduationCap } from 'lucide-react';
-import { navigation } from '@/data/navigation';
+import { navigation, facultyNavigation } from '@/data/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useCan } from '@/features/auth/hooks/useCan';
+import { useSession } from '@/features/auth/hooks/useSession';
 import { useLeaveWaiting } from '@/features/leave/hooks/useLeaveWaiting';
 
 export function Sidebar({
@@ -25,8 +26,15 @@ export function Sidebar({
 }) {
   const { pathname } = useLocation();
   const can = useCan();
-  const items = navigation.filter((item) => can(item.permission));
+  const session = useSession();
+  const userRole = session.status === 'signedIn' ? session.user.role : null;
+  const isFaculty = userRole === 'Faculty';
+  const baseNav = isFaculty ? facultyNavigation : navigation;
+  const items = baseNav.filter((item) => can(item.permission));
   const pending = useLeaveWaiting().data?.length ?? 0;
+  const groups = isFaculty
+    ? ['Overview', 'My Academics', 'My Services', 'Communication']
+    : ['Overview', 'People & academics', 'Administration'];
   return (
     <div className="sidebar-content" data-collapsed={collapsed}>
       <div className="sidebar-brand">
@@ -64,7 +72,7 @@ export function Sidebar({
         )}
       </div>
       <nav aria-label="Main navigation" className="sidebar-nav">
-        {['Overview', 'People & academics', 'Administration']
+        {groups
           .filter((group) => items.some((item) => item.group === group))
           .map((group) => (
             <div className="sidebar-group" key={group}>

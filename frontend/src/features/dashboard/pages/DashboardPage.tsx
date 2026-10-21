@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CalendarDays, RefreshCw } from 'lucide-react';
 import { metrics } from '@/data/mock/dashboard';
 import { useLeaveWaiting } from '@/features/leave/hooks/useLeaveWaiting';
+import { useSession } from '@/features/auth/hooks/useSession';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageTransition } from '@/components/shared/PageTransition';
@@ -11,20 +12,31 @@ import { RecentLeaveRequests } from '../components/RecentLeaveRequests';
 import { QuickActions } from '../components/QuickActions';
 import { NotificationsPreview } from '../components/NotificationsPreview';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
+import { FacultyDashboard } from '../components/FacultyDashboard';
 
 export default function DashboardPage() {
+  const session = useSession();
+  const user = session.status === 'signedIn' ? session.user : null;
+  const isFaculty = user?.role === 'Faculty';
+
   const pending = useLeaveWaiting().data?.length ?? 0;
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     if (!loading) return;
-    const timer = setTimeout(() => setLoading(false), 350);
+    const timer = setTimeout(() => setLoading(false), 250);
     return () => clearTimeout(timer);
   }, [loading]);
+
   return (
     <PageTransition>
       <PageHeader
-        title="Dashboard"
-        description="Your people and campus operations, at a glance."
+        title={isFaculty ? 'Faculty Dashboard' : 'Dashboard'}
+        description={
+          isFaculty
+            ? 'Your teaching schedule, attendance, leaves, and daily academic operations.'
+            : 'Your people and campus operations, at a glance.'
+        }
         action={
           <div className="dashboard-heading-actions">
             <span>
@@ -38,13 +50,16 @@ export default function DashboardPage() {
               disabled={loading}
               aria-label="Refresh dashboard"
             >
-              <RefreshCw />
+              <RefreshCw className={loading ? 'animate-spin' : ''} />
             </Button>
           </div>
         }
       />
+
       {loading ? (
         <DashboardSkeleton />
+      ) : isFaculty ? (
+        <FacultyDashboard />
       ) : (
         <>
           <section className="welcome-banner" aria-labelledby="welcome-title">
