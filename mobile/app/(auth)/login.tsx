@@ -1,12 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Image,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -26,7 +19,10 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<{ identifier?: string; password?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{
+    identifier?: string;
+    password?: string;
+  }>({});
   const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
@@ -51,7 +47,9 @@ export default function LoginScreen() {
       await login(identifier, password, remember);
       router.replace('/(tabs)');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred during login.');
+      setError(
+        err instanceof Error ? err.message : 'An error occurred during login.',
+      );
     } finally {
       setLoading(false);
     }
@@ -70,7 +68,9 @@ export default function LoginScreen() {
           />
         </View>
         <View style={styles.institutionDetails}>
-          <Text style={styles.institutionName}>Jain College of Engineering & Technology</Text>
+          <Text style={styles.institutionName}>
+            Jain College of Engineering & Technology
+          </Text>
           <View style={styles.institutionSubRow}>
             <Text style={styles.institutionLocation}>Hubballi, Karnataka</Text>
             <View style={styles.cetBadge}>
@@ -96,7 +96,9 @@ export default function LoginScreen() {
 
         <View style={styles.headingBlock}>
           <Text style={styles.cardHeading}>Welcome back</Text>
-          <Text style={styles.cardSubtitle}>Sign in to your campus workspace.</Text>
+          <Text style={styles.cardSubtitle}>
+            Sign in to your campus workspace.
+          </Text>
         </View>
 
         {/* Error Banner Box */}
@@ -184,8 +186,9 @@ export default function LoginScreen() {
       {/* Footer Security Box */}
       <View style={styles.footer}>
         <View style={styles.securityPill}>
-          <Text style={styles.securityPillIcon}>🔒</Text>
-          <Text style={styles.securityPillText}>Secure Institutional Gateway</Text>
+          <Text style={styles.securityPillText}>
+            Secure Institutional Gateway
+          </Text>
         </View>
         <Text style={styles.footerSubtext}>
           CampusHR · Jain College of Engineering and Technology, Hubballi
@@ -202,9 +205,7 @@ export default function LoginScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
-              <View style={styles.modalIconBox}>
-                <Text style={styles.modalIconText}>🔑</Text>
-              </View>
+              <View style={styles.modalIconBox}></View>
               <View style={styles.modalTitleBlock}>
                 <Text style={styles.modalTitle}>Password Assistance</Text>
                 <Text style={styles.modalSubTitle}>JCET CampusHR Security</Text>
@@ -213,12 +214,16 @@ export default function LoginScreen() {
 
             <View style={styles.modalInfoBox}>
               <Text style={styles.modalBody}>
-                Faculty and staff accounts are centrally managed. To reset your password or unlock your account, please reach out to the JCET administration.
+                Faculty and staff accounts are centrally managed. To reset your
+                password or unlock your account, please reach out to the JCET
+                administration.
               </Text>
               <View style={styles.modalContactDivider} />
               <View style={styles.modalContactRow}>
                 <Text style={styles.modalContactLabel}>HR Desk:</Text>
-                <Text style={styles.modalContactVal}>Admin Block, Ground Floor (Ext: 104)</Text>
+                <Text style={styles.modalContactVal}>
+                  Admin Block, Ground Floor (Ext: 104)
+                </Text>
               </View>
               <View style={styles.modalContactRow}>
                 <Text style={styles.modalContactLabel}>Email Support:</Text>
@@ -355,7 +360,7 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
   },
   badgeAccent: {
-    color: theme.colors.accent,
+    color: theme.colors.accentInk,
   },
   badgeDivider: {
     color: '#94A3B8',
@@ -468,7 +473,7 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     fontFamily: theme.typography.headingFamily,
     fontSize: 13.5,
-    color: theme.colors.accent,
+    color: theme.colors.accentInk,
   },
 
   /* Primary Login Button Box */

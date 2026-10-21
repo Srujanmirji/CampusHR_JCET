@@ -41,3 +41,11 @@ app/
 ├── documents/
 └── profile/
 ```
+
+## Current integration limits
+
+Daily and weekly timetable screens load authenticated API data. Failed requests show an error; sample classes are restricted to explicit demo sessions.
+
+Smart substitution on mobile is a local demo, available only in demo sessions. Real accounts must use the web substitution page; local assignments are never merged into their schedules. Native push delivery, secure session persistence, and the remaining mobile modules are still unfinished.
+
+Run `npm run test --workspace @campushr/mobile` for timetable API regression checks.

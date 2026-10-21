@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { theme } from '../../lib/theme';
 
-export type ButtonVariant = 'primary' | 'accent' | 'outline' | 'secondary' | 'danger';
+export type ButtonVariant =
+  'primary' | 'accent' | 'outline' | 'secondary' | 'danger';
 
 interface ButtonProps {
   children: React.ReactNode;
@@ -47,9 +48,10 @@ export function Button({
     accessibilityLabel ||
     (typeof children === 'string'
       ? children
-      : Array.isArray(children) && children.every((c) => typeof c === 'string' || typeof c === 'number')
-      ? children.join('')
-      : undefined);
+      : Array.isArray(children) &&
+          children.every((c) => typeof c === 'string' || typeof c === 'number')
+        ? children.join('')
+        : undefined);
 
   return (
     <Pressable
@@ -70,7 +72,11 @@ export function Button({
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'outline' || variant === 'secondary' ? theme.colors.primary : theme.colors.surface}
+          color={
+            variant === 'outline' || variant === 'secondary'
+              ? theme.colors.primary
+              : theme.colors.surface
+          }
         />
       ) : isTextContent(children) ? (
         <Text
@@ -106,7 +112,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
   },
   accent: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.accentInk,
   },
   outline: {
     backgroundColor: theme.colors.surface,
@@ -117,7 +123,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.muted,
   },
   danger: {
-    backgroundColor: theme.colors.error,
+    backgroundColor: theme.colors.errorInk,
   },
   pressed: {
     opacity: 0.85,

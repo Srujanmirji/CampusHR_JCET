@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -42,12 +42,17 @@ export function Input({
   style,
   helperText,
 }: InputProps) {
+  const labelId = useId();
   const [showPassword, setShowPassword] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
   return (
     <View style={[styles.container, style]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && (
+        <Text nativeID={labelId} style={styles.label}>
+          {label}
+        </Text>
+      )}
       <View
         style={[
           styles.inputWrapper,
@@ -57,10 +62,12 @@ export function Input({
         ]}
       >
         <TextInput
+          accessibilityLabel={label}
+          aria-labelledby={label ? labelId : undefined}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={theme.colors.mutedForeground}
           secureTextEntry={isPassword && !showPassword}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
@@ -74,7 +81,9 @@ export function Input({
         {isPassword && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+            accessibilityLabel={
+              showPassword ? 'Hide password' : 'Show password'
+            }
             onPress={() => setShowPassword((prev) => !prev)}
             style={styles.eyeButton}
             hitSlop={8}
@@ -120,7 +129,7 @@ const styles = StyleSheet.create({
       : {}),
   },
   inputWrapperFocused: {
-    borderColor: '#3B82F6',
+    borderColor: theme.colors.primary,
     backgroundColor: '#FFFFFF',
   },
   inputWrapperError: {
@@ -157,7 +166,7 @@ const styles = StyleSheet.create({
   errorText: {
     fontFamily: theme.typography.bodyFamily,
     fontSize: 12,
-    color: theme.colors.error,
+    color: theme.colors.errorInk,
     marginTop: 2,
   },
   helperText: {

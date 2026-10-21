@@ -19,6 +19,7 @@ export function Card({ children, style, onPress }: CardProps) {
   if (onPress) {
     return (
       <Pressable
+        accessibilityRole="button"
         onPress={onPress}
         style={({ pressed }) => [
           styles.card,
@@ -32,7 +33,9 @@ export function Card({ children, style, onPress }: CardProps) {
     );
   }
 
-  return <View style={[styles.card, theme.shadows.card, style]}>{children}</View>;
+  return (
+    <View style={[styles.card, theme.shadows.card, style]}>{children}</View>
+  );
 }
 
 const styles = StyleSheet.create({

@@ -114,8 +114,7 @@ export interface SubstitutionAssignment {
   assignedAt: string; // ISO string
 }
 
-// Fallback faculty roster for demo/offline sessions when backend employees endpoint is unavailable.
-// Real fields only: no fabricated data.
+// Sample faculty roster used only by the local demo.
 export const DEMO_DEPARTMENT_FACULTY: {
   id: string;
   employeeCode: string;
@@ -186,8 +185,17 @@ export const DEMO_PEER_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 7,
     section: 'A',
     batch: null,
-    subject: { id: 105, code: 'BCS701', name: 'Cloud Computing', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-007', employeeCode: 'JCET-CSE-007', name: 'Prof. Vijay Kumar' },
+    subject: {
+      id: 105,
+      code: 'BCS701',
+      name: 'Cloud Computing',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-007',
+      employeeCode: 'JCET-CSE-007',
+      name: 'Prof. Vijay Kumar',
+    },
     room: { id: 203, name: 'Room 303', kind: 'CLASSROOM' },
     day: 'THU',
     startPeriod: 2,
@@ -200,7 +208,11 @@ export const DEMO_PEER_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     section: 'A',
     batch: 'Batch A1',
     subject: { id: 107, code: 'BCSL507', name: 'DBMS Laboratory', kind: 'LAB' },
-    faculty: { id: 'demo-faculty-018', employeeCode: 'JCET-CSE-018', name: 'Prof. Sunita Desai' },
+    faculty: {
+      id: 'demo-faculty-018',
+      employeeCode: 'JCET-CSE-018',
+      name: 'Prof. Sunita Desai',
+    },
     room: { id: 205, name: 'Lab 3 (Computer Center)', kind: 'LAB' },
     day: 'THU',
     startPeriod: 3,
@@ -219,7 +231,11 @@ const storeListeners = new Set<() => void>();
 // Safe browser/web localStorage helper
 function loadPersistedAssignments(): SubstitutionAssignment[] {
   try {
-    if (typeof globalThis !== 'undefined' && 'localStorage' in globalThis && globalThis.localStorage) {
+    if (
+      typeof globalThis !== 'undefined' &&
+      'localStorage' in globalThis &&
+      globalThis.localStorage
+    ) {
       const data = globalThis.localStorage.getItem(STORAGE_KEY);
       if (data) {
         return JSON.parse(data);
@@ -234,7 +250,11 @@ function loadPersistedAssignments(): SubstitutionAssignment[] {
 function savePersistedAssignments(assignments: SubstitutionAssignment[]) {
   memoryStore = assignments;
   try {
-    if (typeof globalThis !== 'undefined' && 'localStorage' in globalThis && globalThis.localStorage) {
+    if (
+      typeof globalThis !== 'undefined' &&
+      'localStorage' in globalThis &&
+      globalThis.localStorage
+    ) {
       globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(assignments));
     }
   } catch {
@@ -266,7 +286,7 @@ export function subscribeToSubstitutionStore(listener: () => void): () => void {
 export function deriveAffectedClasses(
   leaveRequest: LeaveRequestDto,
   timetableEntries: TimetableEntryDto[],
-  periods: PeriodDto[] = JCET_PERIODS
+  periods: PeriodDto[] = JCET_PERIODS,
 ): AffectedClassSlot[] {
   if (!leaveRequest.startDate || !leaveRequest.endDate) return [];
 
@@ -319,7 +339,9 @@ export function deriveAffectedClasses(
 
       // Filter timetable entries for absent faculty on this day of week
       const targetEmpId = leaveRequest.employee.id;
-      const targetEmpCode = leaveRequest.employee.employeeCode.trim().toLowerCase();
+      const targetEmpCode = leaveRequest.employee.employeeCode
+        .trim()
+        .toLowerCase();
 
       const matchingEntries = timetableEntries.filter((entry) => {
         const matchesFaculty =
@@ -342,7 +364,9 @@ export function deriveAffectedClasses(
         const slotId = `${leaveRequest.id}_${dateStr}_${entry.id}`;
 
         // Find period start & end times from period definitions
-        const startPeriodObj = periods.find((p) => p.number === entry.startPeriod);
+        const startPeriodObj = periods.find(
+          (p) => p.number === entry.startPeriod,
+        );
         const endPeriodObj = periods.find((p) => p.number === entry.endPeriod);
 
         const startTime = startPeriodObj?.startTime || '09:00';
@@ -357,7 +381,11 @@ export function deriveAffectedClasses(
 
         // Check if an assignment already exists for this slot
         const existingAssignment = currentAssignments.find(
-          (a) => a.affectedSlotId === slotId || (a.leaveRequestId === leaveRequest.id && a.date === dateStr && a.startPeriod === entry.startPeriod)
+          (a) =>
+            a.affectedSlotId === slotId ||
+            (a.leaveRequestId === leaveRequest.id &&
+              a.date === dateStr &&
+              a.startPeriod === entry.startPeriod),
         );
 
         affectedSlots.push({
@@ -442,7 +470,10 @@ export function findAvailableSubstitutes({
   const candidates: FacultyCandidate[] = [];
 
   // Combine timetable entries with peer entries for robust conflict checking
-  const combinedEntries = [...allTimetableEntries, ...DEMO_PEER_TIMETABLE_ENTRIES];
+  const combinedEntries = [
+    ...allTimetableEntries,
+    ...DEMO_PEER_TIMETABLE_ENTRIES,
+  ];
 
   const absentId = slot.absentFaculty.id.trim().toLowerCase();
   const absentCode = slot.absentFaculty.employeeCode.trim().toLowerCase();
@@ -465,7 +496,10 @@ export function findAvailableSubstitutes({
       if (entry.day !== slot.day) return false;
 
       // Period overlap condition: start1 <= end2 && end1 >= start2
-      return entry.startPeriod <= slot.endPeriod && entry.endPeriod >= slot.startPeriod;
+      return (
+        entry.startPeriod <= slot.endPeriod &&
+        entry.endPeriod >= slot.startPeriod
+      );
     });
 
     const conflictingEntry = hasTimetableConflict
@@ -473,7 +507,12 @@ export function findAvailableSubstitutes({
           const isThisFaculty =
             entry.faculty.id.trim().toLowerCase() === fId ||
             entry.faculty.employeeCode.trim().toLowerCase() === fCode;
-          return isThisFaculty && entry.day === slot.day && entry.startPeriod <= slot.endPeriod && entry.endPeriod >= slot.startPeriod;
+          return (
+            isThisFaculty &&
+            entry.day === slot.day &&
+            entry.startPeriod <= slot.endPeriod &&
+            entry.endPeriod >= slot.startPeriod
+          );
         })
       : null;
 
@@ -495,7 +534,8 @@ export function findAvailableSubstitutes({
       conflictReason = `Timetable Conflict: teaching ${conflictingEntry.subject.code} in ${conflictingEntry.room.name}`;
     } else if (hasSubstitutionConflict) {
       isAvailable = false;
-      conflictReason = 'Substitution Conflict: already assigned covering another class in this slot';
+      conflictReason =
+        'Substitution Conflict: already assigned covering another class in this slot';
     }
 
     // 4. Calculate Match Score using real data rubric:
@@ -504,7 +544,8 @@ export function findAvailableSubstitutes({
     // - Specialization / subject expertise match: +20 pts (if text match found)
     // - Teaching Workload: UNDERLOADED +15 pts, NORMAL +10 pts, OVERLOADED 0 pts
     const baseScore = isAvailable ? 50 : 0;
-    const departmentMatch = faculty.departmentId === slot.department.id ? 25 : 10;
+    const departmentMatch =
+      faculty.departmentId === slot.department.id ? 25 : 10;
 
     let specializationMatch = 0;
     if (faculty.specialization && isAvailable) {
@@ -515,7 +556,7 @@ export function findAvailableSubstitutes({
       // Check keywords match
       const keywords = subjectNameLower.split(/[\s,]+/);
       const matchesKeyword = keywords.some(
-        (kw) => kw.length > 3 && specLower.includes(kw)
+        (kw) => kw.length > 3 && specLower.includes(kw),
       );
 
       if (specLower.includes(subjectCodeLower) || matchesKeyword) {
@@ -597,7 +638,8 @@ export async function createSubstitutionAssignment({
 }: CreateAssignmentParams): Promise<SubstitutionAssignment> {
   if (!candidate.isAvailable) {
     throw new Error(
-      candidate.conflictReason || 'Selected faculty member is not available for this period.'
+      candidate.conflictReason ||
+        'Selected faculty member is not available for this period.',
     );
   }
 
@@ -605,11 +647,17 @@ export async function createSubstitutionAssignment({
 
   // Guard against duplicate assignment for the same affected slot
   const isDuplicate = currentAssignments.some(
-    (a) => a.affectedSlotId === slot.id || (a.leaveRequestId === slot.leaveRequestId && a.date === slot.date && a.startPeriod === slot.startPeriod)
+    (a) =>
+      a.affectedSlotId === slot.id ||
+      (a.leaveRequestId === slot.leaveRequestId &&
+        a.date === slot.date &&
+        a.startPeriod === slot.startPeriod),
   );
 
   if (isDuplicate) {
-    throw new Error('A substitute has already been assigned for this class period.');
+    throw new Error(
+      'A substitute has already been assigned for this class period.',
+    );
   }
 
   const newAssignment: SubstitutionAssignment = {
@@ -673,7 +721,7 @@ export function getSubstitutionAssignments(filter?: {
     list = list.filter(
       (a) =>
         a.substituteFaculty.id.trim().toLowerCase() === target ||
-        a.substituteFaculty.employeeCode.trim().toLowerCase() === target
+        a.substituteFaculty.employeeCode.trim().toLowerCase() === target,
     );
   }
   if (filter?.date) {
@@ -685,7 +733,9 @@ export function getSubstitutionAssignments(filter?: {
 /**
  * Removes a substitution assignment.
  */
-export async function removeSubstitutionAssignment(assignmentId: string): Promise<void> {
+export async function removeSubstitutionAssignment(
+  assignmentId: string,
+): Promise<void> {
   const current = loadPersistedAssignments();
   const filtered = current.filter((a) => a.id !== assignmentId);
   savePersistedAssignments(filtered);
@@ -715,17 +765,21 @@ export function mergeSubstitutionsIntoTimetable(
   regularEntries: TimetableEntryDto[],
   userIdentity?: UserIdentityInput,
   day?: DayOfWeek | null,
-  dateFilter?: string | null
+  dateFilter?: string | null,
 ): TimetableEntryDto[] {
   if (!userIdentity) return regularEntries;
 
   const identifiers: string[] = [];
   if (typeof userIdentity === 'string') {
-    if (userIdentity.trim()) identifiers.push(userIdentity.trim().toLowerCase());
+    if (userIdentity.trim())
+      identifiers.push(userIdentity.trim().toLowerCase());
   } else if (userIdentity) {
-    if (userIdentity.id?.trim()) identifiers.push(userIdentity.id.trim().toLowerCase());
-    if (userIdentity.employeeId?.trim()) identifiers.push(userIdentity.employeeId.trim().toLowerCase());
-    if (userIdentity.employeeCode?.trim()) identifiers.push(userIdentity.employeeCode.trim().toLowerCase());
+    if (userIdentity.id?.trim())
+      identifiers.push(userIdentity.id.trim().toLowerCase());
+    if (userIdentity.employeeId?.trim())
+      identifiers.push(userIdentity.employeeId.trim().toLowerCase());
+    if (userIdentity.employeeCode?.trim())
+      identifiers.push(userIdentity.employeeCode.trim().toLowerCase());
   }
 
   if (identifiers.length === 0) return regularEntries;
@@ -737,7 +791,7 @@ export function mergeSubstitutionsIntoTimetable(
     const isSubstitute = identifiers.some(
       (ident) =>
         a.substituteFaculty.id.trim().toLowerCase() === ident ||
-        a.substituteFaculty.employeeCode.trim().toLowerCase() === ident
+        a.substituteFaculty.employeeCode.trim().toLowerCase() === ident,
     );
     if (!isSubstitute) return false;
     if (dateFilter && a.date !== dateFilter) return false;
@@ -767,7 +821,7 @@ export function mergeSubstitutionsIntoTimetable(
     const isAbsentUser = identifiers.some(
       (ident) =>
         entry.faculty.id.trim().toLowerCase() === ident ||
-        entry.faculty.employeeCode.trim().toLowerCase() === ident
+        entry.faculty.employeeCode.trim().toLowerCase() === ident,
     );
     if (!isAbsentUser) return entry;
 
@@ -778,7 +832,7 @@ export function mergeSubstitutionsIntoTimetable(
       const matchesAbsentFaculty = identifiers.some(
         (ident) =>
           a.absentFaculty.id.trim().toLowerCase() === ident ||
-          a.absentFaculty.employeeCode.trim().toLowerCase() === ident
+          a.absentFaculty.employeeCode.trim().toLowerCase() === ident,
       );
       return matchesDay && matchesPeriod && matchesDate && matchesAbsentFaculty;
     });
@@ -794,6 +848,6 @@ export function mergeSubstitutionsIntoTimetable(
   });
 
   return [...annotatedRegular, ...substituteEntries].sort(
-    (a, b) => a.startPeriod - b.startPeriod
+    (a, b) => a.startPeriod - b.startPeriod,
   );
 }

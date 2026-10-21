@@ -1,8 +1,15 @@
 import React from 'react';
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { theme } from '../../lib/theme';
 
-export type BadgeVariant = 'default' | 'accent' | 'success' | 'warning' | 'secondary';
+export type BadgeVariant =
+  'default' | 'accent' | 'success' | 'warning' | 'secondary';
 
 interface BadgeProps {
   label: string;
@@ -31,7 +38,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
   },
   accent: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.accentInk,
   },
   success: {
     backgroundColor: '#E6F9F0',
@@ -69,4 +76,3 @@ const textStyles = StyleSheet.create({
     color: theme.colors.primary,
   },
 });
-

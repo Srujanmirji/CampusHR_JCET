@@ -21,7 +21,6 @@ import {
 import {
   getPeriods,
   getTimetableEntries,
-  JCET_PERIODS,
   type DayOfWeek,
 } from '../../lib/timetable-api';
 import { theme } from '../../lib/theme';
@@ -82,19 +81,27 @@ export default function TimetableScreen() {
   const { user, accessToken } = useAuth();
 
   const { day: todayDay, isSunday } = getSystemDayOfWeek();
-  const [viewMode, setViewMode] = useState<'TODAY' | 'WEEK'>(isSunday ? 'WEEK' : 'TODAY');
+  const [viewMode, setViewMode] = useState<'TODAY' | 'WEEK'>(
+    isSunday ? 'WEEK' : 'TODAY',
+  );
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(todayDay || 'MON');
 
-  const activeDay: DayOfWeek | null = viewMode === 'TODAY' ? todayDay : selectedDay;
+  const activeDay: DayOfWeek | null =
+    viewMode === 'TODAY' ? todayDay : selectedDay;
 
-  const { data: periods = JCET_PERIODS } = useQuery({
+  const {
+    data: periods = [],
+    error: periodsError,
+    isPending: loadingPeriods,
+    refetch: refetchPeriods,
+  } = useQuery({
     queryKey: ['timetable-periods', accessToken],
     queryFn: () => getPeriods(accessToken),
   });
 
   const {
     data: entries = [],
-    isLoading: loading,
+    isLoading: loadingEntries,
     isRefetching: refreshing,
     error: queryError,
     refetch,
@@ -108,20 +115,23 @@ export default function TimetableScreen() {
     enabled: !!activeDay,
   });
 
-  const error = queryError
-    ? queryError instanceof Error
-      ? queryError.message
+  const loading = loadingEntries || loadingPeriods;
+  const scheduleError = queryError || periodsError;
+  const error = scheduleError
+    ? scheduleError instanceof Error
+      ? scheduleError.message
       : 'Unable to load timetable schedule.'
     : null;
 
   const onRefresh = () => {
     if (activeDay) {
       void refetch();
+      void refetchPeriods();
     }
   };
 
   // Listen for smart substitution assignments updates
-  const [subVersion, setSubVersion] = useState(0);
+  const [, setSubVersion] = useState(0);
 
   useEffect(() => {
     return subscribeToSubstitutionStore(() => {
@@ -130,7 +140,8 @@ export default function TimetableScreen() {
   }, []);
 
   // Merge any assigned substitution duties for the authenticated faculty member
-  const mergedEntries = useMemo(() => {
+  const mergedEntries = (() => {
+    if (!accessToken?.startsWith('demo-')) return entries;
     return mergeSubstitutionsIntoTimetable(
       entries,
       {
@@ -138,9 +149,9 @@ export default function TimetableScreen() {
         employeeId: user?.employeeId,
         employeeCode: user?.employeeCode,
       },
-      activeDay
+      activeDay,
     );
-  }, [entries, user?.id, user?.employeeId, user?.employeeCode, activeDay, subVersion]);
+  })();
 
   // Map entries with period times
   const enrichedEntries = useMemo(() => {
@@ -148,7 +159,9 @@ export default function TimetableScreen() {
     const isToday = activeDay !== null && activeDay === todayDay;
 
     return mergedEntries.map((entry) => {
-      const startPeriodObj = periods.find((p) => p.number === entry.startPeriod);
+      const startPeriodObj = periods.find(
+        (p) => p.number === entry.startPeriod,
+      );
       const endPeriodObj = periods.find((p) => p.number === entry.endPeriod);
 
       const startTime = startPeriodObj?.startTime || '09:00';
@@ -156,7 +169,8 @@ export default function TimetableScreen() {
 
       const startMin = parseTimeToMinutes(startTime);
       const endMin = parseTimeToMinutes(endTime);
-      const isActiveNow = isToday && currentMinutes >= startMin && currentMinutes < endMin;
+      const isActiveNow =
+        isToday && currentMinutes >= startMin && currentMinutes < endMin;
       const isUpcoming = isToday && currentMinutes < startMin;
       const isCompleted = isToday && currentMinutes >= endMin;
 
@@ -221,7 +235,12 @@ export default function TimetableScreen() {
           onPress={() => setViewMode('TODAY')}
           style={[styles.modeTab, viewMode === 'TODAY' && styles.modeTabActive]}
         >
-          <Text style={[styles.modeTabText, viewMode === 'TODAY' && styles.modeTabTextActive]}>
+          <Text
+            style={[
+              styles.modeTabText,
+              viewMode === 'TODAY' && styles.modeTabTextActive,
+            ]}
+          >
             Today
           </Text>
         </Pressable>
@@ -232,7 +251,12 @@ export default function TimetableScreen() {
           onPress={() => setViewMode('WEEK')}
           style={[styles.modeTab, viewMode === 'WEEK' && styles.modeTabActive]}
         >
-          <Text style={[styles.modeTabText, viewMode === 'WEEK' && styles.modeTabTextActive]}>
+          <Text
+            style={[
+              styles.modeTabText,
+              viewMode === 'WEEK' && styles.modeTabTextActive,
+            ]}
+          >
             Full Week
           </Text>
         </Pressable>
@@ -261,11 +285,21 @@ export default function TimetableScreen() {
                     isTodayPill && !isSelected && styles.dayPillToday,
                   ]}
                 >
-                  <Text style={[styles.dayPillLabel, isSelected && styles.dayPillLabelSelected]}>
+                  <Text
+                    style={[
+                      styles.dayPillLabel,
+                      isSelected && styles.dayPillLabelSelected,
+                    ]}
+                  >
                     {day.label}
                   </Text>
                   {isTodayPill && (
-                    <View style={[styles.todayDot, isSelected && styles.todayDotSelected]} />
+                    <View
+                      style={[
+                        styles.todayDot,
+                        isSelected && styles.todayDotSelected,
+                      ]}
+                    />
                   )}
                 </Pressable>
               );
@@ -298,7 +332,14 @@ export default function TimetableScreen() {
       {error && (
         <Card style={styles.errorCard}>
           <Text style={styles.errorText}>{error}</Text>
-          <Button variant="outline" onPress={() => { void refetch(); }} style={styles.retryBtn}>
+          <Button
+            variant="outline"
+            onPress={() => {
+              void refetch();
+              void refetchPeriods();
+            }}
+            style={styles.retryBtn}
+          >
             Try Again
           </Button>
         </Card>
@@ -315,7 +356,8 @@ export default function TimetableScreen() {
           style={styles.scheduleList}
           contentContainerStyle={[
             styles.scheduleListContent,
-            (isSundayHoliday || enrichedEntries.length === 0) && styles.emptyScrollContent,
+            (isSundayHoliday || enrichedEntries.length === 0) &&
+              styles.emptyScrollContent,
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -329,12 +371,11 @@ export default function TimetableScreen() {
           {isSundayHoliday ? (
             /* Sunday / Weekend Free Day State */
             <Card style={styles.emptyCard}>
-              <View style={styles.emptyIconBadge}>
-                <Text style={styles.emptyBadgeText}>☀️</Text>
-              </View>
+              <View style={styles.emptyIconBadge}></View>
               <Text style={styles.emptyTitle}>Sunday Campus Holiday</Text>
               <Text style={styles.emptySubtitle}>
-                No teaching periods are scheduled for today. You can view Monday’s classes or browse the full weekly timetable below.
+                No teaching periods are scheduled for today. You can view
+                Monday’s classes or browse the full weekly timetable below.
               </Text>
               <Button
                 variant="primary"
@@ -350,14 +391,17 @@ export default function TimetableScreen() {
           ) : enrichedEntries.length === 0 ? (
             /* No Classes State */
             <Card style={styles.emptyCard}>
-              <View style={styles.emptyIconBadge}>
-                <Text style={styles.emptyBadgeText}>📅</Text>
-              </View>
+              <View style={styles.emptyIconBadge}></View>
               <Text style={styles.emptyTitle}>No Classes Scheduled</Text>
               <Text style={styles.emptySubtitle}>
-                You have no teaching periods assigned for {DAYS.find((d) => d.key === activeDay)?.full || 'this day'}.
+                You have no teaching periods assigned for{' '}
+                {DAYS.find((d) => d.key === activeDay)?.full || 'this day'}.
               </Text>
-              <Button variant="outline" onPress={onRefresh} style={styles.emptyActionBtn}>
+              <Button
+                variant="outline"
+                onPress={onRefresh}
+                style={styles.emptyActionBtn}
+              >
                 Refresh Timetable
               </Button>
             </Card>
@@ -389,9 +433,12 @@ export default function TimetableScreen() {
                   {/* Substitute Duty Alert Banner */}
                   {classItem.isSubstitute && (
                     <View style={styles.substituteBanner}>
-                      <Text style={styles.substituteTag}>★ SMART SUBSTITUTION</Text>
+                      <Text style={styles.substituteTag}>
+                        ★ SMART SUBSTITUTION
+                      </Text>
                       <Text style={styles.substituteNote}>
-                        {classItem.substituteNote || 'Assigned substitution duty'}
+                        {classItem.substituteNote ||
+                          'Assigned substitution duty'}
                       </Text>
                     </View>
                   )}
@@ -402,19 +449,29 @@ export default function TimetableScreen() {
                       <View style={styles.periodPill}>
                         <Text style={styles.periodPillText}>{periodLabel}</Text>
                       </View>
-                      <Text style={styles.timeRangeText}>{classItem.timeLabel}</Text>
+                      <Text style={styles.timeRangeText}>
+                        {classItem.timeLabel}
+                      </Text>
                     </View>
 
                     <Badge
                       label={classItem.subject.kind}
-                      variant={classItem.subject.kind === 'LAB' ? 'accent' : 'secondary'}
+                      variant={
+                        classItem.subject.kind === 'LAB'
+                          ? 'accent'
+                          : 'secondary'
+                      }
                     />
                   </View>
 
                   {/* Subject Info */}
                   <View style={styles.subjectBlock}>
-                    <Text style={styles.subjectCode}>{classItem.subject.code}</Text>
-                    <Text style={styles.subjectName}>{classItem.subject.name}</Text>
+                    <Text style={styles.subjectCode}>
+                      {classItem.subject.code}
+                    </Text>
+                    <Text style={styles.subjectName}>
+                      {classItem.subject.name}
+                    </Text>
                   </View>
 
                   {/* Details Footer: Section, Batch, Room */}
@@ -429,15 +486,18 @@ export default function TimetableScreen() {
                     </View>
 
                     <View style={styles.roomBadge}>
-                      <Text style={styles.roomIcon}>📍</Text>
-                      <Text style={styles.roomValue}>{classItem.room.name}</Text>
+                      <Text style={styles.roomValue}>
+                        {classItem.room.name}
+                      </Text>
                     </View>
                   </View>
 
                   {/* Status Indicator text for accessibility */}
                   {classItem.isCompleted && (
                     <View style={styles.completedNotice}>
-                      <Text style={styles.completedNoticeText}>✓ Period Concluded</Text>
+                      <Text style={styles.completedNoticeText}>
+                        ✓ Period Concluded
+                      </Text>
                     </View>
                   )}
                 </Card>

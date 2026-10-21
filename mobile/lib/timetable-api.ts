@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { API_BASE_URL } from './api-config';
 
 export type DayOfWeek = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT';
@@ -5,7 +6,7 @@ export type DayOfWeek = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT';
 export interface PeriodDto {
   number: number;
   startTime: string; // "HH:MM" 24h
-  endTime: string;   // "HH:MM" 24h
+  endTime: string; // "HH:MM" 24h
 }
 
 export interface TimetableEntryDto {
@@ -41,7 +42,6 @@ export interface TimetableEntryDto {
   substituteNote?: string;
 }
 
-
 export const JCET_PERIODS: PeriodDto[] = [
   { number: 1, startTime: '09:00', endTime: '10:00' },
   { number: 2, startTime: '10:00', endTime: '11:00' },
@@ -52,7 +52,10 @@ export const JCET_PERIODS: PeriodDto[] = [
   { number: 7, startTime: '16:00', endTime: '17:00' },
 ];
 
-export function getSystemDayOfWeek(date: Date = new Date()): { day: DayOfWeek | null; isSunday: boolean } {
+export function getSystemDayOfWeek(date: Date = new Date()): {
+  day: DayOfWeek | null;
+  isSunday: boolean;
+} {
   const dayIndex = date.getDay();
   switch (dayIndex) {
     case 1:
@@ -104,8 +107,17 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'A',
     batch: null,
-    subject: { id: 101, code: 'BCS501', name: 'Database Management Systems', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 101,
+      code: 'BCS501',
+      name: 'Database Management Systems',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 201, name: 'Room 302', kind: 'CLASSROOM' },
     day: 'MON',
     startPeriod: 1,
@@ -117,8 +129,17 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'B',
     batch: null,
-    subject: { id: 104, code: 'BCS504', name: 'Computer Networks', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 104,
+      code: 'BCS504',
+      name: 'Computer Networks',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 202, name: 'Room 204', kind: 'CLASSROOM' },
     day: 'MON',
     startPeriod: 3,
@@ -131,7 +152,11 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     section: 'A',
     batch: 'Batch A1',
     subject: { id: 107, code: 'BCSL507', name: 'DBMS Laboratory', kind: 'LAB' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 205, name: 'Lab 3 (Computer Center)', kind: 'LAB' },
     day: 'MON',
     startPeriod: 5,
@@ -145,8 +170,17 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'A',
     batch: null,
-    subject: { id: 101, code: 'BCS501', name: 'Database Management Systems', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 101,
+      code: 'BCS501',
+      name: 'Database Management Systems',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 201, name: 'Room 302', kind: 'CLASSROOM' },
     day: 'TUE',
     startPeriod: 2,
@@ -158,14 +192,24 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'B',
     batch: null,
-    subject: { id: 102, code: 'BCS502', name: 'Theory of Computation', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 102,
+      code: 'BCS502',
+      name: 'Theory of Computation',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 202, name: 'Room 204', kind: 'CLASSROOM' },
     day: 'TUE',
     startPeriod: 4,
     endPeriod: 4,
     isSubstitute: true,
-    substituteNote: 'Substitution assigned: Covering for Dr. Suresh V (On Medical Leave)',
+    substituteNote:
+      'Substitution assigned: Covering for Dr. Suresh V (On Medical Leave)',
   },
   {
     id: 'tt-tue-3',
@@ -174,7 +218,11 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     section: 'A',
     batch: 'Batch A2',
     subject: { id: 107, code: 'BCSL507', name: 'DBMS Laboratory', kind: 'LAB' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 205, name: 'Lab 3 (Computer Center)', kind: 'LAB' },
     day: 'TUE',
     startPeriod: 5,
@@ -188,8 +236,17 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'B',
     batch: null,
-    subject: { id: 104, code: 'BCS504', name: 'Computer Networks', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 104,
+      code: 'BCS504',
+      name: 'Computer Networks',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 202, name: 'Room 204', kind: 'CLASSROOM' },
     day: 'WED',
     startPeriod: 1,
@@ -201,8 +258,17 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'A',
     batch: null,
-    subject: { id: 101, code: 'BCS501', name: 'Database Management Systems', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 101,
+      code: 'BCS501',
+      name: 'Database Management Systems',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 201, name: 'Room 302', kind: 'CLASSROOM' },
     day: 'WED',
     startPeriod: 3,
@@ -214,8 +280,17 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'A',
     batch: null,
-    subject: { id: 108, code: 'BCS508', name: 'Mini-Project & Mentorship', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 108,
+      code: 'BCS508',
+      name: 'Mini-Project & Mentorship',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 201, name: 'Room 302', kind: 'CLASSROOM' },
     day: 'WED',
     startPeriod: 7,
@@ -229,8 +304,17 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'B',
     batch: null,
-    subject: { id: 104, code: 'BCS504', name: 'Computer Networks', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 104,
+      code: 'BCS504',
+      name: 'Computer Networks',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 202, name: 'Room 204', kind: 'CLASSROOM' },
     day: 'THU',
     startPeriod: 2,
@@ -242,8 +326,17 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'A',
     batch: null,
-    subject: { id: 101, code: 'BCS501', name: 'Database Management Systems', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 101,
+      code: 'BCS501',
+      name: 'Database Management Systems',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 201, name: 'Room 302', kind: 'CLASSROOM' },
     day: 'THU',
     startPeriod: 4,
@@ -257,8 +350,17 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'A',
     batch: null,
-    subject: { id: 101, code: 'BCS501', name: 'Database Management Systems', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 101,
+      code: 'BCS501',
+      name: 'Database Management Systems',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 201, name: 'Room 302', kind: 'CLASSROOM' },
     day: 'FRI',
     startPeriod: 1,
@@ -270,8 +372,17 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'B',
     batch: null,
-    subject: { id: 104, code: 'BCS504', name: 'Computer Networks', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 104,
+      code: 'BCS504',
+      name: 'Computer Networks',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 202, name: 'Room 204', kind: 'CLASSROOM' },
     day: 'FRI',
     startPeriod: 3,
@@ -283,8 +394,17 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'A',
     batch: null,
-    subject: { id: 109, code: 'BCS509', name: 'Department Tutorial & Doubt Clearance', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 109,
+      code: 'BCS509',
+      name: 'Department Tutorial & Doubt Clearance',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 201, name: 'Room 302', kind: 'CLASSROOM' },
     day: 'FRI',
     startPeriod: 5,
@@ -298,8 +418,17 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'A',
     batch: null,
-    subject: { id: 110, code: 'BCS510', name: 'Technical Seminar & Student Forum', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 110,
+      code: 'BCS510',
+      name: 'Technical Seminar & Student Forum',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 208, name: 'Auditorium 2', kind: 'CLASSROOM' },
     day: 'SAT',
     startPeriod: 1,
@@ -311,8 +440,17 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
     semester: 5,
     section: 'ALL',
     batch: null,
-    subject: { id: 111, code: 'CSE-MTG', name: 'Department Faculty Review Meeting', kind: 'THEORY' },
-    faculty: { id: 'demo-faculty-021', employeeCode: 'JCET-CSE-021', name: 'Prof. Asha Patil' },
+    subject: {
+      id: 111,
+      code: 'CSE-MTG',
+      name: 'Department Faculty Review Meeting',
+      kind: 'THEORY',
+    },
+    faculty: {
+      id: 'demo-faculty-021',
+      employeeCode: 'JCET-CSE-021',
+      name: 'Prof. Asha Patil',
+    },
     room: { id: 209, name: 'CSE Conference Hall', kind: 'CLASSROOM' },
     day: 'SAT',
     startPeriod: 2,
@@ -320,60 +458,74 @@ export const SAMPLE_TIMETABLE_ENTRIES: TimetableEntryDto[] = [
   },
 ];
 
+const periodSchema = z.object({
+  number: z.number().int().positive(),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/),
+});
+const namedSchema = z.object({ id: z.number(), name: z.string() });
+const entrySchema = z.object({
+  id: z.string(),
+  department: namedSchema.extend({ code: z.string() }),
+  semester: z.number(),
+  section: z.string(),
+  batch: z.string().nullable(),
+  subject: namedSchema.extend({
+    code: z.string(),
+    kind: z.enum(['THEORY', 'LAB']),
+  }),
+  faculty: z.object({
+    id: z.string(),
+    employeeCode: z.string(),
+    name: z.string(),
+  }),
+  room: namedSchema.extend({ kind: z.enum(['CLASSROOM', 'LAB']) }),
+  day: z.enum(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']),
+  startPeriod: z.number().int().positive(),
+  endPeriod: z.number().int().positive(),
+});
+
 export async function getPeriods(token: string | null): Promise<PeriodDto[]> {
-  if (token && !token.startsWith('demo-')) {
-    try {
-      const res = await fetch(`${API_BASE_URL}/timetable/periods`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
-      if (res.ok) {
-        const body = await res.json();
-        return body.data || JCET_PERIODS;
-      }
-    } catch {
-      // Fall through to fallback
-    }
-  }
-  return JCET_PERIODS;
+  if (token?.startsWith('demo-')) return JCET_PERIODS;
+  if (!token) throw new Error('Sign in to load your timetable.');
+  const response = await fetch(`${API_BASE_URL}/timetable/periods`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  if (!response.ok)
+    throw new Error('Unable to load period timings. Refresh or sign in again.');
+  return z.object({ data: z.array(periodSchema) }).parse(await response.json())
+    .data;
 }
 
 export async function getTimetableEntries(
   token: string | null,
-  options?: { day?: DayOfWeek; facultyId?: string }
+  options?: { day?: DayOfWeek; facultyId?: string },
 ): Promise<TimetableEntryDto[]> {
-  if (token && !token.startsWith('demo-')) {
-    try {
-      const params = new URLSearchParams();
-      if (options?.day) params.set('day', options.day);
-      if (options?.facultyId) params.set('facultyId', options.facultyId);
-
-      const url = `${API_BASE_URL}/timetable/entries${params.toString() ? `?${params.toString()}` : ''}`;
-      const res = await fetch(url, {
+  if (!token) throw new Error('Sign in to load your timetable.');
+  let entries: TimetableEntryDto[];
+  if (token.startsWith('demo-')) {
+    entries = SAMPLE_TIMETABLE_ENTRIES;
+  } else {
+    const params = new URLSearchParams();
+    if (options?.facultyId) params.set('facultyId', options.facultyId);
+    const response = await fetch(
+      `${API_BASE_URL}/timetable/entries?${params}`,
+      {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
         },
-      });
-      if (res.ok) {
-        const body = await res.json();
-        const entries = body.data || [];
-        if (options?.day) {
-          return entries.filter((e: TimetableEntryDto) => e.day === options.day);
-        }
-        return entries;
-      }
-    } catch {
-      // Fall through to fallback
-    }
+      },
+    );
+    if (!response.ok)
+      throw new Error(
+        'Unable to load your timetable. Refresh or sign in again.',
+      );
+    entries = z
+      .object({ data: z.array(entrySchema) })
+      .parse(await response.json()).data;
   }
-
-  // Fallback demo data
-  let list = [...SAMPLE_TIMETABLE_ENTRIES];
-  if (options?.day) {
-    list = list.filter((e) => e.day === options.day);
-  }
-  return list.sort((a, b) => a.startPeriod - b.startPeriod);
+  return entries
+    .filter((entry) => !options?.day || entry.day === options.day)
+    .sort((a, b) => a.startPeriod - b.startPeriod);
 }

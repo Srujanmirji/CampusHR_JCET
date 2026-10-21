@@ -1,6 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -45,29 +44,26 @@ export function SmartSubstitutionModal({
   timetableEntries,
   currentUser,
 }: SmartSubstitutionModalProps) {
-  const [selectedSlot, setSelectedSlot] = useState<AffectedClassSlot | null>(null);
-  const [selectedCandidate, setSelectedCandidate] = useState<FacultyCandidate | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<AffectedClassSlot | null>(
+    null,
+  );
+  const [selectedCandidate, setSelectedCandidate] =
+    useState<FacultyCandidate | null>(null);
   const [assignmentNote, setAssignmentNote] = useState('');
   const [assigning, setAssigning] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [, setRefreshTrigger] = useState(0);
 
-  // Derive all affected timetable slots for this leave request
-  const affectedSlots = useMemo(() => {
-    if (!leaveRequest) return [];
-    // refreshTrigger forces re-evaluating persisted assignments
-    return deriveAffectedClasses(leaveRequest, timetableEntries);
-  }, [leaveRequest, timetableEntries, refreshTrigger]);
-
-  // Find and rank candidates when a slot is chosen
-  const candidates = useMemo(() => {
-    if (!selectedSlot) return [];
-    return findAvailableSubstitutes({
-      slot: selectedSlot,
-      allTimetableEntries: timetableEntries,
-    });
-  }, [selectedSlot, timetableEntries, refreshTrigger]);
+  const affectedSlots = leaveRequest
+    ? deriveAffectedClasses(leaveRequest, timetableEntries)
+    : [];
+  const candidates = selectedSlot
+    ? findAvailableSubstitutes({
+        slot: selectedSlot,
+        allTimetableEntries: timetableEntries,
+      })
+    : [];
 
   if (!leaveRequest) return null;
 
@@ -91,7 +87,7 @@ export function SmartSubstitutionModal({
       });
 
       setSuccessMessage(
-        `Assigned ${selectedCandidate.name} to cover ${selectedSlot.subject.code} on ${selectedSlot.date} (${selectedSlot.periodLabel}).`
+        `Assigned ${selectedCandidate.name} to cover ${selectedSlot.subject.code} on ${selectedSlot.date} (${selectedSlot.periodLabel}).`,
       );
       setSelectedCandidate(null);
       setSelectedSlot(null);
@@ -103,7 +99,9 @@ export function SmartSubstitutionModal({
       }
     } catch (err) {
       setActionError(
-        err instanceof Error ? err.message : 'Failed to confirm substitution assignment.'
+        err instanceof Error
+          ? err.message
+          : 'Failed to confirm substitution assignment.',
       );
     } finally {
       setAssigning(false);
@@ -114,7 +112,12 @@ export function SmartSubstitutionModal({
   const assignedCount = affectedSlots.filter((s) => !!s.assignment).length;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
       <View style={styles.overlay}>
         <View style={styles.modalCard}>
           {/* Header */}
@@ -122,10 +125,16 @@ export function SmartSubstitutionModal({
             <View style={styles.headerTitleGroup}>
               <Text style={styles.title}>Smart Faculty Substitution</Text>
               <Text style={styles.subtitle}>
-                Covering for {leaveRequest.employee.name} ({leaveRequest.employee.employeeCode})
+                Covering for {leaveRequest.employee.name} (
+                {leaveRequest.employee.employeeCode})
               </Text>
             </View>
-            <Pressable onPress={onClose} style={styles.closeBtn} accessibilityRole="button">
+            <Pressable
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close substitution preview"
+            >
               <Text style={styles.closeBtnText}>✕</Text>
             </Pressable>
           </View>
@@ -133,7 +142,8 @@ export function SmartSubstitutionModal({
           {/* Prototype Sync Notice */}
           <View style={styles.prototypeNotice}>
             <Text style={styles.prototypeNoticeText}>
-              ★ Local Prototype: Assignments are recorded locally on this device. Cross-device synchronization requires backend substitution endpoints.
+              ★ Local Prototype: Assignments are recorded locally on this
+              device. Use the web substitution page for real assignments.
             </Text>
           </View>
 
@@ -148,7 +158,9 @@ export function SmartSubstitutionModal({
               </View>
               <View style={styles.summaryCol}>
                 <Text style={styles.summaryLabel}>Department:</Text>
-                <Text style={styles.summaryValue}>{leaveRequest.department.name}</Text>
+                <Text style={styles.summaryValue}>
+                  {leaveRequest.department.name}
+                </Text>
               </View>
             </View>
 
@@ -182,17 +194,23 @@ export function SmartSubstitutionModal({
             </View>
           )}
 
-          <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
+          <ScrollView
+            style={styles.scrollArea}
+            contentContainerStyle={styles.scrollContent}
+          >
             {/* Step 1: Affected Classes Overview */}
             <Text style={styles.sectionHeading}>
-              {selectedSlot ? 'Step 1: Selected Affected Class' : 'Affected Class Periods'}
+              {selectedSlot
+                ? 'Step 1: Selected Affected Class'
+                : 'Affected Class Periods'}
             </Text>
 
             {affectedSlots.length === 0 ? (
               <Card style={styles.emptyCard}>
                 <Text style={styles.emptyTitle}>No Classes Affected</Text>
                 <Text style={styles.emptyDetail}>
-                  The faculty member has no timetable classes scheduled during the approved leave dates.
+                  The faculty member has no timetable classes scheduled during
+                  the approved leave dates.
                 </Text>
               </Card>
             ) : (
@@ -214,7 +232,9 @@ export function SmartSubstitutionModal({
                       <View style={styles.slotHeader}>
                         <View style={styles.slotTimeGroup}>
                           <View style={styles.periodPill}>
-                            <Text style={styles.periodPillText}>{slot.periodLabel}</Text>
+                            <Text style={styles.periodPillText}>
+                              {slot.periodLabel}
+                            </Text>
                           </View>
                           <Text style={styles.slotDateText}>
                             {slot.date} ({slot.day}) · {slot.timeLabel}
@@ -228,27 +248,37 @@ export function SmartSubstitutionModal({
                       </View>
 
                       <View style={styles.slotSubjectRow}>
-                        <Text style={styles.slotSubjectCode}>{slot.subject.code}</Text>
-                        <Text style={styles.slotSubjectName}>{slot.subject.name}</Text>
+                        <Text style={styles.slotSubjectCode}>
+                          {slot.subject.code}
+                        </Text>
+                        <Text style={styles.slotSubjectName}>
+                          {slot.subject.name}
+                        </Text>
                       </View>
 
                       <Text style={styles.slotMeta}>
                         Sem {slot.semester}
                         {slot.section}
-                        {slot.batch ? ` · ${slot.batch}` : ''} · {slot.room.name} · {slot.subject.kind}
+                        {slot.batch ? ` · ${slot.batch}` : ''} ·{' '}
+                        {slot.room.name} · {slot.subject.kind}
                       </Text>
 
                       {isAssigned && slot.assignment ? (
                         <View style={styles.assignedBanner}>
                           <Text style={styles.assignedBannerText}>
-                            ★ Covered by: {slot.assignment.substituteFaculty.name}
+                            ★ Covered by:{' '}
+                            {slot.assignment.substituteFaculty.name}
                           </Text>
                           {slot.assignment.note && (
-                            <Text style={styles.assignedBannerNote}>"{slot.assignment.note}"</Text>
+                            <Text style={styles.assignedBannerNote}>
+                              "{slot.assignment.note}"
+                            </Text>
                           )}
                           <Text style={styles.assignedBannerMeta}>
                             Assigned by {slot.assignment.assignedBy.name} at{' '}
-                            {new Date(slot.assignment.assignedAt).toLocaleTimeString([], {
+                            {new Date(
+                              slot.assignment.assignedAt,
+                            ).toLocaleTimeString([], {
                               hour: '2-digit',
                               minute: '2-digit',
                             })}
@@ -271,7 +301,9 @@ export function SmartSubstitutionModal({
                             }}
                             style={styles.selectSlotBtn}
                           >
-                            {isSelected ? 'Change Class' : 'Find Best Substitute'}
+                            {isSelected
+                              ? 'Change Class'
+                              : 'Find Best Substitute'}
                           </Button>
                         </View>
                       )}
@@ -288,7 +320,8 @@ export function SmartSubstitutionModal({
                     Step 2: Recommended Faculty for {selectedSlot.periodLabel}
                   </Text>
                   <Text style={styles.candidatesCountText}>
-                    {candidates.filter((c) => c.isAvailable).length} Available · Ranked by Rubric
+                    {candidates.filter((c) => c.isAvailable).length} Available ·
+                    Ranked by Rubric
                   </Text>
                 </View>
 
@@ -296,12 +329,14 @@ export function SmartSubstitutionModal({
                   <Card style={styles.emptyCard}>
                     <Text style={styles.emptyTitle}>No Faculty Available</Text>
                     <Text style={styles.emptyDetail}>
-                      All department faculty members have existing timetable commitments or conflicts during this period.
+                      All department faculty members have existing timetable
+                      commitments or conflicts during this period.
                     </Text>
                   </Card>
                 ) : (
                   candidates.map((cand) => {
-                    const isSelected = selectedCandidate?.facultyId === cand.facultyId;
+                    const isSelected =
+                      selectedCandidate?.facultyId === cand.facultyId;
 
                     return (
                       <Card
@@ -321,7 +356,9 @@ export function SmartSubstitutionModal({
                         <View style={styles.candidateTopRow}>
                           <View style={styles.candidateInfo}>
                             <View style={styles.candidateNameRow}>
-                              <Text style={styles.candidateName}>{cand.name}</Text>
+                              <Text style={styles.candidateName}>
+                                {cand.name}
+                              </Text>
                               {cand.isAvailable && (
                                 <View style={styles.scorePill}>
                                   <Text style={styles.scorePillText}>
@@ -336,7 +373,9 @@ export function SmartSubstitutionModal({
                           </View>
 
                           <Badge
-                            label={cand.isAvailable ? 'Available' : 'Unavailable'}
+                            label={
+                              cand.isAvailable ? 'Available' : 'Unavailable'
+                            }
                             variant={cand.isAvailable ? 'success' : 'secondary'}
                           />
                         </View>
@@ -352,15 +391,21 @@ export function SmartSubstitutionModal({
                         {cand.workloadHours !== null && (
                           <View style={styles.rubricPillsRow}>
                             <Text style={styles.workloadText}>
-                              Load: {cand.workloadHours}h / week ({cand.workloadStatus || 'NORMAL'})
+                              Load: {cand.workloadHours}h / week (
+                              {cand.workloadStatus || 'NORMAL'})
                             </Text>
                             {cand.scoreBreakdown.specializationMatch > 0 && (
                               <View style={styles.tagPill}>
-                                <Text style={styles.tagPillText}>Subject Match +20</Text>
+                                <Text style={styles.tagPillText}>
+                                  Subject Match +20
+                                </Text>
                               </View>
                             )}
                             <View style={styles.tagPill}>
-                              <Text style={styles.tagPillText}>Dept Match +{cand.scoreBreakdown.departmentMatch}</Text>
+                              <Text style={styles.tagPillText}>
+                                Dept Match +
+                                {cand.scoreBreakdown.departmentMatch}
+                              </Text>
                             </View>
                           </View>
                         )}
@@ -368,7 +413,9 @@ export function SmartSubstitutionModal({
                         {/* Conflict Reason */}
                         {!cand.isAvailable && cand.conflictReason && (
                           <View style={styles.conflictBox}>
-                            <Text style={styles.conflictText}>✕ {cand.conflictReason}</Text>
+                            <Text style={styles.conflictText}>
+                              ✕ {cand.conflictReason}
+                            </Text>
                           </View>
                         )}
 
@@ -384,7 +431,9 @@ export function SmartSubstitutionModal({
                               {isSelected && <View style={styles.radioInner} />}
                             </Pressable>
                             <Text style={styles.radioLabel}>
-                              {isSelected ? 'Selected Substitute' : 'Tap to Select'}
+                              {isSelected
+                                ? 'Selected Substitute'
+                                : 'Tap to Select'}
                             </Text>
                           </View>
                         )}
@@ -400,17 +449,34 @@ export function SmartSubstitutionModal({
                       Confirm Substitution Assignment
                     </Text>
                     <Text style={styles.confirmationDetail}>
-                      Assign <Text style={styles.boldText}>{selectedCandidate.name}</Text> to cover{' '}
+                      Assign{' '}
                       <Text style={styles.boldText}>
-                        {selectedSlot.subject.code} ({selectedSlot.subject.name})
+                        {selectedCandidate.name}
                       </Text>{' '}
-                      for <Text style={styles.boldText}>{selectedSlot.absentFaculty.name}</Text> on{' '}
-                      <Text style={styles.boldText}>{selectedSlot.date}</Text> during{' '}
-                      <Text style={styles.boldText}>{selectedSlot.periodLabel}</Text>.
+                      to cover{' '}
+                      <Text style={styles.boldText}>
+                        {selectedSlot.subject.code} ({selectedSlot.subject.name}
+                        )
+                      </Text>{' '}
+                      for{' '}
+                      <Text style={styles.boldText}>
+                        {selectedSlot.absentFaculty.name}
+                      </Text>{' '}
+                      on{' '}
+                      <Text style={styles.boldText}>{selectedSlot.date}</Text>{' '}
+                      during{' '}
+                      <Text style={styles.boldText}>
+                        {selectedSlot.periodLabel}
+                      </Text>
+                      .
                     </Text>
 
-                    <Text style={styles.inputLabel}>Coverage Instructions (Optional):</Text>
+                    <Text style={styles.inputLabel}>
+                      Coverage Instructions (Optional):
+                    </Text>
                     <TextInput
+                      accessibilityLabel="Coverage instructions (optional)"
+                      maxLength={500}
                       style={styles.textInput}
                       placeholder="e.g. Please conduct Unit 4 revision lecture and mark attendance."
                       placeholderTextColor={theme.colors.mutedForeground}
@@ -419,7 +485,8 @@ export function SmartSubstitutionModal({
                     />
 
                     <Text style={styles.notificationDisclaimer}>
-                      🔔 Upon confirmation, a local-device preview push notification will be triggered on this device.
+                      Upon confirmation, a local-device preview push
+                      notification will be triggered on this device.
                     </Text>
 
                     <View style={styles.confirmActionRow}>
@@ -495,6 +562,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   closeBtn: {
+    minHeight: theme.sizes.tapTarget,
+    minWidth: theme.sizes.tapTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 6,
     borderRadius: 6,
     backgroundColor: theme.colors.muted,

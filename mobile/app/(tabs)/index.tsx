@@ -27,7 +27,6 @@ import {
   getPeriods,
   getSystemDayOfWeek,
   getTimetableEntries,
-  JCET_PERIODS,
   parseTimeToMinutes,
   type DayOfWeek,
 } from '../../lib/timetable-api';
@@ -44,13 +43,21 @@ const DAY_LABELS: Record<DayOfWeek, string> = {
 export default function DashboardScreen() {
   const router = useRouter();
   const { user, accessToken, logout } = useAuth();
-  const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
+  const isDemo = !!accessToken?.startsWith('demo-');
+  const [notificationStatus, setNotificationStatus] = useState<string | null>(
+    null,
+  );
 
   // Current system day of week (MON - SAT) or Sunday holiday
   const { day: todayDay, isSunday } = useMemo(() => getSystemDayOfWeek(), []);
 
   // Fetch JCET period timetable definitions
-  const { data: periods = JCET_PERIODS } = useQuery({
+  const {
+    data: periods = [],
+    error: periodsError,
+    isPending: loadingPeriods,
+    refetch: refetchPeriods,
+  } = useQuery({
     queryKey: ['timetable-periods', accessToken],
     queryFn: () => getPeriods(accessToken),
     staleTime: 1000 * 60 * 30, // 30 minutes cache
@@ -59,7 +66,7 @@ export default function DashboardScreen() {
   // Fetch timetable entries for today
   const {
     data: entries = [],
-    isLoading: loadingClasses,
+    isLoading: loadingEntries,
     isRefetching: refreshingClasses,
     error: classesQueryError,
     refetch: refetchClasses,
@@ -74,14 +81,16 @@ export default function DashboardScreen() {
     staleTime: 1000 * 60 * 5, // 5 minutes cache
   });
 
-  const classesError = classesQueryError
-    ? classesQueryError instanceof Error
-      ? classesQueryError.message
+  const loadingClasses = loadingEntries || loadingPeriods;
+  const scheduleError = classesQueryError || periodsError;
+  const classesError = scheduleError
+    ? scheduleError instanceof Error
+      ? scheduleError.message
       : 'Unable to load today’s schedule.'
     : null;
 
   // Listen for smart substitution assignments updates
-  const [subVersion, setSubVersion] = useState(0);
+  const [, setSubVersion] = useState(0);
 
   useEffect(() => {
     return subscribeToSubstitutionStore(() => {
@@ -98,7 +107,8 @@ export default function DashboardScreen() {
   }, []);
 
   // Merge any assigned substitution duties for the authenticated faculty member for today
-  const mergedEntries = useMemo(() => {
+  const mergedEntries = (() => {
+    if (!accessToken?.startsWith('demo-')) return entries;
     return mergeSubstitutionsIntoTimetable(
       entries,
       {
@@ -107,19 +117,23 @@ export default function DashboardScreen() {
         employeeCode: user?.employeeCode,
       },
       todayDay,
-      todayDateStr
+      todayDateStr,
     );
-  }, [entries, user?.id, user?.employeeId, user?.employeeCode, todayDay, todayDateStr, subVersion]);
+  })();
 
   // Enrich timetable entries with period timings, formatted times, and live status
   const enrichedEntries = useMemo(() => {
     if (isSunday || !todayDay) return [];
 
     const currentMinutes = getCurrentTimeMinutes();
-    const sorted = [...mergedEntries].sort((a, b) => a.startPeriod - b.startPeriod);
+    const sorted = [...mergedEntries].sort(
+      (a, b) => a.startPeriod - b.startPeriod,
+    );
 
     return sorted.map((entry) => {
-      const startPeriodObj = periods.find((p) => p.number === entry.startPeriod);
+      const startPeriodObj = periods.find(
+        (p) => p.number === entry.startPeriod,
+      );
       const endPeriodObj = periods.find((p) => p.number === entry.endPeriod);
 
       const startTime = startPeriodObj?.startTime || '09:00';
@@ -169,7 +183,8 @@ export default function DashboardScreen() {
     if (next) {
       return { kind: 'NEXT' as const, entry: next };
     }
-    const allDone = enrichedEntries.length > 0 && enrichedEntries.every((e) => e.isCompleted);
+    const allDone =
+      enrichedEntries.length > 0 && enrichedEntries.every((e) => e.isCompleted);
     if (allDone) {
       return { kind: 'COMPLETED' as const, entry: null };
     }
@@ -181,7 +196,9 @@ export default function DashboardScreen() {
       setNotificationStatus('Sending notification…');
       const result = await sendTestNotification();
       if (result.type === 'preview-simulated') {
-        setNotificationStatus('✓ Notification preview simulated (Expo Go: native push unavailable)');
+        setNotificationStatus(
+          '✓ Notification preview simulated (Expo Go: native push unavailable)',
+        );
       } else {
         setNotificationStatus('✓ Notification sent! Check your device tray.');
       }
@@ -200,8 +217,8 @@ export default function DashboardScreen() {
   const dayTitle = isSunday
     ? 'Sunday · Campus Holiday'
     : todayDay
-    ? `${DAY_LABELS[todayDay]} Schedule`
-    : 'Today’s Schedule';
+      ? `${DAY_LABELS[todayDay]} Schedule`
+      : 'Today’s Schedule';
 
   return (
     <ScreenContainer
@@ -212,6 +229,7 @@ export default function DashboardScreen() {
           onRefresh={() => {
             if (!isSunday && todayDay) {
               void refetchClasses();
+              void refetchPeriods();
             }
           }}
           colors={[theme.colors.primary]}
@@ -225,7 +243,7 @@ export default function DashboardScreen() {
             Hello, {user?.name || 'Faculty Member'}
           </Text>
           <Text style={styles.subGreeting}>
-            {user?.employeeCode || 'JCET-FACULTY'} · Dept. of Computer Science
+            {user?.employeeCode || user?.email} {isDemo ? '· Demo session' : ''}
           </Text>
         </View>
         <Badge
@@ -238,20 +256,27 @@ export default function DashboardScreen() {
       {/* Campus Hero Card */}
       <Card style={styles.heroCard}>
         <Image
+          // Metro resolves bundled assets through require.
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
           source={require('../../assets/jcet-campus.png')}
           style={styles.heroImage}
           resizeMode="cover"
         />
         <View style={styles.heroOverlay}>
           <Text style={styles.heroTagline}>JCET HUBBALLI · CAMPUSHR</Text>
-          <Text style={styles.heroTitle}>People at the heart of our campus.</Text>
+          <Text style={styles.heroTitle}>
+            People at the heart of our campus.
+          </Text>
         </View>
       </Card>
 
       {/* 2x2 Key Status Metrics */}
       <View style={styles.metricsGrid}>
         {/* Metric 1: Today's Classes (Dynamic MB-003) */}
-        <Card style={styles.metricCard} onPress={() => router.push('/(tabs)/timetable')}>
+        <Card
+          style={styles.metricCard}
+          onPress={() => router.push('/(tabs)/timetable')}
+        >
           <View style={styles.metricHeader}>
             <Text style={styles.metricLabel}>Today's Classes</Text>
             {loadingClasses ? (
@@ -274,56 +299,81 @@ export default function DashboardScreen() {
             {loadingClasses
               ? '…'
               : classesError
-              ? '—'
-              : isSunday
-              ? '0'
-              : enrichedEntries.length}
+                ? '—'
+                : isSunday
+                  ? '0'
+                  : enrichedEntries.length}
           </Text>
           <Text style={styles.metricDetail} numberOfLines={1}>
             {loadingClasses
               ? 'Checking schedule…'
               : classesError
-              ? 'Unable to load classes'
-              : isSunday
-              ? 'Sunday · Campus Holiday'
-              : enrichedEntries.length === 0
-              ? 'No classes scheduled today'
-              : classStatus.kind === 'ACTIVE'
-              ? `Now: ${classStatus.entry?.subject.code} (${classStatus.entry?.room.name})`
-              : classStatus.kind === 'NEXT'
-              ? `Next: ${classStatus.entry?.subject.code} at ${classStatus.entry?.startTime12}`
-              : 'All classes completed for today'}
+                ? 'Unable to load classes'
+                : isSunday
+                  ? 'Sunday · Campus Holiday'
+                  : enrichedEntries.length === 0
+                    ? 'No classes scheduled today'
+                    : classStatus.kind === 'ACTIVE'
+                      ? `Now: ${classStatus.entry?.subject.code} (${classStatus.entry?.room.name})`
+                      : classStatus.kind === 'NEXT'
+                        ? `Next: ${classStatus.entry?.subject.code} at ${classStatus.entry?.startTime12}`
+                        : 'All classes completed for today'}
           </Text>
         </Card>
 
         {/* Metric 2: Attendance */}
-        <Card style={styles.metricCard} onPress={() => router.push('/(tabs)/attendance')}>
+        <Card
+          style={styles.metricCard}
+          onPress={() => router.push('/(tabs)/attendance')}
+        >
           <View style={styles.metricHeader}>
             <Text style={styles.metricLabel}>Attendance</Text>
-            <Badge label="Present" variant="success" />
+            <Badge
+              label={isDemo ? 'Demo' : 'View status'}
+              variant="secondary"
+            />
           </View>
-          <Text style={styles.metricValue}>9:15 AM</Text>
-          <Text style={styles.metricDetail}>Punch recorded</Text>
+          <Text style={styles.metricValue}>{isDemo ? '9:15 AM' : '—'}</Text>
+          <Text style={styles.metricDetail}>
+            {isDemo ? 'Sample punch' : 'Open attendance to view status'}
+          </Text>
         </Card>
 
         {/* Metric 3: Leave Balance */}
-        <Card style={styles.metricCard} onPress={() => router.push('/(tabs)/leave')}>
+        <Card
+          style={styles.metricCard}
+          onPress={() => router.push('/(tabs)/leave')}
+        >
           <View style={styles.metricHeader}>
             <Text style={styles.metricLabel}>Leave Balance</Text>
             <Badge label="CL" variant="secondary" />
           </View>
-          <Text style={styles.metricValue}>8.5</Text>
-          <Text style={styles.metricDetail}>Casual leave remaining</Text>
+          <Text style={styles.metricValue}>{isDemo ? '8.5' : '—'}</Text>
+          <Text style={styles.metricDetail}>
+            {isDemo
+              ? 'Sample casual leave balance'
+              : 'Open leave to view balance'}
+          </Text>
         </Card>
 
         {/* Metric 4: Workload */}
-        <Card style={styles.metricCard} onPress={() => router.push('/(tabs)/timetable')}>
+        <Card
+          style={styles.metricCard}
+          onPress={() => router.push('/(tabs)/timetable')}
+        >
           <View style={styles.metricHeader}>
             <Text style={styles.metricLabel}>Workload</Text>
-            <Badge label="Normal" variant="secondary" />
+            <Badge
+              label={isDemo ? 'Demo' : 'View timetable'}
+              variant="secondary"
+            />
           </View>
-          <Text style={styles.metricValue}>16 / 18</Text>
-          <Text style={styles.metricDetail}>Weekly teaching hours</Text>
+          <Text style={styles.metricValue}>{isDemo ? '16 / 18' : '—'}</Text>
+          <Text style={styles.metricDetail}>
+            {isDemo
+              ? 'Sample weekly teaching hours'
+              : 'View workload on the web'}
+          </Text>
         </Card>
       </View>
 
@@ -338,6 +388,7 @@ export default function DashboardScreen() {
             <Pressable
               onPress={() => {
                 void refetchClasses();
+                void refetchPeriods();
               }}
               style={styles.refreshBtn}
               accessibilityLabel="Refresh today's timetable"
@@ -367,6 +418,7 @@ export default function DashboardScreen() {
               variant="outline"
               onPress={() => {
                 void refetchClasses();
+                void refetchPeriods();
               }}
               style={styles.retryButton}
             >
@@ -402,14 +454,29 @@ export default function DashboardScreen() {
           enrichedEntries.map((item, index) => (
             <React.Fragment key={item.id}>
               {index > 0 && <View style={styles.itemSeparator} />}
-              <View style={[styles.classItem, item.isActiveNow && styles.classItemActive]}>
+              <View
+                style={[
+                  styles.classItem,
+                  item.isActiveNow && styles.classItemActive,
+                ]}
+              >
                 {/* Time & Period Column */}
                 <View style={styles.classTime}>
-                  <Text style={[styles.classTimeStart, item.isActiveNow && styles.textActive]}>
+                  <Text
+                    style={[
+                      styles.classTimeStart,
+                      item.isActiveNow && styles.textActive,
+                    ]}
+                  >
                     {item.startTime12}
                   </Text>
                   <Text style={styles.classTimeEnd}>{item.endTime12}</Text>
-                  <View style={[styles.periodBadge, item.isActiveNow && styles.periodBadgeActive]}>
+                  <View
+                    style={[
+                      styles.periodBadge,
+                      item.isActiveNow && styles.periodBadgeActive,
+                    ]}
+                  >
                     <Text
                       style={[
                         styles.periodBadgeText,
@@ -434,7 +501,10 @@ export default function DashboardScreen() {
                 <View style={styles.classDetails}>
                   <View style={styles.subjectRow}>
                     <Text
-                      style={[styles.classSubject, item.isActiveNow && styles.textActive]}
+                      style={[
+                        styles.classSubject,
+                        item.isActiveNow && styles.textActive,
+                      ]}
                       numberOfLines={1}
                     >
                       {item.subject.code} · {item.subject.name}
@@ -452,7 +522,9 @@ export default function DashboardScreen() {
                   {/* Substitution Badge */}
                   {item.isSubstitute && (
                     <View style={styles.substitutePill}>
-                      <Text style={styles.substitutePillText}>Covering Substitution</Text>
+                      <Text style={styles.substitutePillText}>
+                        Covering Substitution
+                      </Text>
                     </View>
                   )}
 
@@ -503,7 +575,8 @@ export default function DashboardScreen() {
       <Card style={styles.notificationCard}>
         <Text style={styles.notificationCardTitle}>Notifications Channel</Text>
         <Text style={styles.notificationCardBody}>
-          CampusHR delivers real-time notifications for substitution duty assignments and leave approvals.
+          Try a notification on this device. Server push delivery is not
+          connected yet.
         </Text>
         <Button
           variant="outline"
@@ -513,7 +586,9 @@ export default function DashboardScreen() {
           Send Test Notification
         </Button>
         {notificationStatus && (
-          <Text style={styles.notificationStatusText}>{notificationStatus}</Text>
+          <Text style={styles.notificationStatusText}>
+            {notificationStatus}
+          </Text>
         )}
       </Card>
 
@@ -578,7 +653,7 @@ const styles = StyleSheet.create({
   heroTagline: {
     fontFamily: theme.typography.headingFamily,
     fontSize: 10,
-    color: theme.colors.accent,
+    color: theme.colors.accentInk,
     letterSpacing: 0.5,
   },
   heroTitle: {
@@ -647,7 +722,7 @@ const styles = StyleSheet.create({
   sectionAction: {
     fontFamily: theme.typography.headingFamily,
     fontSize: theme.typography.caption,
-    color: theme.colors.accent,
+    color: theme.colors.accentInk,
   },
   refreshBtn: {
     width: 28,
@@ -659,7 +734,7 @@ const styles = StyleSheet.create({
   },
   refreshIcon: {
     fontSize: 16,
-    color: theme.colors.accent,
+    color: theme.colors.accentInk,
     fontWeight: 'bold',
     marginTop: -2,
   },
@@ -687,7 +762,7 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontFamily: theme.typography.headingFamily,
     fontSize: theme.typography.label,
-    color: theme.colors.error,
+    color: theme.colors.errorInk,
   },
   errorDetail: {
     fontFamily: theme.typography.bodyFamily,
@@ -806,7 +881,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   textActive: {
-    color: theme.colors.accent,
+    color: theme.colors.accentInk,
   },
   activePill: {
     flexDirection: 'row',

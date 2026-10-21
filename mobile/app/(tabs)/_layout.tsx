@@ -8,6 +8,7 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarIcon: () => null,
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.mutedForeground,
         tabBarStyle: styles.tabBar,
@@ -18,7 +19,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarLabel: ({ focused, color }) => (
+          tabBarLabel: ({ color }) => (
             <Text style={[styles.tabBarLabel, { color }]}>Home</Text>
           ),
         }}
@@ -27,7 +28,7 @@ export default function TabsLayout() {
         name="timetable"
         options={{
           title: 'Timetable',
-          tabBarLabel: ({ focused, color }) => (
+          tabBarLabel: ({ color }) => (
             <Text style={[styles.tabBarLabel, { color }]}>Timetable</Text>
           ),
         }}
@@ -36,7 +37,7 @@ export default function TabsLayout() {
         name="attendance"
         options={{
           title: 'Attendance',
-          tabBarLabel: ({ focused, color }) => (
+          tabBarLabel: ({ color }) => (
             <Text style={[styles.tabBarLabel, { color }]}>Attendance</Text>
           ),
         }}
@@ -45,7 +46,7 @@ export default function TabsLayout() {
         name="leave"
         options={{
           title: 'Leave',
-          tabBarLabel: ({ focused, color }) => (
+          tabBarLabel: ({ color }) => (
             <Text style={[styles.tabBarLabel, { color }]}>Leave</Text>
           ),
         }}
@@ -54,7 +55,7 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarLabel: ({ focused, color }) => (
+          tabBarLabel: ({ color }) => (
             <Text style={[styles.tabBarLabel, { color }]}>Profile</Text>
           ),
         }}
