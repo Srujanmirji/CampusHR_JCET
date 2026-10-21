@@ -11,12 +11,12 @@ import {
   CheckCheck,
   ShieldCheck,
   CalendarDays,
+  CalendarRange,
   Award,
   BookOpen,
   Send,
   FileSpreadsheet,
   BarChart3,
-  Repeat2,
   UserCheck,
 } from 'lucide-react';
 import {
@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { NotificationsPreview } from './NotificationsPreview';
+import { PunchCard } from '@/features/attendance/components/PunchCard';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useReportsSummary } from '@/features/reports/api/reports';
 import { useLeaveWaiting } from '@/features/leave/hooks/useLeaveWaiting';
@@ -98,18 +99,6 @@ export function PrincipalDashboard() {
     summary?.workload?.normalLoadPercentage && summary.workload.normalLoadPercentage > 0
       ? summary.workload.normalLoadPercentage
       : 92.4;
-  const continuityRate =
-    summary?.continuity?.coverageRate && summary.continuity.coverageRate > 0
-      ? summary.continuity.coverageRate
-      : 96.2;
-  const affectedClasses =
-    summary?.continuity?.affectedClasses && summary.continuity.affectedClasses > 0
-      ? summary.continuity.affectedClasses
-      : 18;
-  const coveredClasses =
-    summary?.continuity?.classesCovered && summary.continuity.classesCovered > 0
-      ? summary.continuity.classesCovered
-      : 17;
 
   // Department Health Matrix benchmark items
   const departmentHealthMatrix = [
@@ -210,7 +199,10 @@ export function PrincipalDashboard() {
         />
       </section>
 
-      {/* 2. Institutional KPI Metrics Grid */}
+      {/* 2. Web Attendance Punch Card for Principal */}
+      <PunchCard />
+
+      {/* 3. Institutional KPI Metrics Grid */}
       <section aria-label="Campus Key Performance Indicators" className="metrics-grid">
         <MetricCard
           label="Campus Attendance Today"
@@ -229,12 +221,12 @@ export function PrincipalDashboard() {
           href="/workload"
         />
         <MetricCard
-          label="Academic Continuity Rate"
-          value={`${continuityRate}%`}
-          detail={`${coveredClasses} of ${affectedClasses} affected classes covered`}
-          icon={Repeat2}
+          label="Accredited Programs"
+          value="6 / 6 NBA & AICTE"
+          detail="All engineering & MBA departments accredited"
+          icon={Award}
           index={2}
-          href="/substitution"
+          href="/departments"
         />
         <MetricCard
           label="Executive Leave Sign-Offs"
@@ -430,13 +422,13 @@ export function PrincipalDashboard() {
               </div>
 
               <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-3">
-                <Repeat2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <Award className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                 <div className="text-xs space-y-0.5">
                   <p className="font-semibold text-emerald-700 dark:text-emerald-300">
-                    Smart Substitution Active
+                    Accreditation & Governance Status
                   </p>
                   <p className="text-muted-foreground">
-                    17 classes substituted today across departments without academic disruption.
+                    All 6 engineering & management programs meet VTU academic governance guidelines.
                   </p>
                 </div>
               </div>
@@ -594,9 +586,9 @@ export function PrincipalDashboard() {
                 <ArrowUpRight data-icon="inline-end" />
               </Button>
 
-              <Button variant="ghost" onClick={() => navigate('/substitution')}>
-                <Repeat2 data-icon="inline-start" />
-                <span>Smart Substitution Continuity</span>
+              <Button variant="ghost" onClick={() => navigate('/timetable')}>
+                <CalendarRange data-icon="inline-start" />
+                <span>Campus Timetable Master</span>
                 <ArrowUpRight data-icon="inline-end" />
               </Button>
 

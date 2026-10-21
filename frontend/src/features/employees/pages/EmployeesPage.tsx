@@ -30,7 +30,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCan } from '@/features/auth/hooks/useCan';
+import { useCan, useScope } from '@/features/auth/hooks/useCan';
+import { useSession } from '@/features/auth/hooks/useSession';
 import { listDepartments } from '@/features/departments/api/departments';
 import {
   EMPLOYMENT_TYPES,
@@ -48,10 +49,19 @@ const ALL = 'ALL';
 
 export default function EmployeesPage() {
   const can = useCan();
+  const scopeOf = useScope();
+  const session = useSession();
+  const user = session.status === 'signedIn' ? session.user : undefined;
+  const readScope = scopeOf('employee.read');
+  const isDeptScoped = readScope === 'department';
   const location = useLocation();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [departmentId, setDepartmentId] = useState(ALL);
+  const [chosenDepartmentId, setChosenDepartmentId] = useState(ALL);
+  const departmentId =
+    isDeptScoped && user?.departmentId
+      ? String(user.departmentId)
+      : chosenDepartmentId;
   const [category, setCategory] = useState(ALL);
   const [status, setStatus] = useState<EmployeeFilters['status']>('ACTIVE');
   const [page, setPage] = useState(1);
@@ -92,6 +102,11 @@ export default function EmployeesPage() {
     queryFn: listDepartments,
   });
 
+  const departmentChoices =
+    readScope === 'all'
+      ? (departments.data ?? [])
+      : (departments.data ?? []).filter((d) => d.id === user?.departmentId);
+
   // Keep the open drawer in step with the latest data.
   const current =
     (selected && employees.data?.data.find((row) => row.id === selected.id)) ??
@@ -110,7 +125,7 @@ export default function EmployeesPage() {
   }
   function resetFilters() {
     setSearch('');
-    setDepartmentId(ALL);
+    setChosenDepartmentId(ALL);
     setCategory(ALL);
     setStatus('ACTIVE');
     setPage(1);
@@ -193,14 +208,17 @@ export default function EmployeesPage() {
               <Label htmlFor="filter-department">Department</Label>
               <Select
                 value={departmentId}
-                onValueChange={change(setDepartmentId)}
+                onValueChange={change(setChosenDepartmentId)}
+                disabled={departmentChoices.length < 2}
               >
                 <SelectTrigger id="filter-department" className="lg:w-44">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL}>All departments</SelectItem>
-                  {departments.data?.map((department) => (
+                  {readScope === 'all' && (
+                    <SelectItem value={ALL}>All departments</SelectItem>
+                  )}
+                  {departmentChoices.map((department) => (
                     <SelectItem
                       key={department.id}
                       value={String(department.id)}

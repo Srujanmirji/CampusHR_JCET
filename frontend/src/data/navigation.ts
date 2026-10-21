@@ -270,13 +270,6 @@ export const principalNavigation: {
     group: 'Academic Governance',
   },
   {
-    path: '/substitution',
-    permission: 'substitution.read',
-    label: 'Smart Substitution',
-    icon: Repeat2,
-    group: 'Academic Governance',
-  },
-  {
     path: '/departments',
     permission: 'department.read',
     label: 'Academic Departments',

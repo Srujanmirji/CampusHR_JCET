@@ -38,47 +38,39 @@ import { listEntries, listPeriods } from '@/features/timetable/api/timetable';
 import { leaveDates } from '@/features/leave/utils/leave';
 
 import { NotificationsPreview } from './NotificationsPreview';
+import { PunchCard } from '@/features/attendance/components/PunchCard';
 
-// Realistic schedule for CSE department classes today
-const SAMPLE_DEPT_SCHEDULE = [
+// Realistic personal schedule for HOD (Dr. Rajesh Kulkarni) classes & duties today
+const SAMPLE_HOD_SCHEDULE = [
   {
     periodNumber: 1,
     time: '09:00 – 10:00',
-    subjectCode: '21CS61',
-    subjectName: 'Compiler Design',
-    facultyName: 'Prof. Asha Patil',
-    substituteName: 'Prof. Suresh K (Sub)',
-    semester: 6,
-    section: 'A',
-    room: 'Room 302',
+    subjectCode: '21CS71',
+    subjectName: 'Cloud Computing & Virtualization',
+    batch: 'Sem 7-A',
+    room: 'Room 301',
     kind: 'THEORY',
     isCurrent: false,
-    status: 'Substituted',
+    status: 'Completed',
   },
   {
     periodNumber: 2,
     time: '10:00 – 10:50',
-    subjectCode: '21CS53',
-    subjectName: 'Database Management Systems',
-    facultyName: 'Prof. Rajeshwari M',
-    substituteName: null,
-    semester: 5,
-    section: 'B',
-    room: 'Room 204',
-    kind: 'THEORY',
+    subjectCode: null,
+    subjectName: 'HOD Office Hours & Student Mentoring',
+    batch: 'All Batches',
+    room: 'HOD Cabin',
+    kind: 'ADMIN',
     isCurrent: false,
     status: 'Completed',
   },
   {
     periodNumber: 3,
     time: '11:15 – 12:15',
-    subjectCode: '21CSL66',
-    subjectName: 'Compiler & Systems Lab',
-    facultyName: 'Prof. Ravi Hegde',
-    substituteName: null,
-    semester: 6,
-    section: 'Batch A1',
-    room: 'Systems Lab 3',
+    subjectCode: '21CSL76',
+    subjectName: 'Cloud & Machine Learning Lab',
+    batch: 'Sem 7 · Batch A1',
+    room: 'Systems Lab 1',
     kind: 'LAB',
     isCurrent: true,
     status: 'Ongoing',
@@ -86,13 +78,10 @@ const SAMPLE_DEPT_SCHEDULE = [
   {
     periodNumber: 4,
     time: '12:15 – 13:15',
-    subjectCode: '21CSL66',
-    subjectName: 'Compiler & Systems Lab (Cont.)',
-    facultyName: 'Prof. Ravi Hegde',
-    substituteName: null,
-    semester: 6,
-    section: 'Batch A1',
-    room: 'Systems Lab 3',
+    subjectCode: '21CSL76',
+    subjectName: 'Cloud & Machine Learning Lab (Cont.)',
+    batch: 'Sem 7 · Batch A1',
+    room: 'Systems Lab 1',
     kind: 'LAB',
     isCurrent: false,
     status: 'Upcoming',
@@ -100,14 +89,11 @@ const SAMPLE_DEPT_SCHEDULE = [
   {
     periodNumber: 5,
     time: '14:00 – 15:00',
-    subjectCode: '21CS42',
-    subjectName: 'Design & Analysis of Algorithms',
-    facultyName: 'Prof. Ananya Joshi',
-    substituteName: null,
-    semester: 4,
-    section: 'A',
-    room: 'Room 301',
-    kind: 'THEORY',
+    subjectCode: null,
+    subjectName: 'Department Academic Review & Approvals',
+    batch: 'Faculty & Staff',
+    room: 'HOD Cabin',
+    kind: 'ADMIN',
     isCurrent: false,
     status: 'Upcoming',
   },
@@ -115,12 +101,9 @@ const SAMPLE_DEPT_SCHEDULE = [
     periodNumber: 6,
     time: '15:00 – 16:00',
     subjectCode: '21CS62',
-    subjectName: 'Computer Graphics & Visualization',
-    facultyName: 'Dr. Prakash Deshmukh',
-    substituteName: null,
-    semester: 6,
-    section: 'B',
-    room: 'Room 305',
+    subjectName: 'Machine Learning Foundations',
+    batch: 'Sem 6-B',
+    room: 'Room 204',
     kind: 'THEORY',
     isCurrent: false,
     status: 'Upcoming',
@@ -129,13 +112,10 @@ const SAMPLE_DEPT_SCHEDULE = [
     periodNumber: 7,
     time: '16:00 – 17:00',
     subjectCode: null,
-    subjectName: 'Department Faculty Meeting & Lab Maintenance',
-    facultyName: 'All CSE Faculty',
-    substituteName: null,
-    semester: null,
-    section: null,
-    room: 'Seminar Hall 2',
-    kind: 'DEPARTMENT',
+    subjectName: 'Free Slot / Research & Project Guidance',
+    batch: 'Final Year Projects',
+    room: 'HOD Office',
+    kind: 'FREE',
     isCurrent: false,
     status: 'Upcoming',
   },
@@ -322,31 +302,39 @@ export function HodDashboard() {
 
   const scheduleSlots = useMemo(() => {
     if (timetableQuery.data && timetableQuery.data.length > 0 && periodsQuery.data) {
-      const todayClasses = timetableQuery.data.filter((e) => e.day === todayDayKey);
-      if (todayClasses.length > 0) {
+      const myClasses = timetableQuery.data.filter(
+        (e) =>
+          e.day === todayDayKey &&
+          (e.faculty.id === user?.employeeId ||
+            e.faculty.name.toLowerCase().includes('kulkarni')),
+      );
+      if (myClasses.length > 0) {
         return periodsQuery.data.map((period) => {
-          const match = todayClasses.find(
+          const match = myClasses.find(
             (e) => period.number >= e.startPeriod && period.number <= e.endPeriod,
           );
           return {
             periodNumber: period.number,
             time: `${period.startTime} – ${period.endTime}`,
             subjectCode: match?.subject.code ?? null,
-            subjectName: match ? match.subject.name : 'Free Slot / Prep & Mentoring',
-            facultyName: match ? match.faculty.name : '—',
-            substituteName: null,
-            semester: match?.semester ?? null,
-            section: match?.section ?? null,
-            room: match?.room.name ?? 'Staff Room',
+            subjectName: match ? match.subject.name : 'HOD Office & Academic Governance',
+            batch: match ? `Sem ${match.semester}-${match.section}` : 'HOD Desk',
+            room: match?.room.name ?? 'HOD Cabin',
             kind: match ? match.subject.kind : 'FREE',
             isCurrent: period.number === 3,
-            status: match ? (period.number === 3 ? 'Ongoing' : period.number < 3 ? 'Completed' : 'Upcoming') : 'Free',
+            status: match
+              ? period.number === 3
+                ? 'Ongoing'
+                : period.number < 3
+                  ? 'Completed'
+                  : 'Upcoming'
+              : 'Free',
           };
         });
       }
     }
-    return SAMPLE_DEPT_SCHEDULE;
-  }, [timetableQuery.data, periodsQuery.data, todayDayKey]);
+    return SAMPLE_HOD_SCHEDULE;
+  }, [timetableQuery.data, periodsQuery.data, todayDayKey, user?.employeeId]);
 
   return (
     <>
@@ -369,6 +357,9 @@ export function HodDashboard() {
           height="305"
         />
       </section>
+
+      {/* Web Attendance Punch Card for HOD */}
+      <PunchCard />
 
       {/* 2. Established 6-Card Metrics Grid */}
       <section aria-label="Department key indicators" className="metrics-grid">
@@ -437,13 +428,12 @@ export function HodDashboard() {
 
       {/* 3. Middle 2-Column Row (Matches dashboard-charts layout) */}
       <div className="dashboard-charts">
-        {/* Left Card: Live Department Timetable */}
-
+        {/* Left Card: Live HOD Teaching Schedule */}
         <Card className="flex flex-col">
           <CardHeader>
             <SectionHeader
-              title="Today's department class schedule"
-              description="Live allocations across CSE halls & systems labs"
+              title="Today's teaching schedule"
+              description={`Live teaching allocations & academic slots for ${hodDisplayName}`}
             />
           </CardHeader>
           <CardContent className="flex-1 p-0">
@@ -451,9 +441,9 @@ export function HodDashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-20 pl-3">Period</TableHead>
-                  <TableHead className="px-2">Course & Section</TableHead>
-                  <TableHead className="w-32 px-2">Faculty & Room</TableHead>
-                  <TableHead className="text-right w-16 pr-3">Type</TableHead>
+                  <TableHead className="px-2">Course / Activity</TableHead>
+                  <TableHead className="w-28 px-2">Room / Venue</TableHead>
+                  <TableHead className="text-right w-20 pr-3">Type</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -474,27 +464,26 @@ export function HodDashboard() {
                       </div>
                       <div className="text-[11px] text-muted-foreground mt-0.5">
                         {slot.subjectCode ? `${slot.subjectCode} · ` : ''}
-                        {slot.semester ? `Sem ${slot.semester}-${slot.section ?? ''}` : 'All Batches'}
+                        {slot.batch}
                       </div>
                     </TableCell>
                     <TableCell className="align-top py-2.5 px-2 whitespace-normal break-words">
-                      <div className="font-medium text-foreground text-xs leading-snug">
-                        {slot.facultyName}
-                      </div>
-                      {slot.substituteName && (
-                        <span className="text-brand-orange font-semibold block text-[10px]">
-                          {slot.substituteName}
-                        </span>
-                      )}
-                      <div className="text-[10px] font-mono text-muted-foreground mt-0.5">
+                      <div className="text-xs font-medium text-foreground">
                         {slot.room}
                       </div>
+                      <span className="text-[10px] text-muted-foreground">
+                        {slot.status}
+                      </span>
                     </TableCell>
                     <TableCell className="align-top text-right py-2.5 pr-3">
                       {slot.kind === 'LAB' ? (
                         <StatusBadge status="Present" label="Lab" />
                       ) : slot.kind === 'THEORY' ? (
                         <StatusBadge status="Approved" label="Theory" />
+                      ) : slot.kind === 'ADMIN' ? (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">
+                          Admin
+                        </span>
                       ) : (
                         <span className="text-[11px] text-muted-foreground">Free</span>
                       )}
@@ -504,7 +493,6 @@ export function HodDashboard() {
               </TableBody>
             </Table>
           </CardContent>
-
 
           <CardFooter className="mt-auto pt-3 border-t border-border/40">
             <Button asChild variant="link" className="px-0">

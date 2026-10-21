@@ -33,6 +33,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useScope } from '@/features/auth/hooks/useCan';
+import { useSession } from '@/features/auth/hooks/useSession';
 import { listDepartments } from '@/features/departments/api/departments';
 import {
   bandLabel,
@@ -50,11 +51,16 @@ const ALL = 'ALL';
 
 export default function WorkloadPage() {
   const scopeOf = useScope();
+  const session = useSession();
+  const user = session.status === 'signedIn' ? session.user : undefined;
   const readScope = scopeOf('workload.read');
+  const isDeptScoped = readScope === 'department';
   const canConfigure = scopeOf('workload.configure') !== undefined;
   const ownView = readScope === 'own';
 
-  const [departmentId, setDepartmentId] = useState<number>();
+  const [chosenDepartmentId, setChosenDepartmentId] = useState<number>();
+  const departmentId =
+    isDeptScoped && user?.departmentId ? user.departmentId : chosenDepartmentId;
   const [status, setStatus] = useState<LoadStatus | typeof ALL>(ALL);
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
@@ -63,8 +69,13 @@ export default function WorkloadPage() {
   const departments = useQuery({
     queryKey: ['departments'],
     queryFn: listDepartments,
-    enabled: readScope === 'all',
+    enabled: readScope === 'all' || isDeptScoped,
   });
+
+  const departmentChoices =
+    readScope === 'all'
+      ? (departments.data ?? [])
+      : (departments.data ?? []).filter((row) => row.id === user?.departmentId);
   const workload = useQuery({
     queryKey: ['workload', 'list', departmentId],
     queryFn: () => listWorkload(departmentId),
@@ -197,16 +208,17 @@ export default function WorkloadPage() {
                       onChange={setSearch}
                     />
                   </div>
-                  {readScope === 'all' && (
+                  {!ownView && (
                     <div className="flex flex-col gap-1.5">
                       <Label htmlFor="workload-department">Department</Label>
                       <Select
                         value={departmentId ? String(departmentId) : ALL}
                         onValueChange={(value) =>
-                          setDepartmentId(
+                          setChosenDepartmentId(
                             value === ALL ? undefined : Number(value),
                           )
                         }
+                        disabled={departmentChoices.length < 2}
                       >
                         <SelectTrigger
                           id="workload-department"
@@ -215,8 +227,10 @@ export default function WorkloadPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value={ALL}>All departments</SelectItem>
-                          {(departments.data ?? []).map((row) => (
+                          {readScope === 'all' && (
+                            <SelectItem value={ALL}>All departments</SelectItem>
+                          )}
+                          {departmentChoices.map((row) => (
                             <SelectItem key={row.id} value={String(row.id)}>
                               {row.name}
                             </SelectItem>

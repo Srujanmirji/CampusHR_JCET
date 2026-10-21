@@ -36,7 +36,9 @@ import {
   Inbox,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useCan } from '@/features/auth/hooks/useCan';
+import { useCan, useScope } from '@/features/auth/hooks/useCan';
+import { useSession } from '@/features/auth/hooks/useSession';
+import { listDepartments } from '@/features/departments/api/departments';
 import {
   listAttendance,
   listAttendanceCorrections,
@@ -47,8 +49,24 @@ import { CorrectionsQueueDrawer } from '../components/CorrectionsQueueDrawer';
 
 export default function AttendancePage() {
   const can = useCan();
+  const scopeOf = useScope();
+  const session = useSession();
+  const user = session.status === 'signedIn' ? session.user : undefined;
+  const readScope = scopeOf('attendance.read');
+  const isDeptScoped = readScope === 'department';
   const canApprove = can('attendance_correction.approve');
-  const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
+
+  const { data: departments } = useQuery({
+    queryKey: ['departments'],
+    queryFn: listDepartments,
+  });
+
+  const userDept = departments?.find((d) => d.id === user?.departmentId);
+  const userDeptCode = userDept?.code ?? 'CSE';
+
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('ALL');
+  const departmentFilter = isDeptScoped ? userDeptCode : selectedDeptFilter;
+
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const todayIso = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState<string>(todayIso);
@@ -277,7 +295,9 @@ export default function AttendancePage() {
         {/* Department Attendance Compact Section */}
         <div className="rounded-xl border bg-card p-5 shadow-xs">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-semibold text-foreground">Departments Status</h3>
+            <h3 className="font-semibold text-foreground">
+              {isDeptScoped ? 'Department Attendance Status' : 'Departments Status'}
+            </h3>
             <Building className="h-4 w-4 text-muted-foreground" />
           </div>
           <p className="mb-4 text-xs text-muted-foreground">
@@ -285,31 +305,33 @@ export default function AttendancePage() {
           </p>
           <div className="space-y-3.5">
             {[
-              { code: 'CSE', name: 'Computer Science', rate: 96 },
+              { code: 'CSE', name: 'Computer Science & Engg', rate: 96 },
               { code: 'ECE', name: 'Electronics & Comm', rate: 94 },
               { code: 'AIML', name: 'AI & Machine Learning', rate: 98 },
               { code: 'ME', name: 'Mechanical Engg', rate: 91 },
               { code: 'CE', name: 'Civil Engg', rate: 90 },
-            ].map((dept) => (
-              <div key={dept.code}>
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="font-medium text-foreground">
-                    {dept.name} ({dept.code})
-                  </span>
-                  <span className="font-bold text-foreground">{dept.rate}%</span>
+            ]
+              .filter((dept) => !isDeptScoped || dept.code === userDeptCode)
+              .map((dept) => (
+                <div key={dept.code}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="font-medium text-foreground">
+                      {dept.name} ({dept.code})
+                    </span>
+                    <span className="font-bold text-foreground">{dept.rate}%</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${dept.rate}%`,
+                        backgroundColor:
+                          dept.rate >= 95 ? '#10b981' : dept.rate >= 92 ? '#3b82f6' : '#f59e0b',
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${dept.rate}%`,
-                      backgroundColor:
-                        dept.rate >= 95 ? '#10b981' : dept.rate >= 92 ? '#3b82f6' : '#f59e0b',
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       </div>
@@ -321,19 +343,29 @@ export default function AttendancePage() {
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Filter Log:
             </span>
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="w-[140px] text-xs">
+            <Select
+              value={departmentFilter}
+              onValueChange={setSelectedDeptFilter}
+              disabled={isDeptScoped}
+            >
+              <SelectTrigger className="w-[180px] text-xs">
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">All Departments</SelectItem>
-                <SelectItem value="CSE">CSE</SelectItem>
-                <SelectItem value="ECE">ECE</SelectItem>
-                <SelectItem value="AIML">AIML</SelectItem>
-                <SelectItem value="ME">Mechanical</SelectItem>
-                <SelectItem value="CE">Civil</SelectItem>
-                <SelectItem value="MBA">MBA</SelectItem>
-                <SelectItem value="ADMIN">Administration</SelectItem>
+                {!isDeptScoped && <SelectItem value="ALL">All Departments</SelectItem>}
+                {(!isDeptScoped || userDeptCode === 'CSE') && (
+                  <SelectItem value="CSE">Computer Science & Engineering</SelectItem>
+                )}
+                {!isDeptScoped && (
+                  <>
+                    <SelectItem value="ECE">Electronics & Communication</SelectItem>
+                    <SelectItem value="AIML">Artificial Intelligence & ML</SelectItem>
+                    <SelectItem value="ME">Mechanical Engineering</SelectItem>
+                    <SelectItem value="CE">Civil Engineering</SelectItem>
+                    <SelectItem value="MBA">MBA</SelectItem>
+                    <SelectItem value="ADMIN">Administration</SelectItem>
+                  </>
+                )}
               </SelectContent>
             </Select>
 
@@ -360,12 +392,12 @@ export default function AttendancePage() {
               />
             </div>
 
-            {(departmentFilter !== 'ALL' || statusFilter !== 'ALL' || selectedDate !== todayIso) && (
+            {((!isDeptScoped && departmentFilter !== 'ALL') || statusFilter !== 'ALL' || selectedDate !== todayIso) && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setDepartmentFilter('ALL');
+                  setSelectedDeptFilter('ALL');
                   setStatusFilter('ALL');
                   setSelectedDate(todayIso);
                 }}
