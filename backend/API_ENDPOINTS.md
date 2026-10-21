@@ -305,6 +305,25 @@ emits `notifications:changed` to the user whenever theirs change; refetch.
 
 ## Reports
 
-- GET /reports/attendance
-- GET /reports/leave
-- GET /reports/workload
+Implemented. Protected by `report.read`. Scoped: Super Admin / HR Admin / Principal (all), HOD (own department only), Faculty / Staff (403 Forbidden).
+
+- `GET /reports/summary` (`report.read`)
+  - Executive institutional KPIs and chart datasets:
+    - Headcount breakdown (total, teaching, non-teaching, doctorates, cadre distribution).
+    - Campus-wide attendance % today, presence/absence/late counts, department-wise averages.
+    - Monthly leave days, active leaves today, and 4-month leave category trends.
+    - Academic continuity rate %, classes affected vs covered, uncovered lectures.
+    - Faculty workload compliance % (VTU/AICTE bands).
+  - Returns: 200 `{ data: ExecutiveSummary }`
+- `GET /reports/attendance?from=&to=&departmentId=&format=json|csv` (`report.read`)
+  - Staff attendance breakdown: Days present, late, half-day, absent, on leave, and rate %.
+  - When `format=csv`, returns a direct downloadable RFC 4180 CSV file with `Content-Disposition`.
+- `GET /reports/leave?from=&to=&departmentId=&format=json|csv` (`report.read`)
+  - Departmental leave quota distribution: Requests count, approved days, and CL/ML/EL breakdown.
+  - When `format=csv`, returns a direct downloadable CSV file.
+- `GET /reports/workload?departmentId=&format=json|csv` (`report.read`)
+  - Weekly faculty workload audit: Theory hours, Lab hours, Total teaching hours, Min/Max AICTE thresholds, and status (`NORMAL` | `OVERLOAD` | `UNDERLOAD`).
+  - When `format=csv`, returns a direct downloadable CSV file.
+- `GET /reports/continuity?from=&to=&departmentId=&format=json|csv` (`report.read`)
+  - Syllabus and academic continuity audit: Impacted classes due to leaves, substitute faculty assignments, and coverage status (`COVERED` | `UNCOVERED`).
+  - When `format=csv`, returns a direct downloadable CSV file.

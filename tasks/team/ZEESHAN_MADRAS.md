@@ -56,10 +56,10 @@ check-in), working hours and late rule, working days and holidays.
 
 ## 4. Reports — BE-012, FE-014
 
-- [ ] Attendance, leave and workload reports with filters, scoped by role
+- [x] Attendance, leave and workload reports with filters, scoped by role
       (`report.read`)
-- [ ] CSV export first, then PDF
-- [ ] Web: `/reports` filters and export buttons on real data
+- [x] CSV export first, then PDF
+- [x] Web: `/reports` filters and export buttons on real data
 
 ## Done means
 

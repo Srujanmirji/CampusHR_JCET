@@ -82,9 +82,9 @@
 
 ## BE-012 Reports
 
-- [ ] Attendance reports
-- [ ] Leave reports
-- [ ] Workload reports
+- [x] Attendance reports
+- [x] Leave reports
+- [x] Workload reports
 
 ## BE-013 Security
 
