@@ -164,3 +164,82 @@ export const facultyNavigation: {
   },
 ];
 
+export const hodNavigation: {
+  path: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  group: string;
+  permission?: string;
+}[] = [
+  {
+    path: '/dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    group: 'Overview',
+  },
+  {
+    path: '/timetable',
+    permission: 'timetable.read',
+    label: 'Dept. Timetable',
+    icon: CalendarRange,
+    group: 'Academic Operations',
+  },
+  {
+    path: '/workload',
+    permission: 'workload.read',
+    label: 'Faculty Workload',
+    icon: ChartNoAxesCombined,
+    group: 'Academic Operations',
+  },
+  {
+    path: '/substitution',
+    permission: 'substitution.read',
+    label: 'Smart Substitution',
+    icon: Repeat2,
+    group: 'Academic Operations',
+  },
+  {
+    path: '/employees',
+    permission: 'employee.read',
+    label: 'Faculty Directory',
+    icon: UsersRound,
+    group: 'Department Staff',
+  },
+  {
+    path: '/attendance',
+    permission: 'attendance.read',
+    label: 'Attendance & Corrections',
+    icon: CalendarCheck2,
+    group: 'Department Staff',
+  },
+  {
+    path: '/leave',
+    permission: 'leave.read',
+    label: 'Leave Approvals',
+    icon: CalendarDays,
+    group: 'Department Staff',
+  },
+  {
+    path: '/documents',
+    permission: 'document.read',
+    label: 'Faculty Documents',
+    icon: Files,
+    group: 'Department Staff',
+  },
+  {
+    path: '/reports',
+    permission: 'report.read',
+    label: 'Department Reports',
+    icon: ChartColumn,
+    group: 'Administration',
+  },
+  {
+    path: '/notifications',
+    permission: 'notification.read',
+    label: 'Notifications',
+    icon: Bell,
+    group: 'Administration',
+  },
+];
+
+

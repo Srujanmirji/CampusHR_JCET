@@ -5,6 +5,7 @@ import {
   CheckCheck,
   CalendarRange,
   ChartNoAxesCombined,
+  Repeat2,
   ChartColumn,
   Files,
   Send,
@@ -48,6 +49,12 @@ const actions = [
     icon: CalendarRange,
     path: '/timetable',
     permission: 'timetable.read',
+  },
+  {
+    label: 'Smart Substitution',
+    icon: Repeat2,
+    path: '/substitution',
+    permission: 'substitution.read',
   },
   {
     label: 'Faculty Workload',
