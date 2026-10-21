@@ -37,6 +37,10 @@ npm run dev:web     # http://localhost:5173 — needs the API for sign-in
 Full setup, environment files, the API, the database and the mobile app:
 see [SETUP.md](SETUP.md).
 
+## iOS app planning
+
+The existing Expo app targets iOS and Android. See the [iOS plan and setup](mobile/ios-docs/README.md) and [delivery tasks](tasks/IOS_TASKS.md). Native session persistence, remaining live integrations, physical-device QA and signing/distribution are still pending.
+
 ## Repository layout
 
 See [FILE_STRUCTURE.md](FILE_STRUCTURE.md). Specifications live in `product/`,

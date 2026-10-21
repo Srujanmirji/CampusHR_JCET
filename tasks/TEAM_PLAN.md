@@ -10,7 +10,7 @@ Two teams share one API and one database:
 
 Each person owns whole modules, so two people rarely edit the same files.
 Task IDs refer to `BACKEND_TASKS.md`, `FRONTEND_TASKS.md` and
-`MOBILE_TASKS.md`.
+`MOBILE_TASKS.md`. iOS delivery is tracked in [`IOS_TASKS.md`](IOS_TASKS.md), with setup and acceptance guidance in the [iOS documentation](../mobile/ios-docs/README.md).
 
 Already done: sign-in (email or employee ID), role permissions, employees,
 departments, the web app shell and design system, and the mobile app

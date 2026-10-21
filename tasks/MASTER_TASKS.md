@@ -35,6 +35,7 @@
 ## Phase 5 — Mobile
 
 - [ ] Faculty mobile app
+- [ ] iOS delivery and acceptance — [IOS-001–014](IOS_TASKS.md)
 - [ ] Push notifications
 
 ## Phase 6 — Advanced
