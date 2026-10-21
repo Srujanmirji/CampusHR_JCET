@@ -13,11 +13,15 @@ import { QuickActions } from '../components/QuickActions';
 import { NotificationsPreview } from '../components/NotificationsPreview';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
 import { FacultyDashboard } from '../components/FacultyDashboard';
+import { HodDashboard } from '../components/HodDashboard';
+import { PrincipalDashboard } from '../components/PrincipalDashboard';
 
 export default function DashboardPage() {
   const session = useSession();
   const user = session.status === 'signedIn' ? session.user : null;
   const isFaculty = user?.role === 'Faculty';
+  const isHod = user?.role === 'HOD';
+  const isPrincipal = user?.role === 'Principal';
 
   const pending = useLeaveWaiting().data?.length ?? 0;
   const [loading, setLoading] = useState(true);
@@ -31,11 +35,23 @@ export default function DashboardPage() {
   return (
     <PageTransition>
       <PageHeader
-        title={isFaculty ? 'Faculty Dashboard' : 'Dashboard'}
+        title={
+          isFaculty
+            ? 'Faculty Dashboard'
+            : isHod
+              ? 'HOD Dashboard'
+              : isPrincipal
+                ? 'Principal Executive Dashboard'
+                : 'Dashboard'
+        }
         description={
           isFaculty
             ? 'Your teaching schedule, attendance, leaves, and daily academic operations.'
-            : 'Your people and campus operations, at a glance.'
+            : isHod
+              ? 'Department academic schedule, faculty attendance, substitutions, and approvals.'
+              : isPrincipal
+                ? 'Campus-wide academic governance, departmental health, AICTE compliance, and institutional operations.'
+                : 'Your people and campus operations, at a glance.'
         }
         action={
           <div className="dashboard-heading-actions">
@@ -60,6 +76,10 @@ export default function DashboardPage() {
         <DashboardSkeleton />
       ) : isFaculty ? (
         <FacultyDashboard />
+      ) : isHod ? (
+        <HodDashboard />
+      ) : isPrincipal ? (
+        <PrincipalDashboard />
       ) : (
         <>
           <section className="welcome-banner" aria-labelledby="welcome-title">

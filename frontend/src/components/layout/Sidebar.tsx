@@ -1,7 +1,12 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PanelLeftClose, PanelLeftOpen, X, GraduationCap } from 'lucide-react';
-import { navigation, facultyNavigation } from '@/data/navigation';
+import {
+  navigation,
+  facultyNavigation,
+  hodNavigation,
+  principalNavigation,
+} from '@/data/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -29,12 +34,30 @@ export function Sidebar({
   const session = useSession();
   const userRole = session.status === 'signedIn' ? session.user.role : null;
   const isFaculty = userRole === 'Faculty';
-  const baseNav = isFaculty ? facultyNavigation : navigation;
+  const isHod = userRole === 'HOD';
+  const isPrincipal = userRole === 'Principal';
+  const baseNav = isFaculty
+    ? facultyNavigation
+    : isHod
+      ? hodNavigation
+      : isPrincipal
+        ? principalNavigation
+        : navigation;
   const items = baseNav.filter((item) => can(item.permission));
   const pending = useLeaveWaiting().data?.length ?? 0;
   const groups = isFaculty
     ? ['Overview', 'My Academics', 'My Services', 'Communication']
-    : ['Overview', 'People & academics', 'Administration'];
+    : isHod
+      ? ['Overview', 'Academic Operations', 'Department Staff', 'Administration']
+      : isPrincipal
+        ? [
+            'Overview',
+            'Academic Governance',
+            'Institutional People',
+            'Executive & Reports',
+          ]
+        : ['Overview', 'People & academics', 'Administration'];
+
   return (
     <div className="sidebar-content" data-collapsed={collapsed}>
       <div className="sidebar-brand">
