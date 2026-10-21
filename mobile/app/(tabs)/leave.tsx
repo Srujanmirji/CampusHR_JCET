@@ -14,6 +14,7 @@ import { Card } from '../../components/ui/Card';
 import { ScreenContainer } from '../../components/ui/ScreenContainer';
 import { LeaveApplyModal } from '../../components/leave/LeaveApplyModal';
 import { LeaveDecisionModal } from '../../components/leave/LeaveDecisionModal';
+import { SmartSubstitutionModal } from '../../components/substitution/SmartSubstitutionModal';
 import { useAuth } from '../../lib/auth-context';
 import {
   cancelLeaveRequest,
@@ -24,6 +25,8 @@ import {
   type LeaveRequestDto,
   type LeaveTypeDto,
 } from '../../lib/leave-api';
+import { getSubstitutionAssignments } from '../../lib/substitution-store';
+import { getTimetableEntries, type TimetableEntryDto } from '../../lib/timetable-api';
 import { theme } from '../../lib/theme';
 
 export default function LeaveScreen() {
@@ -41,12 +44,21 @@ export default function LeaveScreen() {
   const [balances, setBalances] = useState<LeaveBalanceDto[]>([]);
   const [myRequests, setMyRequests] = useState<LeaveRequestDto[]>([]);
   const [hodPendingRequests, setHodPendingRequests] = useState<LeaveRequestDto[]>([]);
+  const [hodApprovedRequests, setHodApprovedRequests] = useState<LeaveRequestDto[]>([]);
+  const [timetableEntries, setTimetableEntries] = useState<TimetableEntryDto[]>([]);
 
   // Filter state for My Requests
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
 
   // Modals state
   const [showApplyModal, setShowApplyModal] = useState(false);
+  const [substitutionModalConfig, setSubstitutionModalConfig] = useState<{
+    visible: boolean;
+    request: LeaveRequestDto | null;
+  }>({
+    visible: false,
+    request: null,
+  });
   const [decisionModalConfig, setDecisionModalConfig] = useState<{
     visible: boolean;
     request: LeaveRequestDto | null;
@@ -61,22 +73,45 @@ export default function LeaveScreen() {
     setLoading(true);
     setError(null);
     try {
-      const [fetchedTypes, fetchedBalances, allRequests] = await Promise.all([
+      const [fetchedTypes, fetchedBalances, allRequests, entries] = await Promise.all([
         getLeaveTypes(accessToken),
-        getLeaveBalances(accessToken),
+        getLeaveBalances(accessToken, user?.employeeId || undefined),
         getLeaveRequests(accessToken),
+        getTimetableEntries(accessToken),
       ]);
 
       setTypes(fetchedTypes);
       setBalances(fetchedBalances);
+      setTimetableEntries(entries);
 
       // Separate personal requests and HOD department approvals
       if (isHod) {
+        const myEmpId = user?.employeeId || user?.id;
         const pendingForHod = allRequests.filter(
-          (r) => r.status === 'PENDING' && r.pendingRole === 'HOD'
+          (r) =>
+            r.status === 'PENDING' &&
+            r.pendingRole === 'HOD' &&
+            r.employee.id !== myEmpId &&
+            r.employee.id !== user?.id
         );
         setHodPendingRequests(pendingForHod);
-        setMyRequests(allRequests.filter((r) => r.employee.id === user?.id || r.employee.employeeCode === user?.employeeCode));
+
+        const approvedForHod = allRequests.filter(
+          (r) =>
+            r.status === 'APPROVED' &&
+            (r.department.id === (user?.departmentId || 1) || r.department.code === 'CSE')
+        );
+        setHodApprovedRequests(approvedForHod);
+
+        setMyRequests(
+          allRequests.filter(
+            (r) =>
+              r.employee.id === myEmpId ||
+              r.employee.id === user?.id ||
+              (!!user?.employeeCode &&
+                r.employee.employeeCode.trim().toLowerCase() === user.employeeCode.trim().toLowerCase())
+          )
+        );
       } else {
         setMyRequests(allRequests);
       }
@@ -259,6 +294,82 @@ export default function LeaveScreen() {
               </Card>
             ))
           )}
+
+          {/* =================== SMART SUBSTITUTION COVERAGE SECTION =================== */}
+          <View style={styles.substitutionSectionHeaderRow}>
+            <View>
+              <Text style={styles.sectionTitle}>Smart Faculty Substitution</Text>
+              <Text style={styles.sectionSubtitle}>
+                Department Leave Coverage & Timetable Adjustments
+              </Text>
+            </View>
+            <Badge
+              label={`${hodApprovedRequests.length} Approved`}
+              variant={hodApprovedRequests.length > 0 ? 'secondary' : 'secondary'}
+            />
+          </View>
+
+          {hodApprovedRequests.length === 0 ? (
+            <Card style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>No Approved Leaves Pending Coverage</Text>
+              <Text style={styles.emptySubtitle}>
+                When faculty leave requests are approved, affected timetable classes will appear here for smart substitute assignment.
+              </Text>
+            </Card>
+          ) : (
+            hodApprovedRequests.map((req) => {
+              const assignments = getSubstitutionAssignments({ leaveRequestId: req.id });
+
+              return (
+                <Card key={req.id} style={styles.substitutionCoverageCard}>
+                  <View style={styles.approvalHeader}>
+                    <View style={styles.applicantInfo}>
+                      <Text style={styles.applicantName}>{req.employee.name}</Text>
+                      <Text style={styles.applicantCode}>
+                        {req.employee.employeeCode} · {req.department.name}
+                      </Text>
+                    </View>
+                    <Badge
+                      label={assignments.length > 0 ? `${assignments.length} Sub Assigned` : 'Needs Review'}
+                      variant={assignments.length > 0 ? 'success' : 'warning'}
+                    />
+                  </View>
+
+                  <View style={styles.leaveDetailsBox}>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Approved Leave:</Text>
+                      <Text style={styles.detailValue}>
+                        {req.startDate} {req.startDate !== req.endDate ? `to ${req.endDate}` : ''} ({req.days} {req.days === 1 ? 'day' : 'days'})
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Type:</Text>
+                      <Text style={styles.detailValue}>{req.leaveType.name} ({req.leaveType.code})</Text>
+                    </View>
+                    <View style={styles.reasonBlock}>
+                      <Text style={styles.reasonHeading}>Approved Reason:</Text>
+                      <Text style={styles.reasonBody}>"{req.reason}"</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.substitutionActionRow}>
+                    <Button
+                      variant="primary"
+                      onPress={() =>
+                        setSubstitutionModalConfig({
+                          visible: true,
+                          request: req,
+                        })
+                      }
+                      style={styles.manageSubstitutionBtn}
+                    >
+                      {`★ Smart Substitution (${assignments.length} Assigned)`}
+                    </Button>
+                  </View>
+                </Card>
+              );
+            })
+          )}
         </View>
       ) : (
         /* =================== FACULTY / MY LEAVES VIEW =================== */
@@ -389,7 +500,7 @@ export default function LeaveScreen() {
         onSuccess={loadData}
         token={accessToken}
         currentUser={{
-          id: user?.id || 'demo-faculty-021',
+          id: user?.employeeId || user?.id || 'demo-faculty-021',
           name: user?.name || 'Prof. Asha Patil',
           employeeCode: user?.employeeCode || 'JCET-CSE-021',
           role: user?.role || 'FACULTY',
@@ -412,6 +523,26 @@ export default function LeaveScreen() {
         onSuccess={loadData}
         token={accessToken}
         deciderName={user?.name}
+      />
+
+      {/* Smart Faculty Substitution Modal */}
+      <SmartSubstitutionModal
+        visible={substitutionModalConfig.visible}
+        leaveRequest={substitutionModalConfig.request}
+        onClose={() =>
+          setSubstitutionModalConfig({
+            visible: false,
+            request: null,
+          })
+        }
+        onAssigned={() => void loadData()}
+        timetableEntries={timetableEntries}
+        currentUser={{
+          id: user?.id || 'demo-hod-001',
+          name: user?.name || 'Dr. Ramesh K (HOD)',
+          role: user?.role || 'HOD',
+          employeeCode: user?.employeeCode || 'JCET-CSE-001',
+        }}
       />
     </ScreenContainer>
   );
@@ -755,5 +886,31 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.headingFamily,
     fontSize: 11,
     color: theme.colors.error,
+  },
+  substitutionSectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  sectionSubtitle: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.typography.caption,
+    color: theme.colors.mutedForeground,
+    marginTop: 2,
+  },
+  substitutionCoverageCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.primary,
+    gap: theme.spacing.md,
+  },
+  substitutionActionRow: {
+    marginTop: theme.spacing.xs,
+  },
+  manageSubstitutionBtn: {
+    width: '100%',
   },
 });

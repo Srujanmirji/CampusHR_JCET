@@ -23,6 +23,14 @@ interface ButtonProps {
   accessibilityLabel?: string;
 }
 
+function isTextContent(content: React.ReactNode): boolean {
+  if (typeof content === 'string' || typeof content === 'number') return true;
+  if (Array.isArray(content)) {
+    return content.length > 0 && content.every((item) => isTextContent(item));
+  }
+  return false;
+}
+
 export function Button({
   children,
   onPress,
@@ -35,10 +43,18 @@ export function Button({
 }: ButtonProps) {
   const isInteractive = !disabled && !loading;
 
+  const resolvedAccessibilityLabel =
+    accessibilityLabel ||
+    (typeof children === 'string'
+      ? children
+      : Array.isArray(children) && children.every((c) => typeof c === 'string' || typeof c === 'number')
+      ? children.join('')
+      : undefined);
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel || (typeof children === 'string' ? children : undefined)}
+      accessibilityLabel={resolvedAccessibilityLabel}
       accessibilityState={{ disabled: !isInteractive, busy: loading }}
       disabled={!isInteractive}
       onPress={onPress}
@@ -56,7 +72,7 @@ export function Button({
           size="small"
           color={variant === 'outline' || variant === 'secondary' ? theme.colors.primary : theme.colors.surface}
         />
-      ) : typeof children === 'string' ? (
+      ) : isTextContent(children) ? (
         <Text
           style={[
             styles.text,

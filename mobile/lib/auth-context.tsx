@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { API_BASE_URL } from './api-config';
 
 export interface AuthUser {
   id: string;
@@ -21,7 +22,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 const DEMO_ACCOUNTS: Record<string, AuthUser> = {
   'jcet-cse-021': {
