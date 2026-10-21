@@ -23,8 +23,8 @@ Read first: `mobile/MOBILE_APP.md`, `design/MOBILE_UX.md`,
 ## 2. Login — MB-002 · start now
 
 - [ ] Login screen: employee ID or email, password (`POST /auth/login`)
-- [ ] Phones have no cookies: agree with Srujan how the app receives and
-      sends the refresh token (e.g. in the response body for mobile)
+- [ ] Agree and verify native refresh-cookie/token persistence with Srujan
+      (IOS-002); the current backend uses HttpOnly refresh cookies
 - [ ] Store tokens in `expo-secure-store`, never AsyncStorage
 - [ ] Restore the session on launch; logout clears tokens
 - [ ] Signed-out users only see the login screen
@@ -53,3 +53,7 @@ point.
 `npm run typecheck` and `lint` pass for `mobile/`; `npx expo export` builds iOS
 and Android bundles; tested on a simulator or phone; tasks ticked in
 `MOBILE_TASKS.md`; reviewed by Arihant.
+
+## iOS delivery
+
+Follow [IOS_TASKS.md](../IOS_TASKS.md): IOS-001–004 (setup/session/home), IOS-009–012 (notifications/profile/build), joint QA (IOS-013), and release with Srujan (IOS-014). Start with [the iOS guide](../../mobile/ios-docs/README.md). Keep Android working while changing shared code.

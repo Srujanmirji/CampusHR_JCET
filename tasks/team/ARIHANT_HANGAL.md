@@ -21,7 +21,7 @@ API owner: Srujan (Timetable).
 - [x] Today: classes in order with time, subject, class section and room;
       current class highlighted
 - [x] Week: day-by-day view
-- [x] Substitute duties assigned to you, marked clearly
+- [ ] Server-assigned substitute duties, dated and marked clearly (IOS-005/008); local demo exists
 - [x] Pull to refresh; works with no classes (holiday, weekend)
 - [x] Switch to the Timetable API when it lands
 
@@ -55,3 +55,7 @@ API owner: Zeeshan (Attendance).
 `npm run typecheck` and `lint` pass for `mobile/`; `npx expo export` builds iOS
 and Android bundles; tested on a simulator or phone; tasks ticked in
 `MOBILE_TASKS.md`; reviewed by Pranav.
+
+## iOS delivery
+
+Follow [IOS_TASKS.md](../IOS_TASKS.md): IOS-005–008 (timetable/attendance/leave/substitution), then joint device and accessibility QA (IOS-013). Start after the native session contract/client (IOS-002–003), using [the iOS guide](../../mobile/ios-docs/README.md).
