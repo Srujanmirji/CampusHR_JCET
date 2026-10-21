@@ -106,3 +106,61 @@ export const navigation: {
     group: 'Administration',
   },
 ];
+
+export const facultyNavigation: {
+  path: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  group: string;
+  permission?: string;
+}[] = [
+  {
+    path: '/dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    group: 'Overview',
+  },
+  {
+    path: '/timetable',
+    permission: 'timetable.read',
+    label: 'My Timetable',
+    icon: CalendarRange,
+    group: 'My Academics',
+  },
+  {
+    path: '/workload',
+    permission: 'workload.read',
+    label: 'Teaching Workload',
+    icon: ChartNoAxesCombined,
+    group: 'My Academics',
+  },
+  {
+    path: '/attendance',
+    permission: 'attendance.read',
+    label: 'My Attendance',
+    icon: CalendarCheck2,
+    group: 'My Services',
+  },
+  {
+    path: '/leave',
+    permission: 'leave.read',
+    label: 'Leave Applications',
+    icon: CalendarDays,
+    group: 'My Services',
+  },
+  {
+    path: '/documents',
+    permission: 'document.read',
+    label: 'My Documents',
+    icon: Files,
+    group: 'My Services',
+  },
+  {
+    path: '/notifications',
+    permission: 'notification.read',
+    label: 'Notifications',
+    icon: Bell,
+    group: 'Communication',
+  },
+];
+
