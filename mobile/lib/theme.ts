@@ -2,6 +2,8 @@ export const theme = {
   colors: {
     primary: '#051F5B',
     accent: '#F05023',
+    accentInk: '#B9330F',
+    errorInk: '#B91C1C',
     background: '#F5F7FA',
     foreground: '#1F2937',
     surface: '#FFFFFF',
@@ -52,4 +54,3 @@ export const theme = {
     },
   },
 };
-

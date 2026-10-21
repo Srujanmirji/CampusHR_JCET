@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +14,7 @@ import { Card } from '../../components/ui/Card';
 import { ScreenContainer } from '../../components/ui/ScreenContainer';
 import { LeaveApplyModal } from '../../components/leave/LeaveApplyModal';
 import { LeaveDecisionModal } from '../../components/leave/LeaveDecisionModal';
+import { SmartSubstitutionModal } from '../../components/substitution/SmartSubstitutionModal';
 import { useAuth } from '../../lib/auth-context';
 import {
   cancelLeaveRequest,
@@ -24,14 +25,20 @@ import {
   type LeaveRequestDto,
   type LeaveTypeDto,
 } from '../../lib/leave-api';
+import { getSubstitutionAssignments } from '../../lib/substitution-store';
+import {
+  getTimetableEntries,
+  type TimetableEntryDto,
+} from '../../lib/timetable-api';
 import { theme } from '../../lib/theme';
 
 export default function LeaveScreen() {
   const { user, accessToken } = useAuth();
+  const isDemo = !!accessToken?.startsWith('demo-');
   const isHod = user?.role === 'HOD';
 
   const [activeTab, setActiveTab] = useState<'MY_LEAVES' | 'HOD_APPROVALS'>(
-    isHod ? 'HOD_APPROVALS' : 'MY_LEAVES'
+    isHod ? 'HOD_APPROVALS' : 'MY_LEAVES',
   );
 
   const [loading, setLoading] = useState(true);
@@ -40,13 +47,30 @@ export default function LeaveScreen() {
   const [types, setTypes] = useState<LeaveTypeDto[]>([]);
   const [balances, setBalances] = useState<LeaveBalanceDto[]>([]);
   const [myRequests, setMyRequests] = useState<LeaveRequestDto[]>([]);
-  const [hodPendingRequests, setHodPendingRequests] = useState<LeaveRequestDto[]>([]);
+  const [hodPendingRequests, setHodPendingRequests] = useState<
+    LeaveRequestDto[]
+  >([]);
+  const [hodApprovedRequests, setHodApprovedRequests] = useState<
+    LeaveRequestDto[]
+  >([]);
+  const [timetableEntries, setTimetableEntries] = useState<TimetableEntryDto[]>(
+    [],
+  );
 
   // Filter state for My Requests
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<
+    'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
+  >('ALL');
 
   // Modals state
   const [showApplyModal, setShowApplyModal] = useState(false);
+  const [substitutionModalConfig, setSubstitutionModalConfig] = useState<{
+    visible: boolean;
+    request: LeaveRequestDto | null;
+  }>({
+    visible: false,
+    request: null,
+  });
   const [decisionModalConfig, setDecisionModalConfig] = useState<{
     visible: boolean;
     request: LeaveRequestDto | null;
@@ -57,39 +81,67 @@ export default function LeaveScreen() {
     mode: 'APPROVE',
   });
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [fetchedTypes, fetchedBalances, allRequests] = await Promise.all([
-        getLeaveTypes(accessToken),
-        getLeaveBalances(accessToken),
-        getLeaveRequests(accessToken),
-      ]);
+      const [fetchedTypes, fetchedBalances, allRequests, entries] =
+        await Promise.all([
+          getLeaveTypes(accessToken),
+          getLeaveBalances(accessToken, user?.employeeId || undefined),
+          getLeaveRequests(accessToken),
+          isDemo ? getTimetableEntries(accessToken) : Promise.resolve([]),
+        ]);
 
       setTypes(fetchedTypes);
       setBalances(fetchedBalances);
+      setTimetableEntries(entries);
 
       // Separate personal requests and HOD department approvals
       if (isHod) {
+        const myEmpId = user?.employeeId || user?.id;
         const pendingForHod = allRequests.filter(
-          (r) => r.status === 'PENDING' && r.pendingRole === 'HOD'
+          (r) =>
+            r.status === 'PENDING' &&
+            r.pendingRole === 'HOD' &&
+            r.employee.id !== myEmpId &&
+            r.employee.id !== user?.id,
         );
         setHodPendingRequests(pendingForHod);
-        setMyRequests(allRequests.filter((r) => r.employee.id === user?.id || r.employee.employeeCode === user?.employeeCode));
+
+        const approvedForHod = allRequests.filter(
+          (r) =>
+            r.status === 'APPROVED' && r.department.id === user?.departmentId,
+        );
+        setHodApprovedRequests(approvedForHod);
+
+        setMyRequests(
+          allRequests.filter(
+            (r) =>
+              r.employee.id === myEmpId ||
+              r.employee.id === user?.id ||
+              (!!user?.employeeCode &&
+                r.employee.employeeCode.trim().toLowerCase() ===
+                  user.employeeCode.trim().toLowerCase()),
+          ),
+        );
       } else {
         setMyRequests(allRequests);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load leave records.');
+      setError(
+        err instanceof Error ? err.message : 'Failed to load leave records.',
+      );
     } finally {
       setLoading(false);
     }
-  }
+  }, [accessToken, isDemo, isHod, user]);
 
   useEffect(() => {
+    // The initial load updates loading state before awaiting the API.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadData();
-  }, [accessToken, user?.role]);
+  }, [loadData]);
 
   async function handleCancelRequest(request: LeaveRequestDto) {
     Alert.alert(
@@ -105,11 +157,16 @@ export default function LeaveScreen() {
               await cancelLeaveRequest(accessToken, request.id);
               await loadData();
             } catch (err) {
-              Alert.alert('Error', err instanceof Error ? err.message : 'Could not cancel request.');
+              Alert.alert(
+                'Error',
+                err instanceof Error
+                  ? err.message
+                  : 'Could not cancel request.',
+              );
             }
           },
         },
-      ]
+      ],
     );
   }
 
@@ -125,11 +182,17 @@ export default function LeaveScreen() {
         <View>
           <Text style={styles.pageTitle}>Leave Management</Text>
           <Text style={styles.pageSubtitle}>
-            {isHod ? 'Department Approvals & Personal Quotas' : 'JCET Faculty Leave Portal'}
+            {isHod
+              ? 'Department Approvals & Personal Quotas'
+              : 'JCET Faculty Leave Portal'}
           </Text>
         </View>
 
-        <Pressable onPress={loadData} style={styles.refreshBtn} accessibilityLabel="Refresh leave data">
+        <Pressable
+          onPress={loadData}
+          style={styles.refreshBtn}
+          accessibilityLabel="Refresh leave data"
+        >
           <Text style={styles.refreshBtnText}>↻</Text>
         </Pressable>
       </View>
@@ -139,23 +202,41 @@ export default function LeaveScreen() {
         <View style={styles.tabSegments}>
           <Pressable
             onPress={() => setActiveTab('HOD_APPROVALS')}
-            style={[styles.segmentBtn, activeTab === 'HOD_APPROVALS' && styles.segmentBtnActive]}
+            style={[
+              styles.segmentBtn,
+              activeTab === 'HOD_APPROVALS' && styles.segmentBtnActive,
+            ]}
           >
-            <Text style={[styles.segmentText, activeTab === 'HOD_APPROVALS' && styles.segmentTextActive]}>
+            <Text
+              style={[
+                styles.segmentText,
+                activeTab === 'HOD_APPROVALS' && styles.segmentTextActive,
+              ]}
+            >
               Department Approvals
             </Text>
             {hodPendingRequests.length > 0 && (
               <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{hodPendingRequests.length}</Text>
+                <Text style={styles.countBadgeText}>
+                  {hodPendingRequests.length}
+                </Text>
               </View>
             )}
           </Pressable>
 
           <Pressable
             onPress={() => setActiveTab('MY_LEAVES')}
-            style={[styles.segmentBtn, activeTab === 'MY_LEAVES' && styles.segmentBtnActive]}
+            style={[
+              styles.segmentBtn,
+              activeTab === 'MY_LEAVES' && styles.segmentBtnActive,
+            ]}
           >
-            <Text style={[styles.segmentText, activeTab === 'MY_LEAVES' && styles.segmentTextActive]}>
+            <Text
+              style={[
+                styles.segmentText,
+                activeTab === 'MY_LEAVES' && styles.segmentTextActive,
+              ]}
+            >
               My Leave Records
             </Text>
           </Pressable>
@@ -171,13 +252,17 @@ export default function LeaveScreen() {
       {loading ? (
         <View style={styles.loaderCenter}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loaderText}>Loading leave balances and history…</Text>
+          <Text style={styles.loaderText}>
+            Loading leave balances and history…
+          </Text>
         </View>
       ) : activeTab === 'HOD_APPROVALS' ? (
         /* =================== HOD APPROVALS VIEW =================== */
         <View style={styles.tabContent}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Requests Awaiting Recommendation</Text>
+            <Text style={styles.sectionTitle}>
+              Requests Awaiting Recommendation
+            </Text>
             <Badge
               label={`${hodPendingRequests.length} Pending`}
               variant={hodPendingRequests.length > 0 ? 'warning' : 'secondary'}
@@ -188,7 +273,8 @@ export default function LeaveScreen() {
             <Card style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>All Caught Up!</Text>
               <Text style={styles.emptySubtitle}>
-                There are no pending leave requests from department faculty waiting for your decision.
+                There are no pending leave requests from department faculty
+                waiting for your decision.
               </Text>
             </Card>
           ) : (
@@ -196,7 +282,9 @@ export default function LeaveScreen() {
               <Card key={req.id} style={styles.approvalCard}>
                 <View style={styles.approvalHeader}>
                   <View style={styles.applicantInfo}>
-                    <Text style={styles.applicantName}>{req.employee.name}</Text>
+                    <Text style={styles.applicantName}>
+                      {req.employee.name}
+                    </Text>
                     <Text style={styles.applicantCode}>
                       {req.employee.employeeCode} · {req.department.code} Dept.
                     </Text>
@@ -207,12 +295,16 @@ export default function LeaveScreen() {
                 <View style={styles.leaveDetailsBox}>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Type:</Text>
-                    <Text style={styles.detailValue}>{req.leaveType.name} ({req.leaveType.code})</Text>
+                    <Text style={styles.detailValue}>
+                      {req.leaveType.name} ({req.leaveType.code})
+                    </Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Duration:</Text>
                     <Text style={styles.detailValue}>
-                      {req.startDate} {req.startDate !== req.endDate ? `to ${req.endDate}` : ''} ({req.days} {req.days === 1 ? 'day' : 'days'})
+                      {req.startDate}{' '}
+                      {req.startDate !== req.endDate ? `to ${req.endDate}` : ''}{' '}
+                      ({req.days} {req.days === 1 ? 'day' : 'days'})
                     </Text>
                   </View>
                   {req.halfDay && (
@@ -259,14 +351,124 @@ export default function LeaveScreen() {
               </Card>
             ))
           )}
+
+          {/* =================== SMART SUBSTITUTION COVERAGE SECTION =================== */}
+          <View style={styles.substitutionSectionHeaderRow}>
+            <View>
+              <Text style={styles.sectionTitle}>
+                Smart Faculty Substitution
+              </Text>
+              <Text style={styles.sectionSubtitle}>
+                Department Leave Coverage & Timetable Adjustments
+              </Text>
+            </View>
+            <Badge
+              label={`${hodApprovedRequests.length} Approved`}
+              variant={
+                hodApprovedRequests.length > 0 ? 'secondary' : 'secondary'
+              }
+            />
+          </View>
+
+          {!isDemo ? (
+            <Card>
+              <Text style={styles.emptySubtitle}>
+                Assign and review coverage on the web substitution page. The
+                mobile assignment preview is available only in demo sessions.
+              </Text>
+            </Card>
+          ) : hodApprovedRequests.length === 0 ? (
+            <Card style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>
+                No Approved Leaves Pending Coverage
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                When faculty leave requests are approved, affected timetable
+                classes will appear here for smart substitute assignment.
+              </Text>
+            </Card>
+          ) : (
+            hodApprovedRequests.map((req) => {
+              const assignments = getSubstitutionAssignments({
+                leaveRequestId: req.id,
+              });
+
+              return (
+                <Card key={req.id} style={styles.substitutionCoverageCard}>
+                  <View style={styles.approvalHeader}>
+                    <View style={styles.applicantInfo}>
+                      <Text style={styles.applicantName}>
+                        {req.employee.name}
+                      </Text>
+                      <Text style={styles.applicantCode}>
+                        {req.employee.employeeCode} · {req.department.name}
+                      </Text>
+                    </View>
+                    <Badge
+                      label={
+                        assignments.length > 0
+                          ? `${assignments.length} Sub Assigned`
+                          : 'Needs Review'
+                      }
+                      variant={assignments.length > 0 ? 'success' : 'warning'}
+                    />
+                  </View>
+
+                  <View style={styles.leaveDetailsBox}>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Approved Leave:</Text>
+                      <Text style={styles.detailValue}>
+                        {req.startDate}{' '}
+                        {req.startDate !== req.endDate
+                          ? `to ${req.endDate}`
+                          : ''}{' '}
+                        ({req.days} {req.days === 1 ? 'day' : 'days'})
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Type:</Text>
+                      <Text style={styles.detailValue}>
+                        {req.leaveType.name} ({req.leaveType.code})
+                      </Text>
+                    </View>
+                    <View style={styles.reasonBlock}>
+                      <Text style={styles.reasonHeading}>Approved Reason:</Text>
+                      <Text style={styles.reasonBody}>"{req.reason}"</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.substitutionActionRow}>
+                    <Button
+                      variant="primary"
+                      onPress={() =>
+                        setSubstitutionModalConfig({
+                          visible: true,
+                          request: req,
+                        })
+                      }
+                      style={styles.manageSubstitutionBtn}
+                    >
+                      {`★ Smart Substitution (${assignments.length} Assigned)`}
+                    </Button>
+                  </View>
+                </Card>
+              );
+            })
+          )}
         </View>
       ) : (
         /* =================== FACULTY / MY LEAVES VIEW =================== */
         <View style={styles.tabContent}>
           {/* Leave Balances Carousel / Grid */}
-          <Text style={styles.sectionTitle}>Available Leave Balances ({new Date().getFullYear()})</Text>
+          <Text style={styles.sectionTitle}>
+            Available Leave Balances ({new Date().getFullYear()})
+          </Text>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.balanceScroll}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.balanceScroll}
+          >
             {balances.map((b) => (
               <Card key={b.leaveType.id} style={styles.balanceCard}>
                 <View style={styles.balanceCardHeader}>
@@ -276,9 +478,13 @@ export default function LeaveScreen() {
                 <Text style={styles.balanceName} numberOfLines={1}>
                   {b.leaveType.name}
                 </Text>
-                <Text style={styles.balanceRemaining}>{b.remaining ?? '∞'}</Text>
+                <Text style={styles.balanceRemaining}>
+                  {b.remaining ?? '∞'}
+                </Text>
                 <Text style={styles.balanceMeta}>
-                  {b.entitled !== null ? `Entitled: ${b.entitled} · Used: ${b.used}` : 'No limit quota'}
+                  {b.entitled !== null
+                    ? `Entitled: ${b.entitled} · Used: ${b.used}`
+                    : 'No limit quota'}
                 </Text>
               </Card>
             ))}
@@ -298,17 +504,27 @@ export default function LeaveScreen() {
             <Text style={styles.sectionTitle}>My Leave Applications</Text>
             {/* Filter Tabs */}
             <View style={styles.filterPills}>
-              {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((filter) => (
-                <Pressable
-                  key={filter}
-                  onPress={() => setStatusFilter(filter)}
-                  style={[styles.filterPill, statusFilter === filter && styles.filterPillActive]}
-                >
-                  <Text style={[styles.filterPillText, statusFilter === filter && styles.filterPillTextActive]}>
-                    {filter === 'ALL' ? 'All' : filter}
-                  </Text>
-                </Pressable>
-              ))}
+              {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map(
+                (filter) => (
+                  <Pressable
+                    key={filter}
+                    onPress={() => setStatusFilter(filter)}
+                    style={[
+                      styles.filterPill,
+                      statusFilter === filter && styles.filterPillActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.filterPillText,
+                        statusFilter === filter && styles.filterPillTextActive,
+                      ]}
+                    >
+                      {filter === 'ALL' ? 'All' : filter}
+                    </Text>
+                  </Pressable>
+                ),
+              )}
             </View>
           </View>
 
@@ -327,18 +543,24 @@ export default function LeaveScreen() {
                 req.status === 'APPROVED'
                   ? 'success'
                   : req.status === 'PENDING'
-                  ? 'warning'
-                  : req.status === 'REJECTED'
-                  ? 'default'
-                  : 'secondary';
+                    ? 'warning'
+                    : req.status === 'REJECTED'
+                      ? 'default'
+                      : 'secondary';
 
               return (
                 <Card key={req.id} style={styles.requestCard}>
                   <View style={styles.requestCardHeader}>
                     <View>
-                      <Text style={styles.requestType}>{req.leaveType.name} ({req.leaveType.code})</Text>
+                      <Text style={styles.requestType}>
+                        {req.leaveType.name} ({req.leaveType.code})
+                      </Text>
                       <Text style={styles.requestDates}>
-                        {req.startDate} {req.startDate !== req.endDate ? `to ${req.endDate}` : ''} ({req.days} {req.days === 1 ? 'day' : 'days'})
+                        {req.startDate}{' '}
+                        {req.startDate !== req.endDate
+                          ? `to ${req.endDate}`
+                          : ''}{' '}
+                        ({req.days} {req.days === 1 ? 'day' : 'days'})
                       </Text>
                     </View>
                     <Badge label={req.status} variant={statusVariant} />
@@ -355,9 +577,14 @@ export default function LeaveScreen() {
                       {req.decisions.map((dec, idx) => (
                         <View key={idx} style={styles.decisionItem}>
                           <Text style={styles.decisionAuthor}>
-                            {dec.role} Decision: {dec.approved ? '✓ Approved' : '✕ Rejected'}
+                            {dec.role} Decision:{' '}
+                            {dec.approved ? '✓ Approved' : '✕ Rejected'}
                           </Text>
-                          {dec.note && <Text style={styles.decisionNote}>"{dec.note}"</Text>}
+                          {dec.note && (
+                            <Text style={styles.decisionNote}>
+                              "{dec.note}"
+                            </Text>
+                          )}
                         </View>
                       ))}
                     </View>
@@ -366,12 +593,16 @@ export default function LeaveScreen() {
                   {/* Cancel Button if Still Pending */}
                   {req.status === 'PENDING' && (
                     <View style={styles.requestFooter}>
-                      <Text style={styles.pendingHint}>Waiting for: {req.pendingRole || 'HOD'}</Text>
+                      <Text style={styles.pendingHint}>
+                        Waiting for: {req.pendingRole || 'HOD'}
+                      </Text>
                       <Pressable
                         onPress={() => handleCancelRequest(req)}
                         style={styles.cancelRequestBtn}
                       >
-                        <Text style={styles.cancelRequestText}>Cancel Request</Text>
+                        <Text style={styles.cancelRequestText}>
+                          Cancel Request
+                        </Text>
                       </Pressable>
                     </View>
                   )}
@@ -389,7 +620,7 @@ export default function LeaveScreen() {
         onSuccess={loadData}
         token={accessToken}
         currentUser={{
-          id: user?.id || 'demo-faculty-021',
+          id: user?.employeeId || user?.id || 'demo-faculty-021',
           name: user?.name || 'Prof. Asha Patil',
           employeeCode: user?.employeeCode || 'JCET-CSE-021',
           role: user?.role || 'FACULTY',
@@ -413,6 +644,28 @@ export default function LeaveScreen() {
         token={accessToken}
         deciderName={user?.name}
       />
+
+      {/* Smart Faculty Substitution Modal */}
+      {isDemo && (
+        <SmartSubstitutionModal
+          visible={substitutionModalConfig.visible}
+          leaveRequest={substitutionModalConfig.request}
+          onClose={() =>
+            setSubstitutionModalConfig({
+              visible: false,
+              request: null,
+            })
+          }
+          onAssigned={() => void loadData()}
+          timetableEntries={timetableEntries}
+          currentUser={{
+            id: user?.id || 'demo-hod-001',
+            name: user?.name || 'Dr. Ramesh K (HOD)',
+            role: user?.role || 'HOD',
+            employeeCode: user?.employeeCode || 'JCET-CSE-001',
+          }}
+        />
+      )}
     </ScreenContainer>
   );
 }
@@ -502,7 +755,7 @@ const styles = StyleSheet.create({
   errorText: {
     fontFamily: theme.typography.bodyFamily,
     fontSize: theme.typography.caption,
-    color: theme.colors.error,
+    color: theme.colors.errorInk,
   },
   loaderCenter: {
     padding: theme.spacing.xl,
@@ -745,7 +998,7 @@ const styles = StyleSheet.create({
   pendingHint: {
     fontFamily: theme.typography.bodyFamily,
     fontSize: 11,
-    color: theme.colors.accent,
+    color: theme.colors.accentInk,
   },
   cancelRequestBtn: {
     paddingHorizontal: 8,
@@ -754,6 +1007,32 @@ const styles = StyleSheet.create({
   cancelRequestText: {
     fontFamily: theme.typography.headingFamily,
     fontSize: 11,
-    color: theme.colors.error,
+    color: theme.colors.errorInk,
+  },
+  substitutionSectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  sectionSubtitle: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.typography.caption,
+    color: theme.colors.mutedForeground,
+    marginTop: 2,
+  },
+  substitutionCoverageCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.primary,
+    gap: theme.spacing.md,
+  },
+  substitutionActionRow: {
+    marginTop: theme.spacing.xs,
+  },
+  manageSubstitutionBtn: {
+    width: '100%',
   },
 });

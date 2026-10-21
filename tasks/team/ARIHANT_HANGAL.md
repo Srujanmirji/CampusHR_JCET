@@ -18,22 +18,22 @@ shape with the owner first, so the switch is small.
 
 API owner: Srujan (Timetable).
 
-- [ ] Today: classes in order with time, subject, class section and room;
+- [x] Today: classes in order with time, subject, class section and room;
       current class highlighted
-- [ ] Week: day-by-day view
-- [ ] Substitute duties assigned to you, marked clearly
-- [ ] Pull to refresh; works with no classes (holiday, weekend)
-- [ ] Switch to the Timetable API when it lands
+- [x] Week: day-by-day view
+- [x] Substitute duties assigned to you, marked clearly
+- [x] Pull to refresh; works with no classes (holiday, weekend)
+- [x] Switch to the Timetable API when it lands
 
 ## 2. Leave — MB-006 · after JCET leave rules
 
 API owner: Srujan (Leave).
 
-- [ ] Balances by leave type
-- [ ] Apply: type, dates (date pickers, minimal typing), half day if allowed,
+- [x] Balances by leave type
+- [x] Apply: type, dates (date pickers, minimal typing), half day if allowed,
       reason
-- [ ] My requests with status and the next approver
-- [ ] Cancel a pending request (with confirmation)
+- [x] My requests with status and the next approver
+- [x] Cancel a pending request (with confirmation)
 
 ## 3. Attendance — MB-005 · after JCET attendance policy
 

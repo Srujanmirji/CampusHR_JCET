@@ -37,7 +37,8 @@
     "web": "expo start --web",
     "dev": "expo start",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint app lib"
+    "lint": "eslint app lib components checks",
+    "test": "node --experimental-test-module-mocks --import tsx --test checks/*.test.mjs"
   },
   "private": true
 }

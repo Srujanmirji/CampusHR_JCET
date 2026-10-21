@@ -1,12 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Image,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -14,6 +7,9 @@ import { Input } from '../../components/ui/Input';
 import { ScreenContainer } from '../../components/ui/ScreenContainer';
 import { useAuth } from '../../lib/auth-context';
 import { theme } from '../../lib/theme';
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const jcetLogo = require('../../assets/jcet-logo.png');
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -23,7 +19,10 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<{ identifier?: string; password?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{
+    identifier?: string;
+    password?: string;
+  }>({});
   const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
@@ -48,7 +47,9 @@ export default function LoginScreen() {
       await login(identifier, password, remember);
       router.replace('/(tabs)');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred during login.');
+      setError(
+        err instanceof Error ? err.message : 'An error occurred during login.',
+      );
     } finally {
       setLoading(false);
     }
@@ -56,39 +57,61 @@ export default function LoginScreen() {
 
   return (
     <ScreenContainer contentContainerStyle={styles.container}>
-      {/* College Institutional Branding Header */}
+      {/* College Institutional Branding Header Box */}
       <View style={styles.brandingHeader}>
-        <Image
-          source={require('../../assets/jcet-logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-          accessibilityLabel="JCET institutional logo"
-        />
+        <View style={styles.logoContainer}>
+          <Image
+            source={jcetLogo}
+            style={styles.logo}
+            resizeMode="contain"
+            accessibilityLabel="JCET institutional logo"
+          />
+        </View>
         <View style={styles.institutionDetails}>
-          <Text style={styles.institutionName}>Jain College of Engineering and Technology</Text>
-          <Text style={styles.institutionLocation}>Hubballi, Karnataka · CET Code: E265</Text>
+          <Text style={styles.institutionName}>
+            Jain College of Engineering & Technology
+          </Text>
+          <View style={styles.institutionSubRow}>
+            <Text style={styles.institutionLocation}>Hubballi, Karnataka</Text>
+            <View style={styles.cetBadge}>
+              <Text style={styles.cetBadgeText}>CET: E265</Text>
+            </View>
+          </View>
         </View>
       </View>
 
-      {/* Main Login Card */}
+      {/* Main Login Card Box */}
       <Card style={styles.loginCard}>
+        {/* Product Brand Badge */}
         <View style={styles.productBadgeContainer}>
           <View style={styles.badgePill}>
+            <View style={styles.badgeDot} />
             <Text style={styles.badgeText}>
               Campus<Text style={styles.badgeAccent}>HR</Text>
             </Text>
+            <Text style={styles.badgeDivider}>·</Text>
+            <Text style={styles.badgeTag}>FACULTY PORTAL</Text>
           </View>
         </View>
 
-        <Text style={styles.cardHeading}>Welcome back</Text>
-        <Text style={styles.cardSubtitle}>Sign in to your campus workspace.</Text>
+        <View style={styles.headingBlock}>
+          <Text style={styles.cardHeading}>Welcome back</Text>
+          <Text style={styles.cardSubtitle}>
+            Sign in to your campus workspace.
+          </Text>
+        </View>
 
+        {/* Error Banner Box */}
         {error && (
           <View style={styles.errorBanner}>
+            <View style={styles.errorIconBadge}>
+              <Text style={styles.errorIconText}>!</Text>
+            </View>
             <Text style={styles.errorBannerText}>{error}</Text>
           </View>
         )}
 
+        {/* Form Input Boxes */}
         <View style={styles.formGroup}>
           <Input
             label="Employee ID or College Email"
@@ -120,12 +143,15 @@ export default function LoginScreen() {
           />
         </View>
 
+        {/* Options Row: Checkbox Box & Forgot Password Button */}
         <View style={styles.optionsRow}>
           <Pressable
             accessibilityRole="checkbox"
             accessibilityState={{ checked: remember }}
+            accessibilityLabel="Remember me on this device"
             onPress={() => setRemember(!remember)}
             style={styles.rememberOption}
+            hitSlop={6}
           >
             <View style={[styles.checkbox, remember && styles.checkboxActive]}>
               {remember && <Text style={styles.checkmark}>✓</Text>}
@@ -133,11 +159,18 @@ export default function LoginScreen() {
             <Text style={styles.rememberText}>Remember me</Text>
           </Pressable>
 
-          <Pressable onPress={() => setShowForgotModal(true)}>
+          <Pressable
+            onPress={() => setShowForgotModal(true)}
+            style={styles.forgotBtn}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Forgot password"
+          >
             <Text style={styles.forgotPasswordText}>Forgot password?</Text>
           </Pressable>
         </View>
 
+        {/* Primary Login Button Box */}
         <Button
           variant="primary"
           onPress={handleSubmit}
@@ -146,21 +179,23 @@ export default function LoginScreen() {
           fullWidth
           style={styles.loginButton}
         >
-          Login
+          <Text style={styles.loginButtonText}>Sign In</Text>
         </Button>
       </Card>
 
-      {/* Footer Info */}
+      {/* Footer Security Box */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          CampusHR · Faculty & Staff Portal
-        </Text>
+        <View style={styles.securityPill}>
+          <Text style={styles.securityPillText}>
+            Secure Institutional Gateway
+          </Text>
+        </View>
         <Text style={styles.footerSubtext}>
-          Jain College of Engineering and Technology, Hubballi
+          CampusHR · Jain College of Engineering and Technology, Hubballi
         </Text>
       </View>
 
-      {/* Forgot Password Assistance Modal */}
+      {/* Forgot Password Assistance Modal Box */}
       <Modal
         visible={showForgotModal}
         transparent
@@ -169,16 +204,39 @@ export default function LoginScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Password Assistance</Text>
-            <Text style={styles.modalBody}>
-              Please contact the HR office at JCET to reset your CampusHR account password.
-            </Text>
+            <View style={styles.modalHeaderRow}>
+              <View style={styles.modalIconBox}></View>
+              <View style={styles.modalTitleBlock}>
+                <Text style={styles.modalTitle}>Password Assistance</Text>
+                <Text style={styles.modalSubTitle}>JCET CampusHR Security</Text>
+              </View>
+            </View>
+
+            <View style={styles.modalInfoBox}>
+              <Text style={styles.modalBody}>
+                Faculty and staff accounts are centrally managed. To reset your
+                password or unlock your account, please reach out to the JCET
+                administration.
+              </Text>
+              <View style={styles.modalContactDivider} />
+              <View style={styles.modalContactRow}>
+                <Text style={styles.modalContactLabel}>HR Desk:</Text>
+                <Text style={styles.modalContactVal}>
+                  Admin Block, Ground Floor (Ext: 104)
+                </Text>
+              </View>
+              <View style={styles.modalContactRow}>
+                <Text style={styles.modalContactLabel}>Email Support:</Text>
+                <Text style={styles.modalContactVal}>hr@jcethbl.edu.in</Text>
+              </View>
+            </View>
+
             <Button
               variant="primary"
               onPress={() => setShowForgotModal(false)}
               style={styles.modalButton}
             >
-              Close
+              <Text style={styles.modalBtnText}>Got it, Close</Text>
             </Button>
           </View>
         </View>
@@ -190,102 +248,208 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
-    gap: theme.spacing.section,
+    gap: 18,
     paddingVertical: theme.spacing.xl,
+    paddingHorizontal: 4,
   },
+
+  /* Institutional Header Box */
   brandingHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.section,
-    paddingHorizontal: theme.spacing.xs,
-    marginBottom: theme.spacing.xs,
+    gap: 14,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  logoContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 4,
   },
   logo: {
-    width: 54,
-    height: 54,
+    width: 38,
+    height: 38,
   },
   institutionDetails: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
   institutionName: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.body,
+    fontSize: 14.5,
     color: theme.colors.primary,
-    lineHeight: 20,
+    lineHeight: 19,
+    letterSpacing: -0.2,
+  },
+  institutionSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   institutionLocation: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
+    fontSize: 12,
     color: theme.colors.mutedForeground,
   },
+  cetBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  cetBadgeText: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: 10.5,
+    color: theme.colors.primary,
+  },
+
+  /* Main Login Card Box */
   loginCard: {
-    padding: theme.spacing.page,
-    gap: theme.spacing.section,
+    backgroundColor: theme.colors.surface,
+    padding: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 18,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 4,
   },
   productBadgeContainer: {
     alignSelf: 'flex-start',
   },
   badgePill: {
-    backgroundColor: theme.colors.muted,
-    paddingHorizontal: theme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F0F4FF',
+    paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: '#D0DCFF',
+  },
+  badgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
   },
   badgeText: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.label,
+    fontSize: 13,
     color: theme.colors.primary,
   },
   badgeAccent: {
-    color: theme.colors.accent,
+    color: theme.colors.accentInk,
+  },
+  badgeDivider: {
+    color: '#94A3B8',
+    fontSize: 12,
+  },
+  badgeTag: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: 10.5,
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  headingBlock: {
+    gap: 4,
   },
   cardHeading: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.heading,
+    fontSize: 25,
     color: theme.colors.primary,
+    letterSpacing: -0.4,
   },
   cardSubtitle: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.body,
+    fontSize: 14,
     color: theme.colors.mutedForeground,
-    marginTop: -8,
-  },
-  errorBanner: {
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.control,
-  },
-  errorBannerText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.error,
     lineHeight: 20,
   },
-  formGroup: {
-    gap: theme.spacing.section,
+
+  /* Error Banner Box */
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderLeftWidth: 4,
+    borderLeftColor: '#EF4444',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
+  errorIconBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorIconText: {
+    color: theme.colors.surface,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  errorBannerText: {
+    flex: 1,
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: 13,
+    color: '#991B1B',
+    lineHeight: 18,
+  },
+
+  /* Form Inputs Container */
+  formGroup: {
+    gap: 16,
+  },
+
+  /* Options Row: Checkbox & Forgot Password */
   optionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 2,
   },
   rememberOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.sm,
+    gap: 8,
+    minHeight: 44,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
+    width: 21,
+    height: 21,
+    borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: theme.colors.input,
+    borderColor: '#CBD5E1',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.surface,
+    backgroundColor: '#F8FAFC',
   },
   checkboxActive: {
     backgroundColor: theme.colors.primary,
@@ -298,62 +462,168 @@ const styles = StyleSheet.create({
   },
   rememberText: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.foreground,
+    fontSize: 13.5,
+    color: '#334155',
+  },
+  forgotBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
   },
   forgotPasswordText: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.accent,
+    fontSize: 13.5,
+    color: theme.colors.accentInk,
   },
+
+  /* Primary Login Button Box */
   loginButton: {
-    marginTop: theme.spacing.xs,
+    minHeight: 52,
+    borderRadius: 12,
+    backgroundColor: theme.colors.primary,
+    marginTop: 6,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 4,
   },
+  loginButtonText: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: 16,
+    color: theme.colors.surface,
+    letterSpacing: 0.3,
+  },
+
+  /* Footer Security Box */
   footer: {
     alignItems: 'center',
-    gap: 4,
-    marginTop: theme.spacing.md,
+    gap: 6,
+    marginTop: 8,
   },
-  footerText: {
+  securityPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  securityPillIcon: {
+    fontSize: 11,
+  },
+  securityPillText: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.mutedForeground,
+    fontSize: 11.5,
+    color: '#475569',
   },
   footerSubtext: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.input,
+    fontSize: 11.5,
+    color: '#94A3B8',
     textAlign: 'center',
   },
+
+  /* Password Assistance Modal Box */
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(5, 31, 91, 0.45)',
+    backgroundColor: 'rgba(5, 31, 91, 0.55)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: theme.spacing.page,
+    padding: 20,
   },
   modalCard: {
     width: '100%',
+    maxWidth: 380,
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.modal,
-    padding: theme.spacing.page,
-    gap: theme.spacing.section,
+    borderRadius: 20,
+    padding: 22,
+    gap: 16,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: '#E2E8F0',
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  modalIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalIconText: {
+    fontSize: 20,
+  },
+  modalTitleBlock: {
+    flex: 1,
+    gap: 2,
   },
   modalTitle: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.subheading,
+    fontSize: 18,
     color: theme.colors.primary,
+  },
+  modalSubTitle: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: 12,
+    color: theme.colors.mutedForeground,
+  },
+  modalInfoBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    gap: 8,
   },
   modalBody: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.body,
-    color: theme.colors.foreground,
-    lineHeight: 22,
+    fontSize: 13,
+    color: '#334155',
+    lineHeight: 19,
+  },
+  modalContactDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 4,
+  },
+  modalContactRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalContactLabel: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: 12,
+    color: '#64748B',
+  },
+  modalContactVal: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: 12,
+    color: theme.colors.primary,
   },
   modalButton: {
-    alignSelf: 'flex-end',
-    minWidth: 100,
+    minHeight: 46,
+    borderRadius: 10,
+    backgroundColor: theme.colors.primary,
+  },
+  modalBtnText: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: 14.5,
+    color: theme.colors.surface,
   },
 });

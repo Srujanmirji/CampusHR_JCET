@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import {
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -7,6 +8,7 @@ import {
   View,
   type KeyboardTypeOptions,
   type StyleProp,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 import { theme } from '../../lib/theme';
@@ -40,21 +42,28 @@ export function Input({
   style,
   helperText,
 }: InputProps) {
+  const labelId = useId();
   const [showPassword, setShowPassword] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
   return (
     <View style={[styles.container, style]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && (
+        <Text nativeID={labelId} style={styles.label}>
+          {label}
+        </Text>
+      )}
       <View
         style={[
           styles.inputWrapper,
           isFocused && styles.inputWrapperFocused,
-          Boolean(error) && styles.inputWrapperError,
+          error ? styles.inputWrapperError : null,
           disabled && styles.inputWrapperDisabled,
         ]}
       >
         <TextInput
+          accessibilityLabel={label}
+          aria-labelledby={label ? labelId : undefined}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
@@ -64,6 +73,7 @@ export function Input({
           autoCapitalize={autoCapitalize}
           autoCorrect={autoCorrect}
           editable={!disabled}
+          underlineColorAndroid="transparent"
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           style={styles.input}
@@ -71,15 +81,18 @@ export function Input({
         {isPassword && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+            accessibilityLabel={
+              showPassword ? 'Hide password' : 'Show password'
+            }
             onPress={() => setShowPassword((prev) => !prev)}
             style={styles.eyeButton}
+            hitSlop={8}
           >
             <Text style={styles.eyeText}>{showPassword ? 'Hide' : 'Show'}</Text>
           </Pressable>
         )}
       </View>
-      {Boolean(error) ? (
+      {error ? (
         <Text style={styles.errorText}>{error}</Text>
       ) : helperText ? (
         <Text style={styles.helperText}>{helperText}</Text>
@@ -91,29 +104,37 @@ export function Input({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    gap: theme.spacing.xs,
+    gap: 6,
   },
   label: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.foreground,
+    fontSize: 13,
+    color: '#334155',
     marginBottom: 2,
+    letterSpacing: 0.2,
   },
   inputWrapper: {
-    minHeight: theme.sizes.tapTarget,
+    minHeight: 50,
     borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.control,
-    backgroundColor: theme.colors.surface,
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.section,
+    paddingHorizontal: 14,
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineWidth: 0,
+        } as unknown as ViewStyle)
+      : {}),
   },
   inputWrapperFocused: {
     borderColor: theme.colors.primary,
+    backgroundColor: '#FFFFFF',
   },
   inputWrapperError: {
     borderColor: theme.colors.error,
+    backgroundColor: '#FEF2F2',
   },
   inputWrapperDisabled: {
     backgroundColor: theme.colors.muted,
@@ -122,30 +143,35 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.body,
+    fontSize: 15,
     color: theme.colors.foreground,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineWidth: 0,
+        } as unknown as TextStyle)
+      : {}),
   },
   eyeButton: {
-    paddingHorizontal: theme.spacing.sm,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: theme.colors.muted,
+    borderRadius: 8,
+    backgroundColor: '#EEF2FF',
   },
   eyeText: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.caption,
+    fontSize: 12,
     color: theme.colors.primary,
   },
   errorText: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.error,
+    fontSize: 12,
+    color: theme.colors.errorInk,
     marginTop: 2,
   },
   helperText: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
+    fontSize: 12,
     color: theme.colors.mutedForeground,
     marginTop: 2,
   },

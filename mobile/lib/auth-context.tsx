@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useState } from 'react';
+import { API_BASE_URL } from './api-config';
 
 export interface AuthUser {
   id: string;
@@ -15,20 +16,27 @@ interface AuthContextType {
   status: 'loading' | 'signedIn' | 'signedOut';
   user: AuthUser | null;
   accessToken: string | null;
-  login: (identifier: string, password: string, remember?: boolean) => Promise<void>;
+  login: (
+    identifier: string,
+    password: string,
+    remember?: boolean,
+  ) => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 const DEMO_ACCOUNTS: Record<string, AuthUser> = {
   'jcet-cse-021': {
     id: 'demo-faculty-021',
     email: 'asha.patil@jcethbl.edu.in',
     role: 'FACULTY',
-    permissions: ['timetable.read', 'leave.apply', 'leave.read', 'attendance.check_in'],
+    permissions: [
+      'timetable.read',
+      'leave.apply',
+      'leave.read',
+      'attendance.check_in',
+    ],
     employeeId: 'JCET-CSE-021',
     departmentId: 1,
     employeeCode: 'JCET-CSE-021',
@@ -38,7 +46,12 @@ const DEMO_ACCOUNTS: Record<string, AuthUser> = {
     id: 'demo-faculty-021',
     email: 'asha.patil@jcethbl.edu.in',
     role: 'FACULTY',
-    permissions: ['timetable.read', 'leave.apply', 'leave.read', 'attendance.check_in'],
+    permissions: [
+      'timetable.read',
+      'leave.apply',
+      'leave.read',
+      'attendance.check_in',
+    ],
     employeeId: 'JCET-CSE-021',
     departmentId: 1,
     employeeCode: 'JCET-CSE-021',
@@ -48,7 +61,14 @@ const DEMO_ACCOUNTS: Record<string, AuthUser> = {
     id: 'demo-hod-001',
     email: 'hod.cse@jcethbl.edu.in',
     role: 'HOD',
-    permissions: ['timetable.read', 'timetable.manage', 'leave.apply', 'leave.read', 'leave.approve.department', 'attendance.read'],
+    permissions: [
+      'timetable.read',
+      'timetable.manage',
+      'leave.apply',
+      'leave.read',
+      'leave.approve.department',
+      'attendance.read',
+    ],
     employeeId: 'JCET-CSE-001',
     departmentId: 1,
     employeeCode: 'JCET-CSE-001',
@@ -57,16 +77,17 @@ const DEMO_ACCOUNTS: Record<string, AuthUser> = {
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [status, setStatus] = useState<'loading' | 'signedIn' | 'signedOut'>('loading');
+  const [status, setStatus] = useState<'loading' | 'signedIn' | 'signedOut'>(
+    'signedOut',
+  );
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Initial startup check
-    setStatus('signedOut');
-  }, []);
-
-  async function login(identifier: string, password: string, remember: boolean = false) {
+  async function login(
+    identifier: string,
+    password: string,
+    remember: boolean = false,
+  ) {
     const trimmedId = identifier.trim().toLowerCase();
 
     // Check development demo credentials first for seamless UI testing
@@ -101,13 +122,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           (response.status === 401
             ? 'Invalid employee ID, email, or password.'
             : response.status === 429
-            ? 'Too many login attempts. Please wait 15 minutes.'
-            : 'Unable to connect to the authentication server.');
+              ? 'Too many login attempts. Please wait 15 minutes.'
+              : 'Unable to connect to the authentication server.');
         throw new Error(errorMessage);
       }
 
       if (!data?.accessToken) {
-        throw new Error('Authentication succeeded but no access token was returned.');
+        throw new Error(
+          'Authentication succeeded but no access token was returned.',
+        );
       }
 
       const rawUser = data.user || {};
@@ -118,28 +141,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         permissions: rawUser.permissions || [],
         employeeId: rawUser.employeeId || null,
         departmentId: rawUser.departmentId || null,
-        employeeCode: rawUser.employeeCode || (identifier.includes('@') ? undefined : identifier),
-        name: rawUser.name || (rawUser.email ? rawUser.email.split('@')[0] : 'Faculty Member'),
+        employeeCode:
+          rawUser.employeeCode ||
+          (identifier.includes('@') ? undefined : identifier),
+        name:
+          rawUser.name ||
+          (rawUser.email ? rawUser.email.split('@')[0] : 'Faculty Member'),
       };
 
       setAccessToken(data.accessToken);
       setUser(authenticatedUser);
       setStatus('signedIn');
     } catch (error) {
-      // If backend is unreachable but user entered demo credentials with any password, allow dev testing
-      if (demoUser) {
-        setAccessToken('demo-jwt-token-jcet');
-        setUser(demoUser);
-        setStatus('signedIn');
-        return;
-      }
-
       if (
         (error instanceof TypeError && error.message.includes('fetch')) ||
-        (error instanceof Error && error.message.includes('Network request failed'))
+        (error instanceof Error &&
+          error.message.includes('Network request failed'))
       ) {
         throw new Error(
-          `Backend server is offline at ${API_BASE_URL}.\nTo test in Development Mode, use:\nID: JCET-CSE-021\nPassword: campus123`
+          `Backend server is offline at ${API_BASE_URL}.\nTo test in Development Mode, use:\nID: JCET-CSE-021\nPassword: campus123`,
+          { cause: error },
         );
       }
       throw error;

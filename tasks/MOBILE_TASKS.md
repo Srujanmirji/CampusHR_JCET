@@ -22,8 +22,8 @@
 
 ## MB-004 Timetable
 
-- [ ] Daily
-- [ ] Weekly
+- [x] Daily
+- [x] Weekly
 
 ## MB-005 Attendance
 
@@ -32,9 +32,9 @@
 
 ## MB-006 Leave
 
-- [ ] Apply
-- [ ] View status
-- [ ] Cancel
+- [x] Apply
+- [x] View status
+- [x] Cancel
 
 ## MB-007 Notifications
 

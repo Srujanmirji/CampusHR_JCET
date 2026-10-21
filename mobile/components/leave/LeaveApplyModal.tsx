@@ -10,10 +10,7 @@ import {
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
-import {
-  applyForLeave,
-  type LeaveTypeDto,
-} from '../../lib/leave-api';
+import { applyForLeave, type LeaveTypeDto } from '../../lib/leave-api';
 import { theme } from '../../lib/theme';
 
 interface LeaveApplyModalProps {
@@ -21,7 +18,12 @@ interface LeaveApplyModalProps {
   onClose: () => void;
   onSuccess: () => void;
   token: string | null;
-  currentUser: { id: string; name?: string; employeeCode?: string; role: string };
+  currentUser: {
+    id: string;
+    name?: string;
+    employeeCode?: string;
+    role: string;
+  };
   leaveTypes: LeaveTypeDto[];
 }
 
@@ -34,18 +36,25 @@ export function LeaveApplyModal({
   leaveTypes,
 }: LeaveApplyModalProps) {
   const today = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const [tomorrow] = useState(() =>
+    new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+  );
 
-  const [selectedTypeId, setSelectedTypeId] = useState<number>(leaveTypes[0]?.id || 1);
+  const [selectedTypeId, setSelectedTypeId] = useState<number>(
+    leaveTypes[0]?.id || 1,
+  );
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [isHalfDay, setIsHalfDay] = useState(false);
-  const [halfDaySession, setHalfDaySession] = useState<'FIRST' | 'SECOND'>('FIRST');
+  const [halfDaySession, setHalfDaySession] = useState<'FIRST' | 'SECOND'>(
+    'FIRST',
+  );
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedType = leaveTypes.find((t) => t.id === selectedTypeId) || leaveTypes[0];
+  const selectedType =
+    leaveTypes.find((t) => t.id === selectedTypeId) || leaveTypes[0];
 
   function validate(): boolean {
     setError(null);
@@ -85,7 +94,7 @@ export function LeaveApplyModal({
           halfDay: isHalfDay ? halfDaySession : null,
           reason: reason.trim(),
         },
-        currentUser
+        currentUser,
       );
       // Reset form
       setReason('');
@@ -93,21 +102,33 @@ export function LeaveApplyModal({
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit leave request.');
+      setError(
+        err instanceof Error ? err.message : 'Failed to submit leave request.',
+      );
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
       <View style={styles.overlay}>
         <View style={styles.modalSheet}>
-          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.headerRow}>
               <View>
                 <Text style={styles.modalTitle}>Apply for Leave</Text>
-                <Text style={styles.modalSubtitle}>Submit request for HOD academic approval</Text>
+                <Text style={styles.modalSubtitle}>
+                  Submit request for HOD academic approval
+                </Text>
               </View>
               <Pressable onPress={onClose} style={styles.closeBtn}>
                 <Text style={styles.closeBtnText}>✕</Text>
@@ -130,12 +151,26 @@ export function LeaveApplyModal({
                     <Pressable
                       key={type.id}
                       onPress={() => setSelectedTypeId(type.id)}
-                      style={[styles.typeChip, isSelected && styles.typeChipSelected]}
+                      style={[
+                        styles.typeChip,
+                        isSelected && styles.typeChipSelected,
+                      ]}
                     >
-                      <Text style={[styles.typeChipText, isSelected && styles.typeChipTextSelected]}>
+                      <Text
+                        style={[
+                          styles.typeChipText,
+                          isSelected && styles.typeChipTextSelected,
+                        ]}
+                      >
                         {type.code}
                       </Text>
-                      <Text style={[styles.typeChipName, isSelected && styles.typeChipNameSelected]} numberOfLines={1}>
+                      <Text
+                        style={[
+                          styles.typeChipName,
+                          isSelected && styles.typeChipNameSelected,
+                        ]}
+                        numberOfLines={1}
+                      >
                         {type.name}
                       </Text>
                     </Pressable>
@@ -194,27 +229,52 @@ export function LeaveApplyModal({
                   onPress={() => setIsHalfDay(!isHalfDay)}
                   style={styles.halfDayCheckboxRow}
                 >
-                  <View style={[styles.checkbox, isHalfDay && styles.checkboxActive]}>
+                  <View
+                    style={[
+                      styles.checkbox,
+                      isHalfDay && styles.checkboxActive,
+                    ]}
+                  >
                     {isHalfDay && <Text style={styles.checkmark}>✓</Text>}
                   </View>
-                  <Text style={styles.halfDayLabel}>Apply as Half-Day Leave</Text>
+                  <Text style={styles.halfDayLabel}>
+                    Apply as Half-Day Leave
+                  </Text>
                 </Pressable>
 
                 {isHalfDay && (
                   <View style={styles.sessionToggleRow}>
                     <Pressable
                       onPress={() => setHalfDaySession('FIRST')}
-                      style={[styles.sessionBtn, halfDaySession === 'FIRST' && styles.sessionBtnActive]}
+                      style={[
+                        styles.sessionBtn,
+                        halfDaySession === 'FIRST' && styles.sessionBtnActive,
+                      ]}
                     >
-                      <Text style={[styles.sessionText, halfDaySession === 'FIRST' && styles.sessionTextActive]}>
+                      <Text
+                        style={[
+                          styles.sessionText,
+                          halfDaySession === 'FIRST' &&
+                            styles.sessionTextActive,
+                        ]}
+                      >
                         Morning Session (First)
                       </Text>
                     </Pressable>
                     <Pressable
                       onPress={() => setHalfDaySession('SECOND')}
-                      style={[styles.sessionBtn, halfDaySession === 'SECOND' && styles.sessionBtnActive]}
+                      style={[
+                        styles.sessionBtn,
+                        halfDaySession === 'SECOND' && styles.sessionBtnActive,
+                      ]}
                     >
-                      <Text style={[styles.sessionText, halfDaySession === 'SECOND' && styles.sessionTextActive]}>
+                      <Text
+                        style={[
+                          styles.sessionText,
+                          halfDaySession === 'SECOND' &&
+                            styles.sessionTextActive,
+                        ]}
+                      >
                         Afternoon Session (Second)
                       </Text>
                     </Pressable>
@@ -234,7 +294,11 @@ export function LeaveApplyModal({
 
             {/* Actions */}
             <View style={styles.actionsRow}>
-              <Button variant="outline" onPress={onClose} style={styles.cancelBtn}>
+              <Button
+                variant="outline"
+                onPress={onClose}
+                style={styles.cancelBtn}
+              >
                 Cancel
               </Button>
               <Button

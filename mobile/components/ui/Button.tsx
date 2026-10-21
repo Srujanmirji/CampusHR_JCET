@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { theme } from '../../lib/theme';
 
-export type ButtonVariant = 'primary' | 'accent' | 'outline' | 'secondary' | 'danger';
+export type ButtonVariant =
+  'primary' | 'accent' | 'outline' | 'secondary' | 'danger';
 
 interface ButtonProps {
   children: React.ReactNode;
@@ -21,6 +22,14 @@ interface ButtonProps {
   style?: StyleProp<ViewStyle>;
   fullWidth?: boolean;
   accessibilityLabel?: string;
+}
+
+function isTextContent(content: React.ReactNode): boolean {
+  if (typeof content === 'string' || typeof content === 'number') return true;
+  if (Array.isArray(content)) {
+    return content.length > 0 && content.every((item) => isTextContent(item));
+  }
+  return false;
 }
 
 export function Button({
@@ -35,10 +44,19 @@ export function Button({
 }: ButtonProps) {
   const isInteractive = !disabled && !loading;
 
+  const resolvedAccessibilityLabel =
+    accessibilityLabel ||
+    (typeof children === 'string'
+      ? children
+      : Array.isArray(children) &&
+          children.every((c) => typeof c === 'string' || typeof c === 'number')
+        ? children.join('')
+        : undefined);
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel || (typeof children === 'string' ? children : undefined)}
+      accessibilityLabel={resolvedAccessibilityLabel}
       accessibilityState={{ disabled: !isInteractive, busy: loading }}
       disabled={!isInteractive}
       onPress={onPress}
@@ -54,9 +72,13 @@ export function Button({
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'outline' || variant === 'secondary' ? theme.colors.primary : theme.colors.surface}
+          color={
+            variant === 'outline' || variant === 'secondary'
+              ? theme.colors.primary
+              : theme.colors.surface
+          }
         />
-      ) : typeof children === 'string' ? (
+      ) : isTextContent(children) ? (
         <Text
           style={[
             styles.text,
@@ -90,7 +112,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
   },
   accent: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.accentInk,
   },
   outline: {
     backgroundColor: theme.colors.surface,
@@ -101,7 +123,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.muted,
   },
   danger: {
-    backgroundColor: theme.colors.error,
+    backgroundColor: theme.colors.errorInk,
   },
   pressed: {
     opacity: 0.85,
