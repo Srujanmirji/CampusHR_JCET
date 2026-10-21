@@ -32,6 +32,9 @@ import { createNotificationRepository } from './modules/notifications/notificati
 import type { Realtime } from './modules/notifications/notifications.realtime.js';
 import { createNotificationRouter } from './modules/notifications/notifications.routes.js';
 import { createNotificationService } from './modules/notifications/notifications.service.js';
+import { createReportsRepository } from './modules/reports/reports.repository.js';
+import { createReportsRouter } from './modules/reports/reports.routes.js';
+import { createReportsService } from './modules/reports/reports.service.js';
 import { createSubstitutionRepository } from './modules/substitution/substitution.repository.js';
 import { createSubstitutionRouter } from './modules/substitution/substitution.routes.js';
 import { createSubstitutionService } from './modules/substitution/substitution.service.js';
@@ -129,6 +132,10 @@ export function createApp(
   app.use(
     '/api/v1/notifications',
     createNotificationRouter(auth, notifications),
+  );
+  app.use(
+    '/api/v1/reports',
+    createReportsRouter(auth, createReportsService(createReportsRepository(prisma))),
   );
   app.use(
     '/api/v1/substitution',
