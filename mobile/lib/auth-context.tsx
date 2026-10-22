@@ -57,6 +57,36 @@ const DEMO_ACCOUNTS: Record<string, AuthUser> = {
     employeeCode: 'JCET-CSE-021',
     name: 'Prof. Asha Patil',
   },
+  'zeeshan.faculty@jcethbl.edu.in': {
+    id: 'demo-faculty-001',
+    email: 'zeeshan.faculty@jcethbl.edu.in',
+    role: 'FACULTY',
+    permissions: [
+      'timetable.read',
+      'leave.apply',
+      'leave.read',
+      'attendance.check_in',
+    ],
+    employeeId: 'JCET-CSE-001',
+    departmentId: 1,
+    employeeCode: 'JCET-CSE-001',
+    name: 'Zeeshan Madras',
+  },
+  'jcet-cse-001': {
+    id: 'demo-faculty-001',
+    email: 'zeeshan.faculty@jcethbl.edu.in',
+    role: 'FACULTY',
+    permissions: [
+      'timetable.read',
+      'leave.apply',
+      'leave.read',
+      'attendance.check_in',
+    ],
+    employeeId: 'JCET-CSE-001',
+    departmentId: 1,
+    employeeCode: 'JCET-CSE-001',
+    name: 'Zeeshan Madras',
+  },
   'hod.cse@jcethbl.edu.in': {
     id: 'demo-hod-001',
     email: 'hod.cse@jcethbl.edu.in',
@@ -69,10 +99,107 @@ const DEMO_ACCOUNTS: Record<string, AuthUser> = {
       'leave.approve.department',
       'attendance.read',
     ],
-    employeeId: 'JCET-CSE-001',
+    employeeId: 'JCET-CSE-002',
     departmentId: 1,
-    employeeCode: 'JCET-CSE-001',
-    name: 'Dr. Ramesh K',
+    employeeCode: 'JCET-CSE-002',
+    name: 'Rajesh Kulkarni',
+  },
+  'jcet-cse-002': {
+    id: 'demo-hod-001',
+    email: 'hod.cse@jcethbl.edu.in',
+    role: 'HOD',
+    permissions: [
+      'timetable.read',
+      'timetable.manage',
+      'leave.apply',
+      'leave.read',
+      'leave.approve.department',
+      'attendance.read',
+    ],
+    employeeId: 'JCET-CSE-002',
+    departmentId: 1,
+    employeeCode: 'JCET-CSE-002',
+    name: 'Rajesh Kulkarni',
+  },
+  'principal@jcethbl.edu.in': {
+    id: 'demo-principal-001',
+    email: 'principal@jcethbl.edu.in',
+    role: 'PRINCIPAL',
+    permissions: [
+      'attendance.read',
+      'leave.read',
+      'reports.view',
+      'announcements.manage',
+    ],
+    employeeId: 'JCET-ADM-001',
+    departmentId: 1,
+    employeeCode: 'JCET-ADM-001',
+    name: 'Dr. Suresh Patil',
+  },
+  'hr@jcethbl.edu.in': {
+    id: 'demo-hr-001',
+    email: 'hr@jcethbl.edu.in',
+    role: 'HR_ADMIN',
+    permissions: [
+      'attendance.read',
+      'leave.approve.all',
+      'employees.manage',
+      'reports.view',
+    ],
+    employeeId: 'JCET-ADM-002',
+    departmentId: 1,
+    employeeCode: 'JCET-ADM-002',
+    name: 'Ananya Deshmukh',
+  },
+  'lab.cse@jcethbl.edu.in': {
+    id: 'demo-lab-004',
+    email: 'lab.cse@jcethbl.edu.in',
+    role: 'NON_TEACHING',
+    permissions: [
+      'attendance.check_in',
+      'leave.apply',
+      'leave.read',
+      'documents.read',
+    ],
+    employeeId: 'JCET-CSE-004',
+    departmentId: 1,
+    employeeCode: 'JCET-CSE-004',
+    name: 'Ramesh Kumar',
+  },
+  'jcet-cse-004': {
+    id: 'demo-lab-004',
+    email: 'lab.cse@jcethbl.edu.in',
+    role: 'NON_TEACHING',
+    permissions: [
+      'attendance.check_in',
+      'leave.apply',
+      'leave.read',
+      'documents.read',
+    ],
+    employeeId: 'JCET-CSE-004',
+    departmentId: 1,
+    employeeCode: 'JCET-CSE-004',
+    name: 'Ramesh Kumar',
+  },
+  'zeeshan@jcethbl.edu.in': {
+    id: 'demo-superadmin-001',
+    email: 'zeeshan@jcethbl.edu.in',
+    role: 'SUPER_ADMIN',
+    permissions: ['*'],
+    employeeId: 'JCET-SYS-001',
+    departmentId: 1,
+    employeeCode: 'JCET-SYS-001',
+    name: 'Zeeshan (IT Sys)',
+  },
+  'srujanmirji@jcethbl.edu.in': {
+    id: 'demo-superadmin-002',
+    email: 'srujanmirji@jcethbl.edu.in',
+    role: 'SUPER_ADMIN',
+    permissions: ['*'],
+    employeeId: 'JCET-DIR-001',
+    departmentId: 1,
+    employeeCode: 'JCET-DIR-001',
+    name: 'Srujan Mirji',
   },
 };
 
@@ -92,7 +219,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Check development demo credentials first for seamless UI testing
     const demoUser = DEMO_ACCOUNTS[trimmedId];
-    if (demoUser && password === 'campus123') {
+    if (
+      demoUser &&
+      (password === 'campus123' ||
+        password === 'CampusHR@2026' ||
+        password === 'Srujan1@' ||
+        password === 'Password123!')
+    ) {
       setAccessToken('demo-jwt-token-jcet');
       setUser(demoUser);
       setStatus('signedIn');

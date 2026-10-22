@@ -6,6 +6,7 @@ import {
   facultyNavigation,
   hodNavigation,
   principalNavigation,
+  nonTeachingNavigation,
 } from '@/data/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,13 +37,16 @@ export function Sidebar({
   const isFaculty = userRole === 'Faculty';
   const isHod = userRole === 'HOD';
   const isPrincipal = userRole === 'Principal';
+  const isNonTeaching = userRole === 'Non-Teaching Staff';
   const baseNav = isFaculty
     ? facultyNavigation
     : isHod
       ? hodNavigation
       : isPrincipal
         ? principalNavigation
-        : navigation;
+        : isNonTeaching
+          ? nonTeachingNavigation
+          : navigation;
   const items = baseNav.filter((item) => can(item.permission));
   const pending = useLeaveWaiting().data?.length ?? 0;
   const groups = isFaculty
@@ -56,7 +60,9 @@ export function Sidebar({
             'Institutional People',
             'Executive & Reports',
           ]
-        : ['Overview', 'People & academics', 'Administration'];
+        : isNonTeaching
+          ? ['Overview', 'My Services & Duties', 'Communication']
+          : ['Overview', 'People & academics', 'Administration'];
 
   return (
     <div className="sidebar-content" data-collapsed={collapsed}>
