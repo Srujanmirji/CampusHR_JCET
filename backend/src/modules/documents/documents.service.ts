@@ -13,6 +13,7 @@ import type {
   ReviewDocumentInput,
   UploadDocumentInput,
 } from './documents.schema.js';
+import 'multer';
 
 export interface DocumentsService {
   uploadDocument(

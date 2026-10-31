@@ -49,7 +49,11 @@ async function run(url: string, first: [string, string[]]) {
       ],
     ] as const,
   ]) {
-    const child = spawn(command, args, { env, stdio: 'inherit' });
+    const child = spawn(command, args, {
+      env,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
     const [status] = (await once(child, 'exit')) as [number | null];
     if (status !== 0) return status ?? 1;
   }

@@ -25,24 +25,28 @@ class FakeSocket {
 mock.module('../lib/api-config.ts', {
   exports: { API_BASE_URL: 'https://api.test/api/v1' },
 });
+const fakeIo = (url, options) => {
+  const socket = new FakeSocket();
+  connections.push({ url, options, socket });
+  return socket;
+};
+fakeIo.io = fakeIo;
+fakeIo.default = fakeIo;
 mock.module('socket.io-client', {
-  exports: {
-    io: (url, options) => {
-      const socket = new FakeSocket();
-      connections.push({ url, options, socket });
-      return socket;
-    },
-  },
+  exports: { io: fakeIo, default: fakeIo },
 });
-mock.module(createRequire(import.meta.url).resolve('socket.io-client'), {
-  exports: {
-    io: (url, options) => {
-      const socket = new FakeSocket();
-      connections.push({ url, options, socket });
-      return socket;
-    },
-  },
-});
+const req = createRequire(import.meta.url);
+try {
+  const resolved = req.resolve('socket.io-client');
+  req.cache[resolved] = {
+    id: resolved,
+    filename: resolved,
+    loaded: true,
+    exports: fakeIo,
+  };
+} catch (error) {
+  void error;
+}
 mock.module('../lib/session.ts', {
   exports: {
     apiFetch: () => {},

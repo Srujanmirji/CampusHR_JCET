@@ -16,6 +16,7 @@ import type {
   DocumentsRepository,
 } from '../src/modules/documents/documents.repository.js';
 import { createDocumentsService } from '../src/modules/documents/documents.service.js';
+import 'multer';
 
 function createMemoryDocumentsRepository(): DocumentsRepository {
   const docs: DocumentWithRelations[] = [];
