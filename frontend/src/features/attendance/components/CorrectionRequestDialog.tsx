@@ -20,7 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { requestAttendanceCorrection, type AttendanceStatusKey } from '../api/attendance';
+import {
+  requestAttendanceCorrection,
+  type AttendanceStatusKey,
+} from '../api/attendance';
 
 export function CorrectionRequestDialog({
   open,
@@ -32,7 +35,9 @@ export function CorrectionRequestDialog({
   defaultDate?: string;
 }) {
   const queryClient = useQueryClient();
-  const [date, setDate] = useState(defaultDate || new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(
+    defaultDate || new Date().toISOString().split('T')[0],
+  );
   const [checkIn, setCheckIn] = useState('09:00');
   const [checkOut, setCheckOut] = useState('17:00');
   const [status, setStatus] = useState<AttendanceStatusKey>('PRESENT');
@@ -48,7 +53,11 @@ export function CorrectionRequestDialog({
       setReason('');
     },
     onError: (err: unknown) => {
-      toast.error(err instanceof Error ? err.message : 'Failed to submit correction request.');
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Failed to submit correction request.',
+      );
     },
     onSettled: () => {
       setIsSubmitting(false);
@@ -86,7 +95,8 @@ export function CorrectionRequestDialog({
           <DialogHeader>
             <DialogTitle>Request Attendance Correction</DialogTitle>
             <DialogDescription>
-              Submit a request if you missed a biometric punch or experienced a system glitch.
+              Submit a request if you missed a biometric punch or experienced a
+              system glitch.
             </DialogDescription>
           </DialogHeader>
 

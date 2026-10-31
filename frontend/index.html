@@ -3,6 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <script>
+      try {
+        const scheme = localStorage.getItem('campushr-color-scheme');
+        if (scheme === 'dark' || scheme === 'light') {
+          document.querySelector('meta[name="color-scheme"]').content = scheme;
+          document.documentElement.classList.toggle('dark', scheme === 'dark');
+        }
+      } catch {}
+    </script>
     <meta name="theme-color" content="#051F5B" />
     <link rel="icon" href="/assets/jcet-logo.png" type="image/png" />
     <meta

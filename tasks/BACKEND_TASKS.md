@@ -36,7 +36,7 @@
 - [x] Check-in/out
 - [x] Manual records
 - [x] Corrections
-- [ ] Reports (with BE-012 Reports)
+- [x] Reports (with BE-012 Reports)
 
 ## BE-005 Leave
 
@@ -45,7 +45,7 @@
 - [x] Requests (apply, cancel while pending)
 - [x] Approval workflow (chain by role; audit-logged)
 - [x] Validation (ranges, half days, overlap, balance)
-- [ ] Holiday calendar (days currently exclude Sundays only)
+- [x] Holiday calendar (`CAMPUS_HOLIDAYS` excluded alongside Sundays)
 
 ## BE-006 Timetable
 
@@ -58,7 +58,7 @@
 
 - [x] Workload calculation (weekly theory and lab hours from the timetable)
 - [x] Threshold configuration (band per teaching designation, Principal)
-- [ ] Reports (workload report — with BE-012 Reports)
+- [x] Reports (workload report — with BE-012 Reports)
 
 ## BE-008 Smart Substitution
 
@@ -70,8 +70,8 @@
 
 ## BE-010 Documents
 
-- [ ] Upload metadata
-- [ ] Verification
+- [x] Upload metadata
+- [x] Verification
 - [ ] Expiry jobs
 
 ## BE-011 Notifications
@@ -88,7 +88,7 @@
 
 ## BE-013 Security
 
-- [ ] Rate limiting
-- [ ] Audit logs
-- [ ] Secure headers
-- [ ] Permission tests
+- [x] Rate limiting
+- [x] Audit logs
+- [x] Secure headers
+- [x] Permission tests

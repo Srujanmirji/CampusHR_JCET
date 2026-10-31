@@ -1,0 +1,62 @@
+[
+  {
+    "id": "login",
+    "width": 390,
+    "height": 864
+  },
+  {
+    "id": "home",
+    "width": 390,
+    "height": 1273
+  },
+  {
+    "id": "today",
+    "width": 390,
+    "height": 976
+  },
+  {
+    "id": "attendance",
+    "width": 390,
+    "height": 1170
+  },
+  {
+    "id": "leave",
+    "width": 390,
+    "height": 1192
+  },
+  {
+    "id": "apply",
+    "width": 390,
+    "height": 1021
+  },
+  {
+    "id": "notifications",
+    "width": 390,
+    "height": 864
+  },
+  {
+    "id": "profile",
+    "width": 390,
+    "height": 1399
+  },
+  {
+    "id": "hod-approvals",
+    "width": 390,
+    "height": 864
+  },
+  {
+    "id": "hod-review",
+    "width": 390,
+    "height": 1181
+  },
+  {
+    "id": "hod-coverage",
+    "width": 390,
+    "height": 1287
+  },
+  {
+    "id": "settings",
+    "width": 390,
+    "height": 1466
+  }
+]

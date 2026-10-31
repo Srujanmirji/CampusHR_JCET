@@ -1,16 +1,15 @@
 import { z } from 'zod';
 
-export const reportQuerySchema = z.object({
-  from: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'From date must be in YYYY-MM-DD format')
-    .optional(),
-  to: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'To date must be in YYYY-MM-DD format')
-    .optional(),
-  departmentId: z.coerce.number().int().positive().optional(),
-  format: z.enum(['json', 'csv']).default('json'),
-});
+export const reportQuerySchema = z
+  .object({
+    from: z.iso.date().optional(),
+    to: z.iso.date().optional(),
+    departmentId: z.coerce.number().int().positive().optional(),
+    format: z.enum(['json', 'csv']).default('json'),
+  })
+  .refine(({ from, to }) => !from || !to || from <= to, {
+    path: ['to'],
+    message: 'To date must be on or after from date.',
+  });
 
 export type ReportQuery = z.infer<typeof reportQuerySchema>;

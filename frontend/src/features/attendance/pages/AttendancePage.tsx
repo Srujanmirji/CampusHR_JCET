@@ -93,7 +93,10 @@ export default function AttendancePage() {
   // 3. Filter records client-side for immediate responsive search
   const filteredRecords = useMemo(() => {
     return rawRecords.filter((record: AttendanceRecord) => {
-      if (departmentFilter !== 'ALL' && record.employee.department.code !== departmentFilter) {
+      if (
+        departmentFilter !== 'ALL' &&
+        record.employee.department.code !== departmentFilter
+      ) {
         return false;
       }
       if (statusFilter !== 'ALL') {
@@ -115,7 +118,9 @@ export default function AttendancePage() {
 
   // 4. Calculate live metrics
   const metrics = useMemo(() => {
-    const present = rawRecords.filter((r) => r.status === 'PRESENT' || r.status === 'LATE').length;
+    const present = rawRecords.filter(
+      (r) => r.status === 'PRESENT' || r.status === 'LATE',
+    ).length;
     const absent = rawRecords.filter((r) => r.status === 'ABSENT').length;
     const onLeave = rawRecords.filter((r) => r.status === 'ON_LEAVE').length;
     const late = rawRecords.filter((r) => r.status === 'LATE').length;
@@ -126,24 +131,61 @@ export default function AttendancePage() {
 
   // 5. Mock trend / overview visual data
   const trendData = [
-    { date: 'Mon', Present: Math.max(metrics.present, 12), Leave: 2, Absent: 1 },
-    { date: 'Tue', Present: Math.max(metrics.present, 14), Leave: 1, Absent: 0 },
-    { date: 'Wed', Present: Math.max(metrics.present, 15), Leave: 3, Absent: 1 },
-    { date: 'Thu', Present: Math.max(metrics.present, 13), Leave: 2, Absent: 2 },
-    { date: 'Fri', Present: Math.max(metrics.present, 16), Leave: 1, Absent: 0 },
-    { date: 'Sat', Present: Math.max(metrics.present, 11), Leave: 4, Absent: 1 },
+    {
+      date: 'Mon',
+      Present: Math.max(metrics.present, 12),
+      Leave: 2,
+      Absent: 1,
+    },
+    {
+      date: 'Tue',
+      Present: Math.max(metrics.present, 14),
+      Leave: 1,
+      Absent: 0,
+    },
+    {
+      date: 'Wed',
+      Present: Math.max(metrics.present, 15),
+      Leave: 3,
+      Absent: 1,
+    },
+    {
+      date: 'Thu',
+      Present: Math.max(metrics.present, 13),
+      Leave: 2,
+      Absent: 2,
+    },
+    {
+      date: 'Fri',
+      Present: Math.max(metrics.present, 16),
+      Leave: 1,
+      Absent: 0,
+    },
+    {
+      date: 'Sat',
+      Present: Math.max(metrics.present, 11),
+      Leave: 4,
+      Absent: 1,
+    },
   ];
 
   const pendingCount = pendingCorrections?.data?.length || 0;
 
   const formatTime = (iso?: string | null) => {
     if (!iso) return '—';
-    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
-  const calculateHours = (checkIn?: string | null, checkOut?: string | null) => {
+  const calculateHours = (
+    checkIn?: string | null,
+    checkOut?: string | null,
+  ) => {
     if (!checkIn || !checkOut) return '—';
-    const diff = (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 3600000;
+    const diff =
+      (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 3600000;
     return `${Math.max(0, diff).toFixed(1)} hrs`;
   };
 
@@ -152,7 +194,16 @@ export default function AttendancePage() {
       toast.info('No attendance records available to export for this date.');
       return;
     }
-    const headers = ['Employee Code', 'Name', 'Department', 'Date', 'Check In', 'Check Out', 'Status', 'Gateway'];
+    const headers = [
+      'Employee Code',
+      'Name',
+      'Department',
+      'Date',
+      'Check In',
+      'Check Out',
+      'Status',
+      'Gateway',
+    ];
     const rows = filteredRecords.map((r) => [
       r.employee.employeeCode,
       `"${r.employee.firstName} ${r.employee.lastName}"`,
@@ -163,7 +214,9 @@ export default function AttendancePage() {
       r.status,
       r.source,
     ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -190,7 +243,10 @@ export default function AttendancePage() {
                 <Inbox className="mr-2 h-4 w-4" />
                 Corrections Queue
                 {pendingCount > 0 && (
-                  <Badge variant="secondary" className="ml-2 bg-amber-400 text-black px-1.5 py-0 text-xs">
+                  <Badge
+                    variant="secondary"
+                    className="ml-2 bg-amber-400 text-black px-1.5 py-0 text-xs"
+                  >
                     {pendingCount}
                   </Badge>
                 )}
@@ -272,7 +328,11 @@ export default function AttendancePage() {
                 data={trendData}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  opacity={0.3}
+                />
                 <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip
@@ -296,7 +356,9 @@ export default function AttendancePage() {
         <div className="rounded-xl border bg-card p-5 shadow-xs">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-semibold text-foreground">
-              {isDeptScoped ? 'Department Attendance Status' : 'Departments Status'}
+              {isDeptScoped
+                ? 'Department Attendance Status'
+                : 'Departments Status'}
             </h3>
             <Building className="h-4 w-4 text-muted-foreground" />
           </div>
@@ -318,7 +380,9 @@ export default function AttendancePage() {
                     <span className="font-medium text-foreground">
                       {dept.name} ({dept.code})
                     </span>
-                    <span className="font-bold text-foreground">{dept.rate}%</span>
+                    <span className="font-bold text-foreground">
+                      {dept.rate}%
+                    </span>
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                     <div
@@ -326,7 +390,11 @@ export default function AttendancePage() {
                       style={{
                         width: `${dept.rate}%`,
                         backgroundColor:
-                          dept.rate >= 95 ? '#10b981' : dept.rate >= 92 ? '#3b82f6' : '#f59e0b',
+                          dept.rate >= 95
+                            ? '#10b981'
+                            : dept.rate >= 92
+                              ? '#3b82f6'
+                              : '#f59e0b',
                       }}
                     />
                   </div>
@@ -352,14 +420,22 @@ export default function AttendancePage() {
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
               <SelectContent>
-                {!isDeptScoped && <SelectItem value="ALL">All Departments</SelectItem>}
+                {!isDeptScoped && (
+                  <SelectItem value="ALL">All Departments</SelectItem>
+                )}
                 {(!isDeptScoped || userDeptCode === 'CSE') && (
-                  <SelectItem value="CSE">Computer Science & Engineering</SelectItem>
+                  <SelectItem value="CSE">
+                    Computer Science & Engineering
+                  </SelectItem>
                 )}
                 {!isDeptScoped && (
                   <>
-                    <SelectItem value="ECE">Electronics & Communication</SelectItem>
-                    <SelectItem value="AIML">Artificial Intelligence & ML</SelectItem>
+                    <SelectItem value="ECE">
+                      Electronics & Communication
+                    </SelectItem>
+                    <SelectItem value="AIML">
+                      Artificial Intelligence & ML
+                    </SelectItem>
                     <SelectItem value="ME">Mechanical Engineering</SelectItem>
                     <SelectItem value="CE">Civil Engineering</SelectItem>
                     <SelectItem value="MBA">MBA</SelectItem>
@@ -392,7 +468,9 @@ export default function AttendancePage() {
               />
             </div>
 
-            {((!isDeptScoped && departmentFilter !== 'ALL') || statusFilter !== 'ALL' || selectedDate !== todayIso) && (
+            {((!isDeptScoped && departmentFilter !== 'ALL') ||
+              statusFilter !== 'ALL' ||
+              selectedDate !== todayIso) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -433,20 +511,28 @@ export default function AttendancePage() {
             <tbody className="divide-y divide-border">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
+                  <td
+                    colSpan={7}
+                    className="py-12 text-center text-sm text-muted-foreground"
+                  >
                     Loading verified punch logs...
                   </td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-muted-foreground">
-                    No punch records found for {selectedDate}. Use "Punch In" above to record today's attendance.
+                  <td
+                    colSpan={7}
+                    className="py-12 text-center text-muted-foreground"
+                  >
+                    No punch records found for {selectedDate}. Use "Punch In"
+                    above to record today's attendance.
                   </td>
                 </tr>
               ) : (
                 filteredRecords.map((item: AttendanceRecord) => {
                   const emp = item.employee;
-                  const initials = `${emp.firstName[0] || ''}${emp.lastName[0] || ''}`.toUpperCase();
+                  const initials =
+                    `${emp.firstName[0] || ''}${emp.lastName[0] || ''}`.toUpperCase();
                   const mappedStatus: Status =
                     item.status === 'PRESENT'
                       ? 'Present'
@@ -459,7 +545,10 @@ export default function AttendancePage() {
                             : 'Absent';
 
                   return (
-                    <tr key={item.id} className="transition-colors hover:bg-muted/30">
+                    <tr
+                      key={item.id}
+                      className="transition-colors hover:bg-muted/30"
+                    >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
@@ -492,7 +581,10 @@ export default function AttendancePage() {
                         {calculateHours(item.checkIn, item.checkOut)}
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
-                        <Badge variant="secondary" className="text-[10px] font-mono">
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] font-mono"
+                        >
                           {item.source}
                         </Badge>
                       </td>

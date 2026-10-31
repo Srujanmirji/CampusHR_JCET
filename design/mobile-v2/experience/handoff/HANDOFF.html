@@ -1,0 +1,831 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CampusHR V2 · Developer handoff</title><link rel="stylesheet" href="../../faculty-screens/tokens.css"><style>@font-face{font-family:Inter;src:url(../../faculty-screens/assets/inter-regular.ttf)}body{margin:0;background:var(--canvas);color:var(--ink);font:17px/1.6 Inter,system-ui,sans-serif}main{max-width:1040px;padding:32px 24px;margin:auto}h1{font-size:32px;line-height:1.2;margin:40px 0 24px}h2{font-size:24px;margin:32px 0 16px}h3{font-size:20px}p,li{max-width:72ch}a{color:var(--action);display:inline-block;min-height:48px;align-content:center}nav{display:flex;flex-wrap:wrap;gap:16px}a:focus-visible{outline:2px solid var(--focus);outline-offset:2px}table{width:100%;border-collapse:collapse;font-size:15px;line-height:1.5}th,td{padding:16px 12px;text-align:left;border-bottom:1px solid var(--divider);vertical-align:top}th{background:var(--surfaceSecondary)}section{padding-bottom:40px;border-bottom:1px solid var(--divider);overflow-wrap:anywhere}section:has(table){overflow-x:auto}code{font-size:15px}nav a{font-size:15px}@media(max-width:600px){table{min-width:680px}main{padding:24px 16px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}</style></head><body><main><a href="../index.html">← Design packages</a><h1>CampusHR V2 developer handoff</h1><p>Design frozen for development · 23 October 2026. Synthetic review specimens; native acceptance remains separate.</p><nav aria-label="Handoff sections"><a href="#COMPONENTS">COMPONENTS</a><a href="#SCREENS">SCREENS</a><a href="#INTERACTIONS">INTERACTIONS</a><a href="#ICONS">ICONS</a><a href="#PLATFORMS">PLATFORMS</a><a href="#QA">QA</a><a href="tokens.json">Final tokens</a><a href="check-results.json">Executed checks</a></nav><section id="COMPONENTS"><h1>Component inventory and token freeze</h1>
+<p>The canonical source is ../../DESIGN_SYSTEM.md and ../../tokens.json. The local tokens.json is a byte-identical handoff snapshot, not a second authority. Run the check to detect drift. No new color, typography, spacing or radius scale was introduced.</p>
+<table>
+<thead>
+<tr>
+<th>Canonical component</th>
+<th>Behavior / development acceptance</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>navigationBar</td>
+<td>Role-correct title/back/bell; safe area; no floating settings.</td>
+</tr>
+<tr>
+<td>bottomTabBar</td>
+<td>Faculty and HOD root sets stay distinct; selection icon + label; independent stacks.</td>
+</tr>
+<tr>
+<td>button</td>
+<td>48 minimum target; semantic fill; retained label while busy; duplicate submission prevented.</td>
+</tr>
+<tr>
+<td>secondaryButton</td>
+<td>Secondary semantic fill and ink; same target/loading rules as primary.</td>
+</tr>
+<tr>
+<td>textButton</td>
+<td>Text appearance with a 48 target; explicit accessible action.</td>
+</tr>
+<tr>
+<td>textInput</td>
+<td>Persistent label, autofill intent, inline error; no placeholder-only labeling.</td>
+</tr>
+<tr>
+<td>passwordInput</td>
+<td>Secure entry, show/hide with spoken state, never persist password.</td>
+</tr>
+<tr>
+<td>search</td>
+<td>Search icon, real label, clear action and empty result message.</td>
+</tr>
+<tr>
+<td>segmentedControl</td>
+<td>Selected state and content stay synchronized; native semantics.</td>
+</tr>
+<tr>
+<td>dateSelector</td>
+<td>Native picker, visible committed date, cancel preserves value.</td>
+</tr>
+<tr>
+<td>toggle</td>
+<td>Exposes checked state and real label; native feedback.</td>
+</tr>
+<tr>
+<td>checkbox</td>
+<td>Full label is a 48 target; exposes checked state.</td>
+</tr>
+<tr>
+<td>avatar</td>
+<td>Initials fallback, decorative when adjacent identity is already spoken.</td>
+</tr>
+<tr>
+<td>statusLabel</td>
+<td>Readable semantic ink plus icon and text; no color-only meaning.</td>
+</tr>
+<tr>
+<td>listRow</td>
+<td>Minimum 56; expands for content; no enclosing card per item.</td>
+</tr>
+<tr>
+<td>scheduleRow</td>
+<td>Time rail, period/code/subject/section/room/type; no desktop matrix.</td>
+</tr>
+<tr>
+<td>timelineItem</td>
+<td>Accessible chronological order with status text.</td>
+</tr>
+<tr>
+<td>metric</td>
+<td>Factual server value, label and period; never gamified.</td>
+</tr>
+<tr>
+<td>progress</td>
+<td>Text numerator/denominator or percentage; native progress semantics.</td>
+</tr>
+<tr>
+<td>emptyState</td>
+<td>After successful empty fetch; contextual explanation and existing recovery.</td>
+</tr>
+<tr>
+<td>errorState</td>
+<td>Name failed task and recovery; preserve draft and cached content.</td>
+</tr>
+<tr>
+<td>skeleton</td>
+<td>Layout-matched static placeholders; hidden decorative blocks; busy region.</td>
+</tr>
+<tr>
+<td>bottomSheet</td>
+<td>Native focus containment, close/cancel, safe areas, optional drag handle.</td>
+</tr>
+<tr>
+<td>confirmationSheet</td>
+<td>Identify exact action/subject; explicit cancel; no implicit commit on dismissal.</td>
+</tr>
+<tr>
+<td>alert</td>
+<td>Only consequential or blocking information; native accessibility semantics.</td>
+</tr>
+<tr>
+<td>toast</td>
+<td>Nonessential transient confirmation only; critical errors remain inline.</td>
+</tr>
+<tr>
+<td>notificationRow</td>
+<td>Subtle unread surface, semantic icon, title/body/time; destination and read behavior.</td>
+</tr>
+<tr>
+<td>profileRow</td>
+<td>Icon, label, optional supporting text, chevron; 48 minimum.</td>
+</tr>
+<tr>
+<td>leaveBalanceRow</td>
+<td>Leave type + available/total; truthful period; no invented balance math.</td>
+</tr>
+<tr>
+<td>facultyRecommendationRow</td>
+<td>Identity, role, availability, workload, reasons, quiet supplied match; disabled Assign explains why.</td>
+</tr>
+</tbody></table>
+<h2>Units and status</h2>
+<p>Baseline sizes are logical iOS points, Android dp for layout and sp for text. 48 is the shared minimum target; 14 is the minimum metadata size. Body 17, secondary 15, navigation 18, section 20, greeting 26, large title 32. Space 4/8/12/16/20/24/32/40/48. Radius 8 controls,10 buttons,12 fields,14 appropriate cards,24 sheet top. No elevation by default.</p>
+<p>Pending uses clock + label, approved uses check + label, rejected uses close + label, unavailable uses explanatory text with disabled control. Domain accent is not status: a violet leave icon does not mean approved. The supplied mint/amber/coral accents are not normal text colors: use their darker ink roles.</p>
+</section>
+<section id="SCREENS"><h1>Screen contracts</h1>
+<p>All 20 unique frozen Faculty/HOD screens. The iOS and Android packages each adapt the same 12 requested destinations; they inherit the contracts below. Prototype links may expose a supporting confirmation/detail view without expanding the exported screen set. Native navigation and availability bindings are in PLATFORMS.md.</p>
+<h2>Login</h2>
+<ul>
+<li><strong>Purpose:</strong> Access the institutional account</li>
+<li><strong>Primary action:</strong> Sign in</li>
+<li><strong>Secondary actions:</strong> Remember me; password visibility; Forgot password; Institutional SSO</li>
+<li><strong>Components:</strong> Identity header, labeled login/password fields, checkbox, buttons, help sheet</li>
+<li><strong>States:</strong> Invalid credentials; account inactive; busy; SSO unavailable; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Home; Password Help; institution SSO if configured</li>
+</ul>
+<h2>Faculty Home</h2>
+<ul>
+<li><strong>Purpose:</strong> Orient faculty around the next class</li>
+<li><strong>Primary action:</strong> Open next class</li>
+<li><strong>Secondary actions:</strong> Bell; profile; schedule; root tabs</li>
+<li><strong>Components:</strong> Greeting/date, next-class hero, editorial summary, timeline, tab bar</li>
+<li><strong>States:</strong> No next class; no classes; partial summaries; refresh; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Timetable; Notifications; Profile</li>
+</ul>
+<h2>Timetable Today</h2>
+<ul>
+<li><strong>Purpose:</strong> Read dated teaching and substitution duties</li>
+<li><strong>Primary action:</strong> Select Today or Week</li>
+<li><strong>Secondary actions:</strong> Open class; root tabs</li>
+<li><strong>Components:</strong> Navigation, segmented control, schedule rows, academic rail</li>
+<li><strong>States:</strong> No classes; changed class; substitution; fetch failure; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Timetable Week; class context</li>
+</ul>
+<h2>Timetable Week</h2>
+<ul>
+<li><strong>Purpose:</strong> Read one day at a time on phone</li>
+<li><strong>Primary action:</strong> Choose day</li>
+<li><strong>Secondary actions:</strong> Return Today; open class</li>
+<li><strong>Components:</strong> Day selector, selected date, mobile schedule list</li>
+<li><strong>States:</strong> Weekend empty; selected-day load/error; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Timetable Today; selected day</li>
+</ul>
+<h2>Attendance</h2>
+<ul>
+<li><strong>Purpose:</strong> Record daily attendance and review history</li>
+<li><strong>Primary action:</strong> Check In or Check Out according to server state</li>
+<li><strong>Secondary actions:</strong> Review month and recent activity</li>
+<li><strong>Components:</strong> Status summary, contextual action, monthly distribution, activity rows</li>
+<li><strong>States:</strong> Not checked in; checked in; checked out; permission denied; write uncertainty; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Same screen after confirmed punch; root tabs</li>
+</ul>
+<h2>Leave Management</h2>
+<ul>
+<li><strong>Purpose:</strong> Read balances and personal requests</li>
+<li><strong>Primary action:</strong> Apply for Leave</li>
+<li><strong>Secondary actions:</strong> Filter requests; open request</li>
+<li><strong>Components:</strong> Balance rows, primary button, filter control, native list</li>
+<li><strong>States:</strong> No requests; balances unavailable; pending/approved/rejected; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Apply Leave; Leave Detail</li>
+</ul>
+<h2>Apply Leave</h2>
+<ul>
+<li><strong>Purpose:</strong> Submit a dated leave request with impact context</li>
+<li><strong>Primary action:</strong> Submit Request</li>
+<li><strong>Secondary actions:</strong> Choose type/dates; half-day; attachment; cancel</li>
+<li><strong>Components:</strong> Full-screen form, date selector, toggle, reason, attachment row, impact group</li>
+<li><strong>States:</strong> Invalid dates; insufficient balance; pending; upload error; preserved draft; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Leave Detail on confirmed creation; Leave on cancel</li>
+</ul>
+<h2>Leave Detail</h2>
+<ul>
+<li><strong>Purpose:</strong> Understand request progress and class coverage</li>
+<li><strong>Primary action:</strong> Read status and timeline</li>
+<li><strong>Secondary actions:</strong> Back to requests</li>
+<li><strong>Components:</strong> Status, reason, approval timeline, impact and coverage rows</li>
+<li><strong>States:</strong> Pending recommendation; awaiting final approval; approved; rejected; changed coverage; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Leave Management</li>
+</ul>
+<h2>Notifications</h2>
+<ul>
+<li><strong>Purpose:</strong> Read actionable academic updates</li>
+<li><strong>Primary action:</strong> Open notification destination</li>
+<li><strong>Secondary actions:</strong> Filter; mark all read; back</li>
+<li><strong>Components:</strong> Category tabs, subtle unread row, semantic icon, timestamp</li>
+<li><strong>States:</strong> All read; empty category; broken destination; read update failure; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Leave Detail; Timetable; substitution context; previous screen</li>
+</ul>
+<h2>Faculty Profile</h2>
+<ul>
+<li><strong>Purpose:</strong> Access faculty record and preferences</li>
+<li><strong>Primary action:</strong> Choose profile section</li>
+<li><strong>Secondary actions:</strong> Settings; support; sign out</li>
+<li><strong>Components:</strong> Editorial avatar header, compact stats, grouped profile rows</li>
+<li><strong>States:</strong> Unavailable field; partial stats; expired session; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Existing profile sections; Settings; Password Help; Login on sign out</li>
+</ul>
+<h2>Settings</h2>
+<ul>
+<li><strong>Purpose:</strong> Adjust existing preferences and obtain support</li>
+<li><strong>Primary action:</strong> Choose setting</li>
+<li><strong>Secondary actions:</strong> Back; account/security/support links</li>
+<li><strong>Components:</strong> Grouped rows, toggles, accessibility rows</li>
+<li><strong>States:</strong> Device-managed preference; permission denied; unsupported setting; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Profile; Password Help; platform settings when supported</li>
+</ul>
+<h2>Password Help</h2>
+<ul>
+<li><strong>Purpose:</strong> Explain centrally managed account assistance</li>
+<li><strong>Primary action:</strong> Done</li>
+<li><strong>Secondary actions:</strong> HR Desk; Email Support</li>
+<li><strong>Components:</strong> Native content-sized sheet, text, support rows, close</li>
+<li><strong>States:</strong> Support contacts unconfigured; external action confirmation; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Restore the invoking screen and focus</li>
+</ul>
+<h2>HOD Home</h2>
+<ul>
+<li><strong>Purpose:</strong> Prioritize department decisions</li>
+<li><strong>Primary action:</strong> Review pending approvals</li>
+<li><strong>Secondary actions:</strong> Coverage; workload; bell; role tabs</li>
+<li><strong>Components:</strong> Greeting, two decision rows, compact presence/alerts, continuity progress</li>
+<li><strong>States:</strong> No pending work; partial counts; stale departmental data; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Approvals; Academic Impact; Workload; Notifications</li>
+</ul>
+<h2>Approvals</h2>
+<ul>
+<li><strong>Purpose:</strong> Review department leave queue</li>
+<li><strong>Primary action:</strong> Review request</li>
+<li><strong>Secondary actions:</strong> Pending/Approved/Rejected; role tabs</li>
+<li><strong>Components:</strong> Status segment, applicant/request list rows</li>
+<li><strong>States:</strong> No requests in selected status; permissions changed; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Leave Review; HOD roots</li>
+</ul>
+<h2>Leave Review</h2>
+<ul>
+<li><strong>Purpose:</strong> Make a decision with balance/history/academic context</li>
+<li><strong>Primary action:</strong> Recommend approval (requested design fixture says Approve &amp; Find Cover with authority qualifier)</li>
+<li><strong>Secondary actions:</strong> Reject with reason; inspect impact; back</li>
+<li><strong>Components:</strong> Applicant, leave detail, history, balance, schedule, sticky decisions, confirmation sheet</li>
+<li><strong>States:</strong> Pending; recommendation saved; final approval pending; rejection reason invalid; conflict; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Approvals; Academic Impact; cover only after final approval</li>
+</ul>
+<h2>Academic Impact</h2>
+<ul>
+<li><strong>Purpose:</strong> Inspect each class affected by approved or pending leave</li>
+<li><strong>Primary action:</strong> Find cover when authorized</li>
+<li><strong>Secondary actions:</strong> Back to review</li>
+<li><strong>Components:</strong> Schedule rows, coverage labels, readiness explanation</li>
+<li><strong>States:</strong> Pending final approval; uncovered; partly covered; fully covered; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Smart Coverage on approved fixture; Leave Review</li>
+</ul>
+<h2>Smart Coverage</h2>
+<ul>
+<li><strong>Purpose:</strong> Choose available, suitable covering faculty</li>
+<li><strong>Primary action:</strong> Assign available faculty</li>
+<li><strong>Secondary actions:</strong> Back; inspect recommendation reasons</li>
+<li><strong>Components:</strong> Class context, recommendation rows, availability/status, factual match text</li>
+<li><strong>States:</strong> Unavailable disabled; capacity changed; no candidates; fetch error; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Assignment Confirmation; Academic Impact</li>
+</ul>
+<h2>Assignment Confirmation</h2>
+<ul>
+<li><strong>Purpose:</strong> Protect against assigning the wrong class or person</li>
+<li><strong>Primary action:</strong> Confirm assignment</li>
+<li><strong>Secondary actions:</strong> Cancel/back</li>
+<li><strong>Components:</strong> Faculty context, class/time/location, notification expectation, sticky action</li>
+<li><strong>States:</strong> Busy; availability conflict; workload conflict; lost response; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Coverage Success after saved result; Smart Coverage on cancel</li>
+</ul>
+<h2>Coverage Success</h2>
+<ul>
+<li><strong>Purpose:</strong> Confirm saved coverage and expose remaining work</li>
+<li><strong>Primary action:</strong> Continue to next class</li>
+<li><strong>Secondary actions:</strong> View academic impact</li>
+<li><strong>Components:</strong> Success symbol, assigned class context, delivery status, coverage progress</li>
+<li><strong>States:</strong> Assignment saved; notification pending/sent; no remaining classes; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> Smart Coverage for next uncovered class; Academic Impact</li>
+</ul>
+<h2>HOD Workload View</h2>
+<ul>
+<li><strong>Purpose:</strong> Review factual departmental hours and capacity</li>
+<li><strong>Primary action:</strong> Review capacity alerts</li>
+<li><strong>Secondary actions:</strong> Role root tabs</li>
+<li><strong>Components:</strong> Department heading, compact alert summary, faculty workload rows</li>
+<li><strong>States:</strong> No capacity alerts; missing hours; partial/stale data; initial loading; recoverable error; offline/cached context</li>
+<li><strong>Navigation destination:</strong> HOD root destinations; no new faculty-management feature</li>
+</ul>
+</section>
+<section id="INTERACTIONS"><h1>CampusHR V2 interaction specification</h1>
+<p>Frozen product behavior, 23 October 2026. No new screens, policies or actions. Timing below is a CampusHR tuning target, not a claim that Apple or Google prescribes these exact numbers. No separate SwiftUI reference file was provided: this specification applies the microinteraction principles in the brief. Final spring and haptic feel requires device calibration.</p>
+<h2>Shared rules</h2>
+<p>Acknowledge a touch within one display frame where possible, budget &lt;100 ms. Never delay a network request to finish motion. Keep the original action label during loading, add a busy indicator, prevent duplicate writes. Only confirmed server results may produce a success label, success symbol, haptic or notification-delivered claim. Preserve inputs and context on failure. Announce status once through the platform accessibility API; do not repeatedly announce progress.</p>
+<p>Respect the OS Reduce Motion setting before any in-app preference. Reduced motion uses immediate state updates or a &lt;=100 ms crossfade, without translation, bounce, symbol morphing or shimmer. Haptics obey device and user settings independently; visual and spoken feedback always remain sufficient. No background animation. No motion on ordinary read-only metrics.</p>
+<table>
+<thead>
+<tr>
+<th>Interaction</th>
+<th>Immediate feedback and duration</th>
+<th>Spring / entry / exit</th>
+<th>Haptic</th>
+<th>Reduced motion</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Button press</td>
+<td>Pressed semantic fill on touch-down; release in 100 ms</td>
+<td>No scaling required; release/cancel restores original state</td>
+<td>None for routine taps</td>
+<td>Immediate fill change</td>
+</tr>
+<tr>
+<td>Bottom tab</td>
+<td>Selection and label change in 160 ms; preserve each stack and scroll position</td>
+<td>Short ease-out; no cross-screen lateral travel</td>
+<td>None</td>
+<td>Immediate selection</td>
+</tr>
+<tr>
+<td>Segmented control</td>
+<td>Selected background moves in 160 ms; content changes once</td>
+<td>Critically damped feel, no overshoot; keep focus on selected item</td>
+<td>Light selection if enabled</td>
+<td>Immediate fill and content</td>
+</tr>
+<tr>
+<td>Bottom sheet</td>
+<td>System presentation, target 300–400 ms</td>
+<td>Native spring, subtle settling, reverse dismissal; interactive drag follows finger</td>
+<td>None on open; no threshold buzz during ordinary drag</td>
+<td>Native accessibility-reduced transition</td>
+</tr>
+<tr>
+<td>Date selection</td>
+<td>Native picker feedback; commit on Done/OK, Cancel keeps original</td>
+<td>System picker transition; 160 ms label update after commit</td>
+<td>Light selection, once per committed value</td>
+<td>Immediate label update</td>
+</tr>
+<tr>
+<td>Swipe action</td>
+<td>Follow finger; reveal action; cancel returns row</td>
+<td>Native threshold and resistance; 200 ms settling</td>
+<td>Light once when a meaningful threshold is crossed; never repeatedly</td>
+<td>Native reduced motion; retain explicit accessible action</td>
+</tr>
+<tr>
+<td>Pull-to-refresh</td>
+<td>Native indicator immediately after threshold; retain existing rows</td>
+<td>Native indicator, release spring; stop when fetch settles</td>
+<td>Light threshold feedback once, optional</td>
+<td>Static busy indicator; no content slide where avoidable</td>
+</tr>
+<tr>
+<td>Check-in success</td>
+<td>Busy button, then confirmed time/location or response text</td>
+<td>Checkmark draw/replace 180–220 ms, no confetti; keep stable layout</td>
+<td>Medium only after server confirms</td>
+<td>Static check and announcement</td>
+</tr>
+<tr>
+<td>Leave submission</td>
+<td>Validate locally, then busy label; on success show request detail</td>
+<td>200 ms confirmation transition after response</td>
+<td>Medium on confirmed request creation</td>
+<td>Immediate detail navigation</td>
+</tr>
+<tr>
+<td>HOD recommendation / final approval</td>
+<td>Exact role-aware outcome; never promote recommendation to final status</td>
+<td>Confirmation step then 180–220 ms state replacement</td>
+<td>Medium after confirmed decision</td>
+<td>Static updated status</td>
+</tr>
+<tr>
+<td>Rejection</td>
+<td>Confirmation with required reason; cancel safe; pending write blocks repeats</td>
+<td>Native alert/sheet; 180 ms row/status replacement after success</td>
+<td>One stronger warning feedback on confirmed consequential rejection; never on opening sheet</td>
+<td>Static status and spoken outcome</td>
+</tr>
+<tr>
+<td>Substitute assignment</td>
+<td>Confirm identity/class/time/room; server revalidates capacity and availability</td>
+<td>Native confirmation; 200 ms result change after response</td>
+<td>Medium on assignment saved</td>
+<td>Static check; no symbol bounce</td>
+</tr>
+<tr>
+<td>Notification opening</td>
+<td>Tap tint immediately; open destination; mark read through API</td>
+<td>Standard push transition; destination loading if needed</td>
+<td>None</td>
+<td>Native reduced push; status text preserved</td>
+</tr>
+<tr>
+<td>Loading</td>
+<td>Show layout-matched skeleton after 200 ms if needed; retain cached rows when available</td>
+<td>No authored shimmer; native progress for indeterminate work</td>
+<td>None</td>
+<td>Static skeleton and busy semantics</td>
+</tr>
+<tr>
+<td>Error</td>
+<td>Inline field message or in-context recovery; request fails without erasing input</td>
+<td>100–160 ms appearance; never shake fields</td>
+<td>None; native error feedback optional only for committed failure</td>
+<td>Immediate message</td>
+</tr>
+<tr>
+<td>Empty</td>
+<td>Show after successful empty response; clear reason and relevant existing action</td>
+<td>No entrance animation or illustration loop</td>
+<td>None</td>
+<td>Identical static layout</td>
+</tr>
+<tr>
+<td>Offline</td>
+<td>Persistent in-context banner; label cache time; disable writes and preserve draft</td>
+<td>&lt;=100 ms appearance; hide only after successful reconnect fetch</td>
+<td>None</td>
+<td>Static banner</td>
+</tr>
+</tbody></table>
+<h2>Springs and interruption</h2>
+<p>Use the platform system spring for sheets, swipe cancellation, picker and navigation. For a custom selection indicator only, an initial tuning target is response 0.25 s, damping fraction 0.9 with zero intentional overshoot; Android equivalent is a highly damped spring. These are not cross-platform physics guarantees. Stop or retarget in-flight selection motion on new input. Never queue haptics. No authored spring on chart values, list entrance, or routine data refresh.</p>
+<h2>Platform implementation</h2>
+<p><strong>iOS:</strong> NavigationStack, TabView, sheet with detents appropriate to content, native confirmationDialog/alert, swipeActions, refreshable, Picker and DatePicker. Image(systemName:) for symbols; SF Symbol effects only for a meaningful changed state and availability-gated. UISelectionFeedbackGenerator for committed selection; UIImpactFeedbackGenerator medium for committed actions. Accessibility Reduce Motion controls authored motion; do not override the native system&#39;s adaptation.</p>
+<p><strong>Android:</strong> NavigationBar and NavigationBarItem, ModalBottomSheet, AlertDialog, DatePickerDialog, exposed semantics for all actions, and platform back handling. Use Material state layers, never a second custom ripple. HapticFeedback constants chosen for semantic action and device capability; Android should not mechanically mimic iPhone amplitudes. Cancel predictive-back returns the user to the same draft and scroll position.</p>
+<h2>Data and failure boundaries</h2>
+<ul>
+<li>Lost response after submission: display “Checking your request…” and reconcile with the server before allowing a retry that could duplicate the write. Do not claim the operation failed or succeeded without evidence.</li>
+<li>Assignment conflict: stay at confirmation, explain that availability changed, return to refreshed recommendations. No success haptic.</li>
+<li>Expired session: preserve nonsensitive draft fields as appropriate, ask to sign in; do not cache passwords or attachments.</li>
+<li>Notifications permission denied or delivery pending: assignment may succeed independently. Say “Assignment saved” and “Notification pending” unless delivery evidence supports “Notification sent”.</li>
+<li>Recommendation match percentages are supplied sample values, not a client-computed or approved scoring algorithm. Explain subject fit, capacity and availability; do not add points or rankings.</li>
+</ul>
+<p>References: <a href="https://developer.apple.com/design/human-interface-guidelines/motion">Apple motion</a>, <a href="https://developer.apple.com/design/human-interface-guidelines/sheets">Apple sheets</a>, <a href="https://developer.android.com/develop/ui/compose/accessibility">Android accessibility</a>, <a href="https://developer.android.com/develop/ui/compose/components/navigation-bar">Material navigation</a>. Platform behavior is native; CampusHR timing is a tuning proposal.</p>
+</section>
+<section id="ICONS"><h1>Platform icon mapping</h1>
+<p>Conceptually corresponding families, never mixed within one runtime. SF exports are review-only system-symbol renderings; native code uses SF Symbols with OS availability checks. Android uses Material Symbols Outlined 24/400/FILL 0; selected label/container also communicates state.</p>
+<table>
+<thead>
+<tr>
+<th>Material Symbol / semantic concept</th>
+<th>iOS SF Symbol</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>home</td>
+<td>house</td>
+</tr>
+<tr>
+<td>calendar_month</td>
+<td>calendar</td>
+</tr>
+<tr>
+<td>event_available</td>
+<td>checkmark.circle</td>
+</tr>
+<tr>
+<td>event_busy</td>
+<td>calendar.badge.clock</td>
+</tr>
+<tr>
+<td>account_circle</td>
+<td>person.crop.circle</td>
+</tr>
+<tr>
+<td>notifications</td>
+<td>bell</td>
+</tr>
+<tr>
+<td>arrow_back</td>
+<td>chevron.left</td>
+</tr>
+<tr>
+<td>arrow_forward</td>
+<td>arrow.right</td>
+</tr>
+<tr>
+<td>chevron_right</td>
+<td>chevron.right</td>
+</tr>
+<tr>
+<td>location_on</td>
+<td>mappin.and.ellipse</td>
+</tr>
+<tr>
+<td>schedule</td>
+<td>clock</td>
+</tr>
+<tr>
+<td>visibility</td>
+<td>eye</td>
+</tr>
+<tr>
+<td>visibility_off</td>
+<td>eye.slash</td>
+</tr>
+<tr>
+<td>check</td>
+<td>checkmark</td>
+</tr>
+<tr>
+<td>check_circle</td>
+<td>checkmark.circle</td>
+</tr>
+<tr>
+<td>close</td>
+<td>xmark</td>
+</tr>
+<tr>
+<td>add</td>
+<td>plus</td>
+</tr>
+<tr>
+<td>attach_file</td>
+<td>paperclip</td>
+</tr>
+<tr>
+<td>description</td>
+<td>doc</td>
+</tr>
+<tr>
+<td>school</td>
+<td>graduationcap</td>
+</tr>
+<tr>
+<td>settings</td>
+<td>gearshape</td>
+</tr>
+<tr>
+<td>lock</td>
+<td>lock</td>
+</tr>
+<tr>
+<td>help</td>
+<td>questionmark.circle</td>
+</tr>
+<tr>
+<td>mail</td>
+<td>envelope</td>
+</tr>
+<tr>
+<td>call</td>
+<td>phone</td>
+</tr>
+<tr>
+<td>logout</td>
+<td>rectangle.portrait.and.arrow.right</td>
+</tr>
+<tr>
+<td>info</td>
+<td>info.circle</td>
+</tr>
+<tr>
+<td>keyboard_arrow_down</td>
+<td>chevron.down</td>
+</tr>
+<tr>
+<td>swap_horiz</td>
+<td>arrow.left.arrow.right</td>
+</tr>
+<tr>
+<td>tune</td>
+<td>slider.horizontal.3</td>
+</tr>
+<tr>
+<td>fingerprint</td>
+<td>touchid</td>
+</tr>
+<tr>
+<td>accessibility_new</td>
+<td>accessibility</td>
+</tr>
+<tr>
+<td>contrast</td>
+<td>circle.lefthalf.filled</td>
+</tr>
+<tr>
+<td>language</td>
+<td>globe</td>
+</tr>
+<tr>
+<td>volume_up</td>
+<td>speaker.wave.2</td>
+</tr>
+<tr>
+<td>shield</td>
+<td>checkmark.shield</td>
+</tr>
+<tr>
+<td>business</td>
+<td>building.2</td>
+</tr>
+<tr>
+<td>badge</td>
+<td>person.text.rectangle</td>
+</tr>
+<tr>
+<td>workspace_premium</td>
+<td>rosette</td>
+</tr>
+<tr>
+<td>history</td>
+<td>clock.arrow.circlepath</td>
+</tr>
+<tr>
+<td>bar_chart</td>
+<td>chart.bar</td>
+</tr>
+<tr>
+<td>circle</td>
+<td>circle</td>
+</tr>
+<tr>
+<td>wifi</td>
+<td>wifi</td>
+</tr>
+<tr>
+<td>battery_full</td>
+<td>battery.100</td>
+</tr>
+<tr>
+<td>signal_cellular_alt</td>
+<td>antenna.radiowaves.left.and.right</td>
+</tr>
+<tr>
+<td>download</td>
+<td>arrow.down.doc</td>
+</tr>
+</tbody></table>
+<p>Faculty recommendations / people: iOS person.2; Android account_circle for an individual and group for a group (group is not needed by current exported screens). Search: magnifyingglass / search. Filters: slider.horizontal.3 / tune. Use only a single family per platform, with an accessible control label; decorative icons are hidden from accessibility.</p>
+<p>SF raster exports were generated by export-symbols.swift from this Mac’s system APIs. Use is restricted to Apple platform design review; do not redistribute for Android or non-Apple runtime use. Material font and Inter licensing remain in ../../faculty-screens/assets/.</p>
+</section>
+<section id="PLATFORMS"><h1>Platform adaptations and developer handoff</h1>
+<p>Product design V2 is frozen for development. These are separate iOS and Android review packages; browser previews communicate visual treatment and content, not working native widgets. The original faculty package remains unchanged. All sample identities, leave requests, metrics, matches, notifications and assignment results are synthetic.</p>
+<h2>iOS package</h2>
+<p>Twelve exported views: Login, Home, Timetable (Today with Week access), Attendance, Leave, Apply Leave, Notifications, Profile, HOD Approvals, Leave Review, Smart Coverage, Settings.</p>
+<p>Use system SF Pro, with V2&#39;s named hierarchy as the baseline. Map titles to largeTitle/title2/headline, body to body, secondary to subheadline and caption to a readable footnote. Use scaled metrics for custom sizes; no maximum Dynamic Type cap or minimumScaleFactor to squeeze labels. The browser uses the Apple system font on macOS as a specimen, not proof of Dynamic Type support.</p>
+<p>Use NavigationStack for push destinations and TabView for root destinations. Preserve independent tab stacks; native leading back button and edge-swipe return to the previous view. Hide bottom tabs for the full-screen Apply Leave flow. Root tabs remain Faculty Home/Timetable/Attendance/Leave/Profile; HOD Home/Approvals/Timetable/Workload/Profile. Bell is top-right, Settings is inside Profile. Do not add Notifications as an HOD root tab.</p>
+<p>SF Symbols are the only product glyph family. Specimen PNGs are exported using AppKit system symbols on this Mac; native iOS implementation uses Image(systemName:) with OS availability fallbacks. Do not ship raster exports or assume macOS availability proves the oldest supported iOS version. See ICONS.md.</p>
+<p>Use native segmented Picker, DatePicker, sheet, alert and contextMenu. Password Help uses a content-sized sheet with safe-area-aware bottom action. Apply Leave remains a full-screen form; do not put a long form into a cramped half sheet. Confirm rejection with reason; context menus may expose existing actions, never silently commit decisions. Swipe actions have accessible button equivalents.</p>
+<p>SafeAreaInset for sticky decision actions; scroll content gets matching bottom padding. Respect the home indicator, navigation bar and keyboard insets, including landscape. Keyboard Next moves through form fields; Done dismisses where appropriate. Scroll invalid field into view and keep its real label and error visible. On cancel/back with edits, show native discard confirmation and preserve the draft if cancelled. iPad uses bounded readable content, not stretched phone rows.</p>
+<h2>Android package</h2>
+<p>Same twelve content destinations and role permissions. Inter remains the frozen V2 body/display family with system sp scaling. Do not force fontScale=1 or cap scaling; reflow rows and action groups when space is insufficient.</p>
+<p>Use Material 3 Scaffold with a NavigationBar, selected icon indicator and Material state layers. Top app bar uses Android&#39;s back arrow; Android back first dismisses the keyboard, then sheet/dialog, then the current pushed destination. At a root destination follow platform app-exit expectations; do not cycle tabs as a fake history. Support predictive back through the navigation framework. Gesture and three-button navigation insets must both work.</p>
+<p>Use Material Symbols Outlined consistently. Selected state is indicated by the container and label, never color alone. Browser font is the same licensed Google symbol subset used by the frozen faculty specimen. Do not mix SF exports into Android.</p>
+<p>Use Material DatePickerDialog, ModalBottomSheet and AlertDialog. Native Material text fields own focus/error/supporting-text states; the specimen&#39;s tinted field is visual intent only. V2 color roles map to primary/action, onPrimary/onAction, surface/surface, surfaceContainer/surfaceSecondary, onSurface/ink, onSurfaceVariant/textSecondary, outline/controlStroke, error/coralInk. Success mintInk and warning amberInk remain explicit product roles. Component shape remains restrained by V2 instead of applying giant rounded containers everywhere.</p>
+<p>Dynamic color may affect neutral app-adjacent surfaces only after every text pair is validated. Keep action blue, leave violet, attendance mint, warning amber, destructive coral and the small JCET orange accent stable. Brand assets and semantic status roles never change with wallpaper. No dynamic color implementation or new dark palette is part of this design freeze.</p>
+<p>Keep all targets &gt;=48 dp, even if a visual icon is 24 dp. Use WindowInsets.safeDrawing and IME padding; no buttons behind keyboard or system navigation. At large text, allow stacked action rows and vertically expanded navigation labels instead of ellipsis for critical meaning.</p>
+<h2>Backend truth and capability boundaries</h2>
+<p>The requested “Approve &amp; Find Cover” label is retained as a design fixture with an explicit “HOD recommendation · Final approval is still required” qualifier. Production must use “Recommend approval” for a nonfinal HOD actor, show the actual approval chain, and only enter assignment after final approval permits it. This is a capability binding, not a permission change. Reject follows server authority as well. The prototype never unlocks final approval when its HOD action is tapped; Smart Coverage is a separate already-approved fixture.</p>
+<p>Revalidate assignment availability and workload on commit. Never compute match scores in the client, or infer that 94% is a validated recommendation model. Workload thresholds, attendance percentages and academic-continuity definitions come from the backend and institutional policy. No new metric formula is approved here.</p>
+<p>Institutional SSO, location attestation, lunch tracking, support addresses and full profile subfeatures are design entry points, not claims of implemented integrations. Do not make fake API data appear live. Use confirmed API capabilities and explicit unavailable states until integrations exist. Confirmed notification delivery is separate from assignment creation.</p>
+<h2>Sources</h2>
+<p><a href="https://developer.apple.com/design/human-interface-guidelines">Apple HIG</a>, <a href="https://developer.apple.com/sf-symbols/">SF Symbols</a>, <a href="https://developers.google.com/fonts/docs/material_symbols">Material Symbols</a>, <a href="https://developer.android.com/develop/ui/compose/components/navigation-bar">Material navigation behavior</a>, <a href="https://developer.android.com/develop/ui/compose/accessibility">Android scalable content and semantics</a>.</p>
+</section>
+<section id="QA"><h1>Final product design QA and freeze</h1>
+<p>23 October 2026. Design freeze covers the existing V2 standard, 12 Faculty views, 8 HOD views and the 12-view iOS / 12-view Android adaptations. Product functionality and IA are unchanged. This is a design handoff, not production or native-device acceptance.</p>
+<h2>Evidence and disposition</h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Design decision / review outcome</th>
+<th>Verification boundary</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Visual consistency</td>
+<td>Existing V2 CSS and tokens reused, no replacement visual language; list-first HOD and recommendation rows</td>
+<td>Browser renders reviewed; frozen files hash-checked</td>
+</tr>
+<tr>
+<td>Typography</td>
+<td>V2 hierarchy and &gt;=14 metadata; Inter for generic/Android, system face for iOS</td>
+<td>Real rendered fonts checked; native Dynamic Type pending</td>
+</tr>
+<tr>
+<td>Spacing / radius</td>
+<td>Existing 4–48 spacing and 8–24 contextual radii; no nested summary cards or new shadow scale</td>
+<td>Render and CSS review</td>
+</tr>
+<tr>
+<td>Semantic colors</td>
+<td>Readable ink variants; blue timetable, mint attendance/success, violet leave, amber warning, coral rejection</td>
+<td>Canonical validator measures designated pairs; arbitrary wallpaper colors not approved</td>
+</tr>
+<tr>
+<td>Navigation</td>
+<td>Faculty/HOD five-root sets; bell entry; Settings in Profile; review pushes into decision/coverage</td>
+<td>Prototype flows plus screen contracts; native stacks/back pending</td>
+</tr>
+<tr>
+<td>Icon consistency</td>
+<td>Material only on generic/Android; SF only on iOS; no emoji action icons</td>
+<td>Local icon assets loaded in previews; iOS OS-version fallback pending</td>
+</tr>
+<tr>
+<td>Touch targets</td>
+<td>Shared &gt;=48 layout minimum, including disabled controls and full row labels</td>
+<td>Automated rendered checks at 375/430/1280</td>
+</tr>
+<tr>
+<td>Focus</td>
+<td>Visible 2px outline for actions/fields and keyboard scroll areas; rejection sheet trap/Escape/return</td>
+<td>Browser keyboard traversal; VoiceOver/TalkBack pending</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Icon + text, no color-only meaning; recommendation distinct from final approval</td>
+<td>HOD flow assertion; delivery status requires backend evidence</td>
+</tr>
+<tr>
+<td>Forms</td>
+<td>Persistent labels, secure password, visible visibility state, date/half-day validation, attachment boundary</td>
+<td>Frozen faculty checks plus HOD rejection reason test; native IME pending</td>
+</tr>
+<tr>
+<td>Sheets</td>
+<td>Short support/confirmation content only; Apply Leave full-screen; cancel safe</td>
+<td>Focus trap tested on rejection; native sheets/pickers specified separately</td>
+</tr>
+<tr>
+<td>Loading</td>
+<td>Static skeleton structure with busy semantics; preserve cached context</td>
+<td>Specification complete; all API states require runtime integration</td>
+</tr>
+<tr>
+<td>Empty</td>
+<td>Contextual category/status message and existing recovery action</td>
+<td>HOD Approved empty filter exercised; other cases specified</td>
+</tr>
+<tr>
+<td>Error</td>
+<td>Inline actionable errors; preserve reason/dates; revalidate conflicts</td>
+<td>Rejection validation exercised; network conflicts specified</td>
+</tr>
+<tr>
+<td>Offline</td>
+<td>Explicit offline label + last sync; no writes; keep draft; reconcile unknown writes</td>
+<td>Specified, not a claim of working offline persistence</td>
+</tr>
+<tr>
+<td>Long names / departments</td>
+<td>Wrap rather than ellipsize identity; time rail retains context; stacked actions at expanded text</td>
+<td>375px injected long names and 200% CSS text stress; native font scaling pending</td>
+</tr>
+<tr>
+<td>Small / large phones</td>
+<td>Continuous scrolling instead of compressed desktop matrix; fixed decisions outside scroll content</td>
+<td>375px and 430px preview bounds; landscape/native pending</td>
+</tr>
+<tr>
+<td>Desktop review</td>
+<td>Preview framing only, not a new desktop product design</td>
+<td>1280px preview checked</td>
+</tr>
+<tr>
+<td>Safe areas</td>
+<td>Platform inset contract separates content, fixed actions and system navigation</td>
+<td>Specimen visual allowances; actual cutouts/insets pending</td>
+</tr>
+<tr>
+<td>Keyboard overlap</td>
+<td>IME inset, invalid-field scroll and focus-return contract</td>
+<td>Browser keyboard traversal; actual iOS/Android soft keyboard pending</td>
+</tr>
+<tr>
+<td>Bottom navigation</td>
+<td>Selected root has label and icon; HOD Approvals/Workload retained</td>
+<td>Rendered view checks; scaled native tab layout pending</td>
+</tr>
+<tr>
+<td>Dark readiness</td>
+<td>Semantic roles and no component-local hex make a later theme possible</td>
+<td>Dark palette/screens are not designed, tested or approved; ship V2 light only</td>
+</tr>
+<tr>
+<td>Reduced motion</td>
+<td>No decorative motion; browser reduced-motion override; native equivalents per interaction</td>
+<td>Browser reduce setting used; device-level setting pending</td>
+</tr>
+</tbody></table>
+<h2>Inconsistencies identified and resolved in new artifacts</h2>
+<ul>
+<li>HOD approval segments now use three columns; workload summary inherits no unrelated faculty flex layout.</li>
+<li>New HOD Review and Assign controls initially lacked the shared button base. Added the existing button primitive, restoring the 48 minimum and the same disabled/focus semantics.</li>
+<li>HOD stub destination buttons initially inherited browser button borders. Removed those borders in the HOD specimen so root navigation follows V2.</li>
+<li>A direct translation of the supplied approval CTA would misrepresent current HOD authority. Added a visible final-approval qualifier and separated the approved coverage fixture; the production role binding is mandatory in PLATFORMS.md.</li>
+<li>Visual review caught a relative URL that prevented SF masks from loading; corrected the asset base and added HTTP-failure assertions to the check.</li>
+<li>SF Symbols and Material Symbols cannot share a renderer on iOS. Added separate system-symbol review exports and a native-image handoff requirement; Android uses only Material.</li>
+<li>The provided institutional logo asset is a JGI mark, not a verified official JCET crest. Preserve it as supplied for continuity; obtain approved institutional artwork before release. Do not fabricate a crest.</li>
+</ul>
+<p>The requested Faculty screens were not changed to fix these new-preview issues. No new features, metric formula, role permission or dark palette is introduced.</p>
+<h2>State acceptance for every data screen</h2>
+<p>Initial load: stable title/navigation with matching static skeleton. Populated: current server data and period. Empty: successful zero result with contextual message. Recoverable error: retry the failed read, keep useful cached context. Offline: explicitly stale read-only context and preserved draft. Permission loss: explain unavailability and remove unauthorized action. Write pending: block duplicate commit. Write failure: preserve input. Uncertain outcome: reconcile before retry. Success: confirmed response only. Screen-specific variants are listed in SCREENS.md; none can be omitted merely because the happy-path PDF is complete.</p>
+<h2>Remaining native acceptance before release</h2>
+<p>Run actual iOS and Android builds on the smallest supported phones and a large device; test landscape, 200% and accessibility text sizes, long identities, native date picker, keyboard Next/Done, interactive sheet dismissal, predictive/edge back, safe areas, gesture/three-button navigation, VoiceOver/TalkBack order and announcements, assistive alternative to swipe, reduced motion, disabled haptics, slow/offline reconnect, expired session, assignment conflict and lost write response. Confirm SF availability on the minimum iOS version and check real fonts after fallback. These are acceptance gates, not passed results.</p>
+<p>Freeze source: ../../DESIGN_SYSTEM.md and ../../tokens.json. Final inventory COMPONENTS.md; platform bindings PLATFORMS.md; icons ICONS.md; motion INTERACTIONS.md; every screen SCREENS.md and screens.json; executed browser evidence check-results.json.</p>
+</section></main></body></html>

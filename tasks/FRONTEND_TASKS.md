@@ -83,7 +83,7 @@ Verification and launch steps: `frontend/README.md`.
 - [x] Department filter
 - [x] Conflict display (clash message in the add/edit dialog)
 - [x] API data; HOD adds, edits and removes classes; subjects and rooms
-- [ ] Substitute assignments shown in the grid (with Smart Substitution)
+- [x] Substitute assignments shown in the grid (with Smart Substitution)
 
 ## FE-010 Workload
 
@@ -99,19 +99,19 @@ Verification and launch steps: `frontend/README.md`.
 - [x] Assignment action (confirmation, coverage progress, completion, undo)
 - [x] Manual no-substitute decision with academic arrangement
 - [x] "Classes you are covering" for faculty
-- [ ] Updated timetable view with substitutes
+- [x] Updated timetable view with substitutes
 
 ## FE-013 Documents
 
-- [ ] Upload
-- [ ] Verification queue
-- [ ] Preview
+- [x] Upload
+- [x] Verification queue
+- [x] Preview
 
 ## FE-014 Reports
 
-- [ ] Filters
+- [x] Filters
 - [x] Charts
-- [ ] Export actions
+- [x] Export actions
 
 ## FE-015 Notifications
 

@@ -14,7 +14,12 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { listRequests, type LeaveRequest } from '../api/leave';
-import { shiftMonth, thisMonth } from '../utils/leave';
+import {
+  ACADEMIC_TIMELINE_EVENTS,
+  holidayName,
+  shiftMonth,
+  thisMonth,
+} from '../utils/leave';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const SHOWN_PER_DAY = 3;
@@ -67,7 +72,7 @@ export function LeaveCalendar({
     (request) => request.status === 'APPROVED' || request.status === 'PENDING',
   );
   const onDay = (day: string) =>
-    isSunday(day)
+    isSunday(day) || Boolean(holidayName(day))
       ? []
       : live.filter(
           (request) => request.startDate <= day && request.endDate >= day,
@@ -127,7 +132,7 @@ export function LeaveCalendar({
             />
             Waiting for approval
           </span>
-          <span>Sundays are not leave days.</span>
+          <span>Sundays and campus holidays are not leave days.</span>
         </p>
       </CardHeader>
       <CardContent>
@@ -171,12 +176,20 @@ export function LeaveCalendar({
                           key={day}
                           className={cn(
                             'h-28 border p-1.5 align-top',
-                            isSunday(day) && 'bg-muted/50',
+                            (isSunday(day) || Boolean(holidayName(day))) &&
+                              'bg-muted/50',
                           )}
                         >
-                          <span className="text-xs text-muted-foreground tabular-nums">
-                            {Number(day.slice(8))}
-                          </span>
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              {Number(day.slice(8))}
+                            </span>
+                            {holidayName(day) && (
+                              <span className="truncate rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                                {holidayName(day)}
+                              </span>
+                            )}
+                          </div>
                           <DayChips
                             compact
                             requests={onDay(day)}
@@ -217,6 +230,55 @@ export function LeaveCalendar({
                 Nobody is on leave in {title}.
               </p>
             )}
+
+            <div className="mt-6 border-t pt-5">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    VTU Academic Calendar & Campus Timeline
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    CIE internal assessments, semester milestones, and
+                    institutional holidays.
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                {ACADEMIC_TIMELINE_EVENTS.map((event) => (
+                  <div
+                    key={event.id}
+                    className="flex flex-col justify-between gap-1.5 rounded-xl border bg-muted/25 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-[11px] font-medium text-muted-foreground tabular-nums">
+                        {event.date}
+                      </span>
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                          event.category === 'EXAM' &&
+                            'bg-blue-500/15 text-blue-700',
+                          event.category === 'HOLIDAY' &&
+                            'bg-amber-500/15 text-amber-800',
+                          event.category === 'ACADEMIC' &&
+                            'bg-emerald-500/15 text-emerald-800',
+                          event.category === 'EVENT' &&
+                            'bg-purple-500/15 text-purple-800',
+                        )}
+                      >
+                        {event.category}
+                      </span>
+                    </div>
+                    <strong className="text-xs font-semibold text-foreground">
+                      {event.title}
+                    </strong>
+                    <p className="text-xs text-muted-foreground">
+                      {event.detail}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </>
         )}
       </CardContent>

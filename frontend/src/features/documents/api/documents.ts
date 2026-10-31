@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { apiRequest } from '@/services/api';
+import { apiRequest, getSessionIdentity } from '@/services/api';
 
 export const DOCUMENT_CATEGORY_MAP = {
   IDENTITY: 'Identity & Government Proof',
@@ -23,7 +23,13 @@ export type DocumentStatusKey = keyof typeof DOCUMENT_STATUS_MAP;
 export const documentSchema = z.object({
   id: z.string(),
   employeeId: z.string(),
-  category: z.enum(['IDENTITY', 'ACADEMIC', 'EMPLOYMENT', 'CERTIFICATION', 'OTHER']),
+  category: z.enum([
+    'IDENTITY',
+    'ACADEMIC',
+    'EMPLOYMENT',
+    'CERTIFICATION',
+    'OTHER',
+  ]),
   title: z.string(),
   documentType: z.string(),
   fileUrl: z.string(),
@@ -93,7 +99,9 @@ export function useDocuments(params: {
     queryKey: ['documents', params],
     queryFn: async () => {
       const qs = query.toString();
-      const res = (await apiRequest(`/documents${qs ? `?${qs}` : ''}`)) as ListDocumentsResponse;
+      const res = (await apiRequest(
+        `/documents${qs ? `?${qs}` : ''}`,
+      )) as ListDocumentsResponse;
       return res;
     },
   });
@@ -103,7 +111,9 @@ export function usePendingDocumentsCount() {
   return useQuery({
     queryKey: ['documents', 'pending-count'],
     queryFn: async () => {
-      const res = (await apiRequest('/documents/pending-count')) as { data: { count: number } };
+      const res = (await apiRequest('/documents/pending-count')) as {
+        data: { count: number };
+      };
       return res.data.count;
     },
   });
@@ -161,4 +171,32 @@ export function useDeleteDocument() {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
     },
   });
+}
+
+export async function documentBlob(id: string): Promise<Blob> {
+  z.uuid().parse(id);
+  const owner = getSessionIdentity();
+  if (!owner) throw new Error('Sign in to view documents.');
+  const blob = (await apiRequest(`/documents/${id}/content`, {
+    responseType: 'blob',
+  })) as Blob;
+  if (getSessionIdentity() !== owner)
+    throw new Error('Session changed. Reopen documents.');
+  if (
+    !['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(
+      blob.type,
+    ) ||
+    !blob.size ||
+    blob.size > 10 * 1024 * 1024
+  )
+    throw new Error('Document preview is unavailable.');
+  return blob;
+}
+export async function downloadDocument(document: DocumentItem) {
+  const url = URL.createObjectURL(await documentBlob(document.id));
+  const link = globalThis.document.createElement('a');
+  link.href = url;
+  link.download = document.fileName;
+  link.click();
+  URL.revokeObjectURL(url);
 }

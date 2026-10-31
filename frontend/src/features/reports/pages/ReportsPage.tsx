@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { ReportPreviewModal } from '../components/ReportPreviewModal';
@@ -52,13 +53,15 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 export default function ReportsPage() {
-  const { data: summary, isLoading } = useReportsSummary();
-  const [selectedReport, setSelectedReport] = useState<ReportCategory | null>(null);
+  const { data: summary, isLoading, isError, refetch } = useReportsSummary();
+  const [selectedReport, setSelectedReport] = useState<ReportCategory | null>(
+    null,
+  );
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const continuityRate = summary?.continuity.coverageRate ?? 94;
-  const affectedLectures = summary?.continuity.affectedClasses ?? 18;
-  const coveredLectures = summary?.continuity.classesCovered ?? 17;
+  const continuityRate = summary?.continuity.coverageRate ?? '—';
+  const affectedLectures = summary?.continuity.affectedClasses ?? '—';
+  const coveredLectures = summary?.continuity.classesCovered ?? '—';
 
   const dynamicCategories: ReportCategory[] = [
     {
@@ -80,7 +83,7 @@ export default function ReportsPage() {
       description:
         'Daily check-ins, late arrivals, half-day leaves, and department-wise attendance averages across campus.',
       metricLabel: 'Campus Attendance',
-      metricValue: `${summary?.attendance.todayRate ?? 94.2}%`,
+      metricValue: `${summary?.attendance.todayRate ?? '—'}%`,
       iconName: 'CalendarCheck2',
       updatedAt: 'Today',
     },
@@ -91,9 +94,9 @@ export default function ReportsPage() {
       description:
         'Monthly distribution of Casual, Medical, and Earned leaves, departmental absence frequencies, and quota utilization.',
       metricLabel: 'Monthly Leave Days',
-      metricValue: `${summary?.leave.monthlyLeaveDays ?? 38} Days`,
+      metricValue: `${summary?.leave.monthlyLeaveDays ?? '—'} Days`,
       iconName: 'CalendarDays',
-      updatedAt: 'October 2026 cycle',
+      updatedAt: 'Current month',
     },
     {
       id: 'faculty-workload',
@@ -102,45 +105,9 @@ export default function ReportsPage() {
       description:
         'Audit of VTU/AICTE teaching hours per week across Professors, Associate Professors, and Assistant Professors.',
       metricLabel: 'Faculty at Normal Load',
-      metricValue: `${summary?.workload.normalLoadPercentage ?? 81.8}%`,
+      metricValue: `${summary?.workload.normalLoadPercentage ?? '—'}%`,
       iconName: 'ChartNoAxesCombined',
       updatedAt: 'Weekly audit',
-    },
-    {
-      id: 'department-strength',
-      title: 'Department Strength & Cadre Ratio',
-      category: 'Institutional Planning',
-      description:
-        'Cadre ratio breakdown (Professors to Assistant Professors), teaching to non-teaching allocations.',
-      metricLabel: 'Total Headcount',
-      metricValue: `${summary?.headcount.total ?? 60} Staff`,
-      iconName: 'Building2',
-      updatedAt: 'Live return',
-    },
-    {
-      id: 'faculty-qualification',
-      title: 'Faculty Qualification Profile',
-      category: 'Accreditation',
-      description:
-        'Breakdown of Ph.D holders, pursuing Ph.D scholars, M.Tech specialists for NBA/NAAC criteria.',
-      metricLabel: 'Doctorate Ratio',
-      metricValue: summary?.headcount.total
-        ? `${Math.round((summary.headcount.doctorates / summary.headcount.total) * 100)}%`
-        : '48.5%',
-      iconName: 'GraduationCap',
-      updatedAt: 'NBA Cycle 2026',
-    },
-    {
-      id: 'naac-nba-reporting',
-      title: 'NAAC / NBA Faculty Metric Dossier',
-      category: 'Compliance & Audit',
-      description:
-        'Automated Criteria 2.1, 2.2, 2.4 datasets with faculty retention rate, student-teacher ratio, and sanction letters.',
-      badge: 'VTU / NBA Audit',
-      metricLabel: 'Audit Readiness',
-      metricValue: '96%',
-      iconName: 'Award',
-      updatedAt: 'Autumn 2026 cycle',
     },
   ];
 
@@ -149,23 +116,8 @@ export default function ReportsPage() {
     setPreviewOpen(true);
   }
 
-  const deptAttendanceData = summary?.attendance.departmentAverages.length
-    ? summary.attendance.departmentAverages
-    : [
-        { department: 'CSE', rate: 95.2 },
-        { department: 'ECE', rate: 93.8 },
-        { department: 'MECH', rate: 91.5 },
-        { department: 'CIVIL', rate: 94.0 },
-      ];
-
-  const leaveTrendsData = summary?.leave.monthlyTrends.length
-    ? summary.leave.monthlyTrends
-    : [
-        { month: 'Jul 2026', CL: 16, ML: 4, EL: 2, other: 1 },
-        { month: 'Aug 2026', CL: 18, ML: 5, EL: 3, other: 1 },
-        { month: 'Sep 2026', CL: 22, ML: 6, EL: 4, other: 2 },
-        { month: 'Oct 2026', CL: 26, ML: 7, EL: 4, other: 1 },
-      ];
+  const deptAttendanceData = summary?.attendance.departmentAverages ?? [];
+  const leaveTrendsData = summary?.leave.monthlyTrends ?? [];
 
   return (
     <PageTransition>
@@ -174,6 +126,12 @@ export default function ReportsPage() {
         description="Accreditation dossier generation, academic continuity tracking, and campus audit metrics."
       />
 
+      {isError && (
+        <div role="alert">
+          Reports could not be loaded.{' '}
+          <Button onClick={() => void refetch()}>Retry</Button>
+        </div>
+      )}
       {/* Featured KPI: Academic Continuity Banner */}
       <div className="mb-6 rounded-xl border-2 border-primary/30 bg-primary/5 p-5 shadow-xs">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -192,7 +150,7 @@ export default function ReportsPage() {
             <p className="text-xs text-muted-foreground max-w-2xl leading-relaxed">
               When faculty members submit leave requests, CampusHR automatically
               computes timetable conflicts and suggests substitute allocations
-              to guarantee zero missed syllabus lectures.
+              to help administrators arrange class coverage.
             </p>
           </div>
 
@@ -202,15 +160,23 @@ export default function ReportsPage() {
                 Affected Lectures
               </span>
               <div className="text-xl font-bold text-foreground">
-                {isLoading ? <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /> : affectedLectures}
+                {isLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
+                ) : (
+                  affectedLectures
+                )}
               </div>
             </div>
             <div className="rounded-lg border bg-card px-4 py-2 text-center shadow-xs">
               <span className="text-[11px] text-muted-foreground">
-                Covered with Substitute
+                Covered / Not Needed
               </span>
               <div className="text-xl font-bold text-emerald-600">
-                {isLoading ? <Loader2 className="h-5 w-5 animate-spin mx-auto text-emerald-600" /> : coveredLectures}
+                {isLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto text-emerald-600" />
+                ) : (
+                  coveredLectures
+                )}
               </div>
             </div>
             <Button
@@ -236,14 +202,16 @@ export default function ReportsPage() {
             const isContinuity = report.id === 'academic-continuity';
 
             return (
-              <div
+              <button
+                type="button"
                 key={report.id}
                 onClick={() => handleOpenReport(report)}
-                className={`group cursor-pointer rounded-xl border p-4 transition-all hover:border-primary/50 hover:shadow-md ${
+                className={cn(
+                  'group cursor-pointer rounded-xl border p-4 text-left transition-all hover:border-primary/50 hover:shadow-md',
                   isContinuity
                     ? 'border-primary/40 bg-card'
-                    : 'border-border bg-card'
-                }`}
+                    : 'border-border bg-card',
+                )}
               >
                 <div className="flex items-start justify-between">
                   <div className="rounded-lg bg-primary/10 p-2.5 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
@@ -283,7 +251,7 @@ export default function ReportsPage() {
                     Preview <ArrowRight className="h-3 w-3" />
                   </span>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -292,7 +260,7 @@ export default function ReportsPage() {
       {/* Analytics Charts Grid */}
       <div className="grid gap-6 lg:grid-cols-2 mb-6">
         {/* Department-wise Attendance Rate */}
-        <div className="rounded-xl border bg-card p-5 shadow-xs">
+        <div className="min-w-0 rounded-xl border bg-card p-5 shadow-xs">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="font-semibold text-foreground">
@@ -304,7 +272,7 @@ export default function ReportsPage() {
             </div>
             <Badge variant="outline">Live Attendance</Badge>
           </div>
-          <div className="h-[250px] w-full">
+          <div className="h-[250px] w-full min-w-0 overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={deptAttendanceData}
@@ -316,7 +284,7 @@ export default function ReportsPage() {
                   opacity={0.3}
                 />
                 <XAxis dataKey="department" tick={{ fontSize: 12 }} />
-                <YAxis domain={[80, 100]} tick={{ fontSize: 12 }} unit="%" />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} unit="%" />
                 <Tooltip
                   contentStyle={{
                     borderRadius: '8px',
@@ -324,7 +292,10 @@ export default function ReportsPage() {
                     borderColor: 'var(--border)',
                     fontSize: '12px',
                   }}
-                  formatter={(value: unknown) => [`${Number(value)}%`, 'Attendance Rate']}
+                  formatter={(value: unknown) => [
+                    `${Number(value)}%`,
+                    'Attendance Rate',
+                  ]}
                 />
                 <Bar
                   dataKey="rate"
@@ -338,7 +309,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Monthly Leave Trend */}
-        <div className="rounded-xl border bg-card p-5 shadow-xs">
+        <div className="min-w-0 rounded-xl border bg-card p-5 shadow-xs">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="font-semibold text-foreground">
@@ -350,7 +321,7 @@ export default function ReportsPage() {
             </div>
             <Badge variant="outline">Odd Semester</Badge>
           </div>
-          <div className="h-[250px] w-full">
+          <div className="h-[250px] w-full min-w-0 overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={leaveTrendsData}

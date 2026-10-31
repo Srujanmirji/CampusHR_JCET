@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, RefreshCw } from 'lucide-react';
 import { metrics } from '@/data/mock/dashboard';
 import { useLeaveWaiting } from '@/features/leave/hooks/useLeaveWaiting';
@@ -17,6 +18,7 @@ import { HodDashboard } from '../components/HodDashboard';
 import { PrincipalDashboard } from '../components/PrincipalDashboard';
 
 export default function DashboardPage() {
+  const queryClient = useQueryClient();
   const session = useSession();
   const user = session.status === 'signedIn' ? session.user : null;
   const isFaculty = user?.role === 'Faculty';
@@ -57,12 +59,18 @@ export default function DashboardPage() {
           <div className="dashboard-heading-actions">
             <span>
               <CalendarDays aria-hidden="true" />
-              March 2026
+              {new Date().toLocaleDateString('en-IN', {
+                month: 'long',
+                year: 'numeric',
+              })}
             </span>
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setLoading(true)}
+              onClick={() => {
+                void queryClient.invalidateQueries();
+                setLoading(true);
+              }}
               disabled={loading}
               aria-label="Refresh dashboard"
             >

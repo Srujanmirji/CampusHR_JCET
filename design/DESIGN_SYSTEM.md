@@ -1,5 +1,9 @@
 # CampusHR Design System
 
+## Mobile V2 authority
+
+For future Faculty/HOD mobile design, use [CampusHR Mobile Design System V2](mobile-v2/DESIGN_SYSTEM.md), its [tokens](mobile-v2/tokens.json) and [component specimens](mobile-v2/COMPONENT_SPECIMENS.pdf). The guidance below is the earlier shared/web reference; V2 supersedes its mobile visual values. The running app has not yet adopted V2.
+
 ## Visual Direction
 
 Professional academic enterprise UI.

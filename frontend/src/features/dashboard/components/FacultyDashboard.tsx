@@ -6,116 +6,28 @@ import {
   CalendarRange,
   ChartNoAxesCombined,
   Clock,
-  Files,
   Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { SectionHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useSession } from '@/features/auth/hooks/useSession';
-import { getTodayAttendance, punchAttendance } from '@/features/attendance/api/attendance';
+import {
+  getTodayAttendance,
+  punchAttendance,
+} from '@/features/attendance/api/attendance';
 import { CorrectionRequestDialog } from '@/features/attendance/components/CorrectionRequestDialog';
 import { listEntries, listPeriods } from '@/features/timetable/api/timetable';
 import { listBalances, type Balance } from '@/features/leave/api/leave';
-import { useDocuments } from '@/features/documents/api/documents';
 import { facultyWorkloadQuery } from '@/features/workload/api/workload';
 
 import { RecentLeaveRequests } from './RecentLeaveRequests';
 import { QuickActions } from './QuickActions';
 import { NotificationsPreview } from './NotificationsPreview';
-
-// Standard 7-period schedule template for JCET faculty
-const SAMPLE_SCHEDULE = [
-  {
-    periodNumber: 1,
-    time: '09:00 – 10:00',
-    subjectCode: '21CS61',
-    subjectName: 'Compiler Design',
-    semester: 6,
-    section: 'A',
-    room: 'Room 302',
-    kind: 'THEORY',
-    isCurrent: false,
-  },
-  {
-    periodNumber: 2,
-    time: '10:00 – 10:50',
-    subjectCode: '21CS53',
-    subjectName: 'Database Management Systems',
-    semester: 5,
-    section: 'B',
-    room: 'Room 204',
-    kind: 'THEORY',
-    isCurrent: false,
-  },
-  {
-    periodNumber: 3,
-    time: '11:15 – 12:15',
-    subjectCode: '21CSL66',
-    subjectName: 'Compiler & Systems Lab',
-    semester: 6,
-    section: 'Batch A1',
-    room: 'Systems Lab 3',
-    kind: 'LAB',
-    isCurrent: true,
-  },
-  {
-    periodNumber: 4,
-    time: '12:15 – 13:15',
-    subjectCode: '21CSL66',
-    subjectName: 'Compiler & Systems Lab (Cont.)',
-    semester: 6,
-    section: 'Batch A1',
-    room: 'Systems Lab 3',
-    kind: 'LAB',
-    isCurrent: false,
-  },
-  {
-    periodNumber: 5,
-    time: '14:00 – 15:00',
-    subjectCode: null,
-    subjectName: 'Student Mentoring & Course Prep',
-    semester: null,
-    section: null,
-    room: 'Staff Room',
-    kind: 'FREE',
-    isCurrent: false,
-  },
-  {
-    periodNumber: 6,
-    time: '15:00 – 16:00',
-    subjectCode: '21CS62',
-    subjectName: 'Computer Graphics & Visualization',
-    semester: 6,
-    section: 'A',
-    room: 'Room 305',
-    kind: 'THEORY',
-    isCurrent: false,
-  },
-  {
-    periodNumber: 7,
-    time: '16:00 – 17:00',
-    subjectCode: null,
-    subjectName: 'Department & AICTE Work',
-    semester: null,
-    section: null,
-    room: 'Department Library',
-    kind: 'FREE',
-    isCurrent: false,
-  },
-];
 
 export function FacultyDashboard() {
   const session = useSession();
@@ -126,7 +38,11 @@ export function FacultyDashboard() {
   const employeeId = user?.employeeId ?? undefined;
 
   // 1. Attendance Query
-  const { data: todayAttendance, isLoading: loadingAttendance } = useQuery({
+  const {
+    data: todayAttendance,
+    isLoading: loadingAttendance,
+    isError: attendanceError,
+  } = useQuery({
     queryKey: ['attendance', 'today'],
     queryFn: getTodayAttendance,
   });
@@ -148,36 +64,34 @@ export function FacultyDashboard() {
   });
 
   // 3. Timetable Query
-  const { data: periods } = useQuery({
+  const { data: periods, isError: periodsError } = useQuery({
     queryKey: ['timetable', 'periods'],
     queryFn: listPeriods,
   });
 
-  const { data: timetableEntries } = useQuery({
+  const { data: timetableEntries, isError: timetableError } = useQuery({
     queryKey: ['timetable', 'entries', { facultyId: employeeId }],
     queryFn: () => listEntries(employeeId ? { facultyId: employeeId } : {}),
   });
 
   // 4. Leave Balances Query
-  const { data: leaveBalances } = useQuery<Balance[]>({
+  const { data: leaveBalances, isError: leaveError } = useQuery<Balance[]>({
     queryKey: ['leave', 'balances'],
     queryFn: listBalances,
   });
 
   // 5. Workload Query
-  const { data: workloadData } = useQuery({
+  const { data: workloadData, isError: workloadError } = useQuery({
     ...facultyWorkloadQuery(employeeId ?? ''),
     enabled: Boolean(employeeId),
   });
 
-  // 6. Documents Query
-  const { data: documentsData } = useDocuments({
-    employeeId: employeeId ?? undefined,
-  });
-
   const formatTime = (iso?: string | null) => {
     if (!iso) return '—';
-    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   const isCheckedIn = Boolean(todayAttendance?.checkIn);
@@ -186,91 +100,105 @@ export function FacultyDashboard() {
   // Faculty details
   const facultyName =
     workloadData?.faculty?.name ??
-    (user?.email?.split('@')[0]?.replace('.', ' ') ?? 'Faculty Member');
+    user?.email?.split('@')[0]?.replace('.', ' ') ??
+    'Faculty Member';
   const departmentName =
-    workloadData?.faculty?.department?.name ?? 'Department of Computer Science & Engineering';
-  const designationName = workloadData?.faculty?.designation?.name ?? 'Assistant Professor';
-  const employeeCode = workloadData?.faculty?.employeeCode ?? 'JCET-CSE-004';
+    workloadData?.faculty?.department?.name ??
+    'Department of Computer Science & Engineering';
+  const designationName =
+    workloadData?.faculty?.designation?.name ?? 'Designation unavailable';
+  const employeeCode = workloadData?.faculty?.employeeCode ?? 'Unavailable';
 
   // Day mapping
-  const todayDayMap: Record<number, string> = {
-    1: 'MON',
-    2: 'TUE',
-    3: 'WED',
-    4: 'THU',
-    5: 'FRI',
-    6: 'SAT',
-  };
-  const todayDayKey = todayDayMap[new Date().getDay()] || 'MON';
+  const todayDayKey = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'short',
+  })
+    .format(new Date())
+    .toUpperCase();
+  const campusTime = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date());
 
   const scheduleSlots = useMemo(() => {
     if (timetableEntries && timetableEntries.length > 0) {
-      const todayClasses = timetableEntries.filter((e) => e.day === todayDayKey);
+      const todayClasses = timetableEntries.filter(
+        (e) => e.day === todayDayKey,
+      );
       if (todayClasses.length > 0 && periods) {
         return periods.map((period) => {
           const match = todayClasses.find(
-            (e) => period.number >= e.startPeriod && period.number <= e.endPeriod,
+            (e) =>
+              period.number >= e.startPeriod && period.number <= e.endPeriod,
           );
           return {
             periodNumber: period.number,
             time: `${period.startTime} – ${period.endTime}`,
             subjectCode: match?.subject.code ?? null,
-            subjectName: match ? match.subject.name : 'Free Period / Course Prep',
+            subjectName: match
+              ? match.subject.name
+              : 'Free Period / Course Prep',
             semester: match?.semester ?? null,
             section: match?.section ?? null,
             room: match?.room.name ?? 'Staff Room',
             kind: match ? match.subject.kind : 'FREE',
-            isCurrent: period.number === 3,
+            isCurrent:
+              campusTime >= period.startTime && campusTime < period.endTime,
           };
         });
       }
     }
-    return SAMPLE_SCHEDULE;
-  }, [timetableEntries, todayDayKey, periods]);
+    return [];
+  }, [timetableEntries, todayDayKey, campusTime, periods]);
 
   // Leave balances
-  const clBalance = leaveBalances?.find((b) => b.leaveType.code === 'CL') ?? {
-    remaining: 8,
-    entitled: 12,
-    used: 4,
-    pending: 0,
-  };
-  const mlBalance = leaveBalances?.find((b) => b.leaveType.code === 'ML') ?? {
-    remaining: 8,
-    entitled: 10,
-    used: 2,
-    pending: 0,
-  };
-
-  const docsList = documentsData?.data ?? [];
-  const verifiedDocsCount = docsList.filter((d) => d.status === 'VERIFIED').length || 4;
+  const clBalance = leaveBalances?.find((b) => b.leaveType.code === 'CL');
+  const mlBalance = leaveBalances?.find((b) => b.leaveType.code === 'ML');
+  const totalLeaveRemaining =
+    leaveBalances && leaveBalances.length > 0
+      ? leaveBalances.reduce((sum, b) => sum + (b.remaining ?? 0), 0)
+      : null;
 
   return (
     <>
+      {(attendanceError ||
+        periodsError ||
+        timetableError ||
+        leaveError ||
+        workloadError) && (
+        <p role="alert">
+          Some dashboard data could not be loaded. Refresh to retry; unavailable
+          values are not estimated.
+        </p>
+      )}
       {/* 1. Established JCET Welcome Banner */}
       <section className="welcome-banner" aria-labelledby="welcome-title">
         <div>
           <h2 id="welcome-title" className="capitalize">
             Welcome, Prof. {facultyName}
           </h2>
-          <p>{departmentName} · Jain College of Engineering and Technology, Hubballi</p>
+          <p>
+            {departmentName} · Jain College of Engineering and Technology,
+            Hubballi
+          </p>
           <span>
-            {designationName} <b>•</b> AY 2025–26 (Even Sem) <b>•</b> Employee Code: {employeeCode}
+            {designationName} <b>•</b> AY 2025–26 (Even Sem) <b>•</b> Employee
+            Code: {employeeCode}
           </span>
         </div>
-        <img
-          src="/assets/jcet-campus.png"
-          alt=""
-          width="656"
-          height="305"
-        />
+        <img src="/assets/jcet-campus.png" alt="" width="656" height="305" />
       </section>
 
-      {/* 2. Established 6-Card Metrics Grid */}
+      {/* 2. 4-Card Faculty Metrics Grid */}
       <section aria-label="Faculty key indicators" className="metrics-grid">
         <MetricCard
           label="Today's attendance"
-          value={isCheckedOut ? 'Completed' : isCheckedIn ? 'Present' : 'Not marked'}
+          value={
+            isCheckedOut ? 'Completed' : isCheckedIn ? 'Present' : 'Not marked'
+          }
           detail={
             isCheckedOut
               ? `Out at ${formatTime(todayAttendance?.checkOut)}`
@@ -285,8 +213,8 @@ export function FacultyDashboard() {
 
         <MetricCard
           label="Today's lectures"
-          value="4 classes"
-          detail="Next: Period 3 in Room 302"
+          value={`${timetableEntries?.filter((entry) => entry.day === todayDayKey).length ?? 0} classes`}
+          detail="Classes in your timetable today"
           icon={CalendarRange}
           index={1}
           href="/timetable"
@@ -294,115 +222,148 @@ export function FacultyDashboard() {
 
         <MetricCard
           label="Weekly workload"
-          value={`${workloadData?.totalHours ?? 16} hrs`}
-          detail="AICTE compliant · 14–18h band"
+          value={`${workloadData?.totalHours ?? '—'} hrs`}
+          detail={workloadData?.status ?? 'Workload band not available'}
           icon={ChartNoAxesCombined}
           index={2}
           href="/workload"
         />
 
         <MetricCard
-          label="Casual leave (CL)"
-          value={`${clBalance.remaining} days`}
-          detail={`${clBalance.remaining} of ${clBalance.entitled} remaining`}
+          label="Leaves"
+          value={`${totalLeaveRemaining ?? '—'} days`}
+          detail={`CL: ${clBalance?.remaining ?? '—'} · ML: ${mlBalance?.remaining ?? '—'} remaining`}
           icon={CalendarDays}
           index={3}
           href="/leave"
         />
-
-        <MetricCard
-          label="Medical leave (ML)"
-          value={`${mlBalance.remaining} days`}
-          detail={`${mlBalance.remaining} of ${mlBalance.entitled} remaining`}
-          icon={Clock}
-          index={4}
-          href="/leave"
-        />
-
-        <MetricCard
-          label="Verified documents"
-          value={`${verifiedDocsCount} of 4`}
-          detail="100% verified · VTU & AICTE OK"
-          icon={Files}
-          index={5}
-          href="/documents"
-        />
       </section>
 
-      {/* 3. Middle 2-Column Row (Matches dashboard-charts layout) */}
+      {/* 3. Middle 2-Column Bento Row */}
       <div className="dashboard-charts">
-        {/* Left Card: Today's Lecture Schedule */}
+        {/* Left Card: Apple Calendar Timeline for Today's Lecture Schedule */}
         <Card className="leave-card">
           <CardHeader>
             <SectionHeader
               title="Today's lecture schedule"
-              description="7 academic periods · Wednesday"
+              description={`${periods?.length ?? 5} academic periods · ${todayDayKey}`}
+              action={
+                <span className="chart-period">
+                  {
+                    scheduleSlots.filter(
+                      (s) => s.kind === 'THEORY' || s.kind === 'LAB',
+                    ).length
+                  }{' '}
+                  active sessions
+                </span>
+              }
             />
           </CardHeader>
-          <div data-slot="table-container">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-16">Period</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Subject / Course</TableHead>
-                  <TableHead>Room</TableHead>
-                  <TableHead>Type</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {scheduleSlots.map((slot) => (
-                  <TableRow
+          <CardContent className="space-y-2.5">
+            {scheduleSlots.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+                No classes to display for today.
+              </div>
+            ) : (
+              scheduleSlots.map((slot) => {
+                const isLab = slot.kind === 'LAB';
+                const isTheory = slot.kind === 'THEORY';
+                return (
+                  <div
                     key={slot.periodNumber}
-                    className={slot.isCurrent ? 'bg-primary/5 font-medium' : ''}
+                    className={`flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors ${
+                      slot.isCurrent
+                        ? 'border-primary/40 bg-primary/8'
+                        : 'border-border/70 bg-muted/30 hover:bg-muted/50'
+                    }`}
                   >
-                    <TableCell className="font-semibold text-primary">
-                      P{slot.periodNumber}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                      {slot.time}
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium text-foreground">{slot.subjectName}</div>
-                      {slot.subjectCode && (
-                        <div className="text-xs text-muted-foreground">
-                          {slot.subjectCode} · Sem {slot.semester}-{slot.section}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className={`h-9 w-1.5 shrink-0 rounded-full ${
+                          isLab
+                            ? 'bg-[#5856d6]'
+                            : isTheory
+                              ? 'bg-[#0071e3]'
+                              : 'bg-muted-foreground/35'
+                        }`}
+                        aria-hidden="true"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center rounded-md bg-primary/10 px-1.5 py-0.5 text-[11px] font-bold text-primary">
+                            P{slot.periodNumber}
+                          </span>
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {slot.time}
+                          </span>
                         </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs">{slot.room}</TableCell>
-                    <TableCell>
-                      {slot.kind === 'LAB' ? (
+                        <p className="mt-1 truncate text-sm font-semibold text-foreground">
+                          {slot.subjectName}
+                        </p>
+                        {slot.subjectCode && (
+                          <p className="text-xs text-muted-foreground">
+                            {slot.subjectCode} · Sem {slot.semester}-
+                            {slot.section}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      {isLab ? (
                         <StatusBadge status="Present" label="Lab" />
-                      ) : slot.kind === 'THEORY' ? (
+                      ) : isTheory ? (
                         <StatusBadge status="Approved" label="Theory" />
                       ) : (
-                        <span className="text-xs text-muted-foreground">Prep</span>
+                        <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          Course Prep
+                        </span>
                       )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                      <span className="text-[11px] font-medium text-muted-foreground">
+                        {slot.room}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
         </Card>
 
-        {/* Right Card: Daily Shift & Biometric Punch */}
+        {/* Right Card: Apple Watch / Health Style Live Shift & Biometric Bento */}
         <Card className="leave-card">
           <CardHeader>
             <SectionHeader
               title="Daily shift & biometric punch"
-              description="Today's attendance recording"
+              description="Live campus attendance & shift progress"
+              action={
+                <StatusBadge
+                  status={
+                    isCheckedOut
+                      ? 'Present'
+                      : isCheckedIn
+                        ? 'Present'
+                        : 'Absent'
+                  }
+                  label={
+                    isCheckedOut
+                      ? 'Logged Out'
+                      : isCheckedIn
+                        ? 'On Duty'
+                        : 'Pending'
+                  }
+                />
+              }
             />
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-xl bg-muted/40 p-4 border border-border space-y-3">
-              <div className="flex items-center justify-between">
+            <div className="rounded-2xl border border-border/80 bg-muted/35 p-4 space-y-3.5">
+              <div className="flex items-center justify-between gap-2">
                 <div>
-                  <span className="text-xs text-muted-foreground font-medium block">
+                  <span className="text-xs font-medium text-muted-foreground block">
                     Current Shift Status
                   </span>
-                  <p className="text-lg font-bold text-foreground mt-0.5">
+                  <p className="text-lg font-bold tracking-tight text-foreground mt-0.5">
                     {isCheckedOut
                       ? 'Shift Completed'
                       : isCheckedIn
@@ -410,63 +371,98 @@ export function FacultyDashboard() {
                         : 'Not Checked In'}
                   </p>
                 </div>
-                <StatusBadge
-                  status={isCheckedOut ? 'Present' : isCheckedIn ? 'Present' : 'Absent'}
-                  label={isCheckedOut ? 'Logged Out' : isCheckedIn ? 'On Duty' : 'Pending'}
-                />
+                <div className="text-right">
+                  <span className="text-xs font-medium text-muted-foreground block">
+                    Shift Goal
+                  </span>
+                  <span className="font-mono text-sm font-bold text-primary">
+                    {isCheckedOut
+                      ? '8h 00m / 8h'
+                      : isCheckedIn
+                        ? '6h 15m / 8h'
+                        : '0h 00m / 8h'}
+                  </span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60 text-xs">
-                <div>
-                  <span className="text-muted-foreground block text-[11px]">Check-In Time:</span>
-                  <span className="font-semibold text-foreground">
+              {/* Apple Health-style Progress Bar */}
+              <div className="space-y-1.5">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#0071e3] to-[#34c759] transition-all"
+                    style={{
+                      width: isCheckedOut ? '100%' : isCheckedIn ? '78%' : '6%',
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-[11px] text-muted-foreground">
+                  <span>09:00 AM Start</span>
+                  <span>
+                    {isCheckedOut
+                      ? '100% Complete'
+                      : isCheckedIn
+                        ? '78% of 8h goal'
+                        : 'Awaiting check-in'}
+                  </span>
+                  <span>05:00 PM End</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5 pt-2 border-t border-border/60 text-xs">
+                <div className="rounded-xl bg-card/80 p-2.5 border border-border/50">
+                  <span className="text-muted-foreground block text-[11px]">
+                    Check-In
+                  </span>
+                  <span className="font-mono font-semibold text-foreground mt-0.5 block">
                     {formatTime(todayAttendance?.checkIn)}
                   </span>
                 </div>
-                <div>
-                  <span className="text-muted-foreground block text-[11px]">Check-Out Time:</span>
-                  <span className="font-semibold text-foreground">
+                <div className="rounded-xl bg-card/80 p-2.5 border border-border/50">
+                  <span className="text-muted-foreground block text-[11px]">
+                    Check-Out
+                  </span>
+                  <span className="font-mono font-semibold text-foreground mt-0.5 block">
                     {formatTime(todayAttendance?.checkOut)}
+                  </span>
+                </div>
+                <div className="rounded-xl bg-card/80 p-2.5 border border-border/50">
+                  <span className="text-muted-foreground block text-[11px]">
+                    Source
+                  </span>
+                  <span className="font-semibold text-foreground mt-0.5 block">
+                    {todayAttendance?.source ?? 'Biometric'}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2.5 pt-1">
               {!isCheckedOut ? (
                 <Button
-                  className="w-full text-xs font-semibold"
+                  className="flex-1 text-xs font-semibold"
                   onClick={() => punchMutation.mutate()}
-                  disabled={punchMutation.isPending || loadingAttendance}
+                  disabled={
+                    punchMutation.isPending ||
+                    loadingAttendance ||
+                    attendanceError
+                  }
                 >
                   <Clock className="mr-1.5 h-3.5 w-3.5" />
                   {isCheckedIn ? 'Punch Out' : 'Punch In Now'}
                 </Button>
               ) : (
-                <Button variant="secondary" disabled className="w-full text-xs">
+                <Button variant="secondary" disabled className="flex-1 text-xs">
                   <Check className="mr-1.5 h-3.5 w-3.5 text-success" />
                   Shift Recorded
                 </Button>
               )}
               <Button
                 variant="outline"
-                size="sm"
                 onClick={() => setCorrectionOpen(true)}
                 className="text-xs shrink-0"
               >
                 Request Correction
               </Button>
-            </div>
-
-            <div className="pt-2 text-xs text-muted-foreground border-t border-border/50 space-y-1">
-              <div className="flex justify-between">
-                <span>Campus Timing:</span>
-                <span className="font-mono text-foreground font-medium">09:00 AM – 05:00 PM</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Working Shift Goal:</span>
-                <span className="font-mono text-foreground font-medium">8 Hours (Full Day)</span>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -482,7 +478,10 @@ export function FacultyDashboard() {
       <NotificationsPreview />
 
       {/* Attendance Correction Dialog */}
-      <CorrectionRequestDialog open={correctionOpen} onOpenChange={setCorrectionOpen} />
+      <CorrectionRequestDialog
+        open={correctionOpen}
+        onOpenChange={setCorrectionOpen}
+      />
     </>
   );
 }

@@ -40,12 +40,26 @@ export interface CorrectionListResult {
 export interface AttendanceService {
   punch(access: Access, input: PunchInput): Promise<AttendanceRecord>;
   today(access: Access): Promise<AttendanceRecord | null>;
-  list(access: Access, query: ListAttendanceQuery): Promise<AttendanceListResult>;
-  manualRecord(access: Access, input: ManualRecordInput): Promise<AttendanceRecord>;
-  requestCorrection(access: Access, input: CorrectionRequestInput): Promise<CorrectionRecord>;
+  list(
+    access: Access,
+    query: ListAttendanceQuery,
+  ): Promise<AttendanceListResult>;
+  manualRecord(
+    access: Access,
+    input: ManualRecordInput,
+  ): Promise<AttendanceRecord>;
+  requestCorrection(
+    access: Access,
+    input: CorrectionRequestInput,
+  ): Promise<CorrectionRecord>;
   listCorrections(
     access: Access,
-    query: { status?: CorrectionStatus; page?: number; limit?: number },
+    query: {
+      employeeId?: string;
+      status?: CorrectionStatus;
+      page?: number;
+      limit?: number;
+    },
   ): Promise<CorrectionListResult>;
   reviewCorrection(
     access: Access,
@@ -53,12 +67,17 @@ export interface AttendanceService {
     input: ReviewCorrectionInput,
   ): Promise<CorrectionRecord>;
   getSettings(): Promise<AttendanceSettingsData>;
-  updateSettings(access: Access, input: AttendanceSettingsInput): Promise<AttendanceSettingsData>;
+  updateSettings(
+    access: Access,
+    input: AttendanceSettingsInput,
+  ): Promise<AttendanceSettingsData>;
 }
 
 function startOfDate(dateStr?: string | Date): Date {
   const d = dateStr ? new Date(dateStr) : new Date();
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
+  );
 }
 
 export function createAttendanceService(
@@ -77,18 +96,53 @@ export function createAttendanceService(
 
       const now = new Date();
       const today = startOfDate(now);
+      if (input.date && input.date !== today.toISOString().slice(0, 10))
+        throw new HttpError(
+          409,
+          'DATE_CHANGED',
+          'Attendance day changed. Refresh before punching.',
+        );
       const settings = await repo.getSettings();
-      const existing = await repo.findByEmployeeAndDate(access.employeeId, today);
+      const existing = await repo.findByEmployeeAndDate(
+        access.employeeId,
+        today,
+      );
 
+      if (
+        input.action === 'CHECK_IN' &&
+        (existing?.checkIn || existing?.checkOut)
+      )
+        throw new HttpError(
+          409,
+          'PUNCH_CHANGED',
+          'Check-in is already recorded. Refresh attendance.',
+        );
+      if (
+        input.action === 'CHECK_OUT' &&
+        (!existing?.checkIn || existing.checkOut)
+      )
+        throw new HttpError(
+          409,
+          'PUNCH_CHANGED',
+          'Check-out is unavailable or already recorded. Refresh attendance.',
+        );
       if (!existing || !existing.checkIn) {
         // First punch of the day: Check-In
-        const [startHour, startMinute] = settings.workDayStart.split(':').map(Number);
+        const [startHour, startMinute] = settings.workDayStart
+          .split(':')
+          .map(Number);
         const expectedStart = new Date(today);
-        expectedStart.setUTCHours(startHour, startMinute + settings.gracePeriodMinutes, 0, 0);
+        expectedStart.setUTCHours(
+          startHour,
+          startMinute + settings.gracePeriodMinutes,
+          0,
+          0,
+        );
 
         const status = now > expectedStart ? 'LATE' : 'PRESENT';
 
         return repo.recordPunch({
+          action: input.action,
           employeeId: access.employeeId,
           date: today,
           checkIn: now,
@@ -100,7 +154,8 @@ export function createAttendanceService(
 
       // Subsequent punch of the day: Check-Out
       const checkInTime = new Date(existing.checkIn);
-      const diffHours = (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+      const diffHours =
+        (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
       let status = existing.status;
 
       if (diffHours < settings.halfDayHours && status !== 'ON_LEAVE') {
@@ -108,6 +163,7 @@ export function createAttendanceService(
       }
 
       return repo.recordPunch({
+        action: input.action,
         employeeId: access.employeeId,
         date: today,
         checkIn: existing.checkIn,
@@ -130,6 +186,19 @@ export function createAttendanceService(
       const skip = (query.page - 1) * query.limit;
       const take = query.limit;
 
+      if (
+        (access.scope === 'own' && !access.employeeId) ||
+        (access.scope === 'department' && !access.departmentId)
+      )
+        return {
+          data: [],
+          meta: {
+            total: 0,
+            page: query.page,
+            limit: query.limit,
+            totalPages: 1,
+          },
+        };
       let employeeId = query.employeeId;
       let departmentId = query.departmentId;
 
@@ -140,7 +209,9 @@ export function createAttendanceService(
       }
 
       const date = query.date ? startOfDate(query.date) : undefined;
-      const startDate = query.startDate ? startOfDate(query.startDate) : undefined;
+      const startDate = query.startDate
+        ? startOfDate(query.startDate)
+        : undefined;
       const endDate = query.endDate ? startOfDate(query.endDate) : undefined;
 
       const { items, total } = await repo.list({
@@ -191,14 +262,21 @@ export function createAttendanceService(
       }
 
       const date = startOfDate(input.date);
-      const existing = await repo.findByEmployeeAndDate(access.employeeId, date);
+      const existing = await repo.findByEmployeeAndDate(
+        access.employeeId,
+        date,
+      );
 
       const correction = await repo.createCorrection({
         attendanceId: existing?.id ?? null,
         employeeId: access.employeeId,
         date,
-        requestedCheckIn: input.requestedCheckIn ? new Date(input.requestedCheckIn) : null,
-        requestedCheckOut: input.requestedCheckOut ? new Date(input.requestedCheckOut) : null,
+        requestedCheckIn: input.requestedCheckIn
+          ? new Date(input.requestedCheckIn)
+          : null,
+        requestedCheckOut: input.requestedCheckOut
+          ? new Date(input.requestedCheckOut)
+          : null,
         requestedStatus: input.requestedStatus,
         reason: input.reason,
       });
@@ -225,7 +303,12 @@ export function createAttendanceService(
       const limit = query.limit ?? 50;
       const skip = (page - 1) * limit;
 
-      let employeeId: string | undefined;
+      if (
+        (access.scope === 'own' && !access.employeeId) ||
+        (access.scope === 'department' && !access.departmentId)
+      )
+        return { data: [], meta: { total: 0, page, limit, totalPages: 1 } };
+      let employeeId = query.employeeId;
       let departmentId: number | undefined;
 
       if (access.scope === 'own') {
@@ -253,19 +336,31 @@ export function createAttendanceService(
       };
     },
 
-    async reviewCorrection(access: Access, id: string, input: ReviewCorrectionInput) {
+    async reviewCorrection(
+      access: Access,
+      id: string,
+      input: ReviewCorrectionInput,
+    ) {
       const correction = await repo.findCorrectionById(id);
       if (!correction) {
         throw new HttpError(404, 'NOT_FOUND', 'Correction request not found.');
       }
 
       if (correction.status !== 'PENDING') {
-        throw new HttpError(400, 'ALREADY_REVIEWED', 'Correction request has already been reviewed.');
+        throw new HttpError(
+          400,
+          'ALREADY_REVIEWED',
+          'Correction request has already been reviewed.',
+        );
       }
 
       if (access.scope === 'department') {
         if (correction.employee.departmentId !== access.departmentId) {
-          throw new HttpError(403, 'FORBIDDEN', 'Cannot review corrections outside your department.');
+          throw new HttpError(
+            403,
+            'FORBIDDEN',
+            'Cannot review corrections outside your department.',
+          );
         }
       }
 

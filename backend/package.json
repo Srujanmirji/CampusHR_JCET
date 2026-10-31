@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "demo": "tsx test/demo/server.ts",
     "dev": "tsx watch src/server.ts",
     "prebuild": "prisma generate",
     "build": "tsc -p tsconfig.json",

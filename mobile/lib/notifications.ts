@@ -1,183 +1,120 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
+import { z } from 'zod';
 
-// Check if running inside Expo Go client
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-const isAndroidExpoGo = Platform.OS === 'android' && isExpoGo;
-
-// Expo SDK 53+ removed remote push notifications (FCM) from Expo Go on Android.
-// In SDK 53+, importing the root `expo-notifications` package on Android Expo Go evaluates
-// DevicePushTokenAutoRegistration.fx which calls warnOfExpoGoPushUsage and throws an unhandled Error at module evaluation time.
-// To ensure the app starts safely in Expo Go without crashing, we dynamically require expo-notifications
-// only when safe, and wrap in try/catch.
-let Notifications: typeof import('expo-notifications') | null = null;
-
-if (!isAndroidExpoGo) {
+export const pushPayloadSchema = z
+  .object({ notificationId: z.uuid(), recipientId: z.uuid() })
+  .strict();
+export const pushProjectId = z
+  .uuid()
+  .safeParse(
+    Constants.easConfig?.projectId ??
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      process.env.EXPO_PUBLIC_EXPO_PROJECT_ID,
+  );
+const supported =
+  Platform.OS !== 'web' &&
+  Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
+let notifications: typeof import('expo-notifications') | null = null;
+if (supported) {
   try {
+    // Expo Go/web must never evaluate the native remote-push registration module.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    Notifications = require('expo-notifications');
-    if (Notifications && typeof Notifications.setNotificationHandler === 'function') {
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowBanner: true,
-          shouldShowList: true,
-          shouldPlaySound: true,
-          shouldSetBadge: false,
-        }),
-      });
-    }
-  } catch (error) {
-    console.warn('[notifications] expo-notifications could not be loaded in current environment:', error);
-    Notifications = null;
+    notifications = require('expo-notifications');
+  } catch {
+    /* A missing native module is shown as unavailable, never simulated. */
   }
 }
-
-export interface NotificationDeliveryResult {
-  delivered: boolean;
-  type: 'native-local' | 'preview-simulated' | 'unsupported';
-  message: string;
-}
-
-/**
- * Checks whether native notification features are available in the current runtime environment.
- */
-export function isNotificationSupported(): boolean {
-  return Notifications !== null && !isAndroidExpoGo;
-}
-
-/**
- * Configures notification channels and requests notification permissions.
- * Gracefully returns false if running in Expo Go on Android or if permissions are denied.
- */
-export async function enableNotifications(): Promise<boolean> {
-  if (isAndroidExpoGo || !Notifications) {
-    return false;
-  }
-
-  try {
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
+export const pushNative = {
+  supported: !!notifications && pushProjectId.success,
+  projectId: pushProjectId.success ? pushProjectId.data : null,
+  platform: Platform.OS === 'ios' ? ('ios' as const) : ('android' as const),
+  async permission(ask: boolean) {
+    if (!notifications)
+      throw new Error(
+        'A signed development build is required for remote alerts.',
+      );
+    if (Platform.OS === 'android')
+      await notifications.setNotificationChannelAsync('campushr', {
         name: 'CampusHR',
-        importance: Notifications.AndroidImportance.HIGH,
+        importance: notifications.AndroidImportance.DEFAULT,
       });
-    }
-
-    const current = await Notifications.getPermissionsAsync();
-    if (current.granted) return true;
-
-    const requested = await Notifications.requestPermissionsAsync();
-    return requested.granted;
-  } catch (error) {
-    console.warn('[notifications] Failed to request notification permissions:', error);
-    return false;
-  }
-}
-
-/**
- * Fetches the Expo push token for server-side remote pushes.
- * Returns an informative error object on Android Expo Go or unsupported environments.
- */
-export async function getPushToken(): Promise<{ token?: string; error?: string }> {
-  if (isAndroidExpoGo) {
-    return {
-      error:
-        'Remote push notifications are not supported in Expo Go on Android (SDK 53+). A development build is required for production FCM push.',
-    };
-  }
-
-  if (!Notifications || typeof Notifications.getExpoPushTokenAsync !== 'function') {
-    return {
-      error: 'Push notification service is not available in the current environment.',
-    };
-  }
-
-  try {
-    const token = (await Notifications.getExpoPushTokenAsync()).data;
-    return { token };
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : 'Push token unavailable.',
-    };
-  }
-}
-
-/**
- * Sends a local test notification to demonstrate notification rendering.
- * Falls back to a simulated console log preview on Android Expo Go.
- */
-export async function sendTestNotification(): Promise<NotificationDeliveryResult> {
-  const title = 'Substitute assigned';
-  const body = 'You are covering CSE 5A, Data Structures, today at 10:00 AM. [Local Device Preview]';
-
-  if (Notifications && typeof Notifications.scheduleNotificationAsync === 'function') {
+    const current = await notifications.getPermissionsAsync();
+    if (ask && !current.granted && current.canAskAgain)
+      return notifications.requestPermissionsAsync();
+    return current;
+  },
+  async token() {
+    if (!notifications || !pushProjectId.success)
+      throw new Error('An approved Expo project is required.');
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-        },
-        trigger: null,
-      });
-      return {
-        delivered: true,
-        type: 'native-local',
-        message: 'Notification sent to device tray.',
-      };
-    } catch (err) {
-      console.warn('[notifications] Failed to schedule test notification:', err);
+      const result = await Promise.race([
+        notifications.getExpoPushTokenAsync({ projectId: pushProjectId.data }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () =>
+              reject(
+                new Error(
+                  'Push token request timed out. Retry when connected.',
+                ),
+              ),
+            15000,
+          );
+        }),
+      ]);
+      return result.data;
+    } finally {
+      clearTimeout(timer);
     }
-  }
-
-  console.info(`[Notification Preview] ${title}: ${body}`);
-  return {
-    delivered: true,
-    type: 'preview-simulated',
-    message: isAndroidExpoGo
-      ? 'Preview simulated (native notifications unavailable in Android Expo Go SDK 53+; requires development build for remote push).'
-      : 'Notification simulated in current environment.',
-  };
-}
-
-/**
- * Triggers a local preview notification when an HOD assigns a substitute.
- * Note: Delivered only to the local test device for prototype demonstration.
- * Does not throw when running in Expo Go.
- */
-export async function sendSubstitutionAssignedNotification(params: {
-  substituteName: string;
-  subjectCode: string;
-  date: string;
-  periodLabel: string;
-}): Promise<NotificationDeliveryResult> {
-  const title = 'Smart Substitution Assigned';
-  const body = `Assigned: ${params.substituteName} covering ${params.subjectCode} on ${params.date} (${params.periodLabel}). [Local Device Preview]`;
-
-  if (Notifications && typeof Notifications.scheduleNotificationAsync === 'function') {
-    try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-          data: { type: 'substitution', ...params },
-        },
-        trigger: null,
-      });
-      return {
-        delivered: true,
-        type: 'native-local',
-        message: 'Local notification banner scheduled.',
-      };
-    } catch (err) {
-      console.warn('[notifications] Failed to schedule native substitution notification:', err);
-    }
-  }
-
-  console.info(`[Notification Preview] ${title}: ${body}`);
-  return {
-    delivered: true,
-    type: 'preview-simulated',
-    message: isAndroidExpoGo
-      ? 'Local preview simulated (native notifications unavailable in Android Expo Go SDK 53+; requires development build for remote push).'
-      : 'Notification simulated in current environment.',
-  };
-}
+  },
+  listen(
+    own: (data: unknown) => boolean,
+    received: () => void,
+    tapped: (data: unknown) => void,
+    rotated: () => void,
+  ) {
+    if (!notifications) return () => {};
+    const api = notifications;
+    let listening = true;
+    api.setNotificationHandler({
+      handleNotification: async (notification) => {
+        const allowed = own(notification.request.content.data);
+        return {
+          shouldShowBanner: allowed,
+          shouldShowList: allowed,
+          shouldPlaySound: allowed,
+          shouldSetBadge: false,
+        };
+      },
+    });
+    const subscriptions = [
+      api.addNotificationReceivedListener((notification) => {
+        if (own(notification.request.content.data)) received();
+      }),
+      api.addNotificationResponseReceivedListener((response) =>
+        tapped(response.notification.request.content.data),
+      ),
+      api.addPushTokenListener(() => rotated()),
+    ];
+    void api
+      .getLastNotificationResponseAsync()
+      .then((response) => {
+        if (listening && response)
+          tapped(response.notification.request.content.data);
+      })
+      .catch(() => undefined);
+    return () => {
+      listening = false;
+      subscriptions.forEach((subscription) => subscription.remove());
+      api.setNotificationHandler(null);
+    };
+  },
+  async clearResponse() {
+    await notifications?.clearLastNotificationResponseAsync();
+  },
+  async clearTray() {
+    await notifications?.dismissAllNotificationsAsync();
+    await notifications?.setBadgeCountAsync(0);
+  },
+};

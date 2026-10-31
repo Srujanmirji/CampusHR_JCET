@@ -45,7 +45,13 @@ export const correctionRecordSchema = z.object({
   date: z.string(),
   requestedCheckIn: z.string().nullable().optional(),
   requestedCheckOut: z.string().nullable().optional(),
-  requestedStatus: z.enum(['PRESENT', 'ABSENT', 'HALF_DAY', 'ON_LEAVE', 'LATE']),
+  requestedStatus: z.enum([
+    'PRESENT',
+    'ABSENT',
+    'HALF_DAY',
+    'ON_LEAVE',
+    'LATE',
+  ]),
   reason: z.string(),
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']),
   reviewedByUserId: z.string().nullable().optional(),
@@ -168,7 +174,8 @@ export async function listAttendance(filters: ListAttendanceFilters = {}) {
   if (filters.date) params.set('date', filters.date);
   if (filters.startDate) params.set('startDate', filters.startDate);
   if (filters.endDate) params.set('endDate', filters.endDate);
-  if (filters.departmentId) params.set('departmentId', String(filters.departmentId));
+  if (filters.departmentId)
+    params.set('departmentId', String(filters.departmentId));
   if (filters.employeeId) params.set('employeeId', filters.employeeId);
   if (filters.status) params.set('status', filters.status);
   if (filters.page) params.set('page', String(filters.page));
@@ -187,7 +194,9 @@ export async function recordManualAttendance(input: ManualRecordInput) {
   return oneAttendance.parse(res).data;
 }
 
-export async function requestAttendanceCorrection(input: CorrectionRequestInput) {
+export async function requestAttendanceCorrection(
+  input: CorrectionRequestInput,
+) {
   const res = await apiRequest('/attendance/corrections', {
     method: 'POST',
     body: input,
@@ -195,11 +204,13 @@ export async function requestAttendanceCorrection(input: CorrectionRequestInput)
   return oneCorrection.parse(res).data;
 }
 
-export async function listAttendanceCorrections(filters: {
-  status?: string;
-  page?: number;
-  limit?: number;
-} = {}) {
+export async function listAttendanceCorrections(
+  filters: {
+    status?: string;
+    page?: number;
+    limit?: number;
+  } = {},
+) {
   const params = new URLSearchParams();
   if (filters.status) params.set('status', filters.status);
   if (filters.page) params.set('page', String(filters.page));
@@ -210,7 +221,10 @@ export async function listAttendanceCorrections(filters: {
   return listCorrectionResponse.parse(res);
 }
 
-export async function reviewAttendanceCorrection(id: string, input: ReviewCorrectionInput) {
+export async function reviewAttendanceCorrection(
+  id: string,
+  input: ReviewCorrectionInput,
+) {
   const res = await apiRequest(`/attendance/corrections/${id}`, {
     method: 'PATCH',
     body: input,
@@ -223,7 +237,9 @@ export async function getAttendanceSettings(): Promise<AttendanceSettings> {
   return (res as { data: AttendanceSettings }).data;
 }
 
-export async function updateAttendanceSettings(input: AttendanceSettings): Promise<AttendanceSettings> {
+export async function updateAttendanceSettings(
+  input: AttendanceSettings,
+): Promise<AttendanceSettings> {
   const res = await apiRequest('/attendance/settings', {
     method: 'PUT',
     body: input,

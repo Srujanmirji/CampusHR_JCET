@@ -16,9 +16,7 @@ export function Providers({ children }: { children: ReactNode }) {
           reducedMotion="user"
           transition={{ duration: motionTiming.duration, ease: 'easeOut' }}
         >
-          <TooltipProvider delayDuration={200}>
-            {children}
-          </TooltipProvider>
+          <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
           <Toaster position="bottom-right" closeButton />
         </MotionConfig>
       </SessionProvider>

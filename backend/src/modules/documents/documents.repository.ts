@@ -43,7 +43,12 @@ export interface DocumentsRepository {
     search?: string;
     page: number;
     limit: number;
-  }): Promise<{ data: DocumentWithRelations[]; total: number; page: number; totalPages: number }>;
+  }): Promise<{
+    data: DocumentWithRelations[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }>;
 
   updateStatus(
     id: string,
@@ -60,7 +65,9 @@ export interface DocumentsRepository {
   countPending(employeeId?: string): Promise<number>;
 }
 
-export function createDocumentsRepository(prisma: PrismaClient): DocumentsRepository {
+export function createDocumentsRepository(
+  prisma: PrismaClient,
+): DocumentsRepository {
   return {
     async create(data) {
       return prisma.document.create({
@@ -129,9 +136,15 @@ export function createDocumentsRepository(prisma: PrismaClient): DocumentsReposi
         where.OR = [
           { title: { contains: search, mode: 'insensitive' } },
           { documentType: { contains: search, mode: 'insensitive' } },
-          { employee: { firstName: { contains: search, mode: 'insensitive' } } },
+          {
+            employee: { firstName: { contains: search, mode: 'insensitive' } },
+          },
           { employee: { lastName: { contains: search, mode: 'insensitive' } } },
-          { employee: { employeeCode: { contains: search, mode: 'insensitive' } } },
+          {
+            employee: {
+              employeeCode: { contains: search, mode: 'insensitive' },
+            },
+          },
         ];
       }
 

@@ -18,6 +18,8 @@
     "dev:mobile": "npm run dev --workspace @campushr/mobile",
     "build": "npm run build --workspace @campushr/web && npm run build --workspace @campushr/api",
     "start": "npm run db:deploy --workspace @campushr/api && npm run start --workspace @campushr/api",
+    "staging:start": "node scripts/staging/preflight.mjs && npm start",
+    "staging:check": "node --test scripts/staging/*.test.mjs",
     "typecheck": "npm run typecheck --workspaces",
     "lint": "npm run lint --workspaces",
     "test": "npm run test --workspace @campushr/api",

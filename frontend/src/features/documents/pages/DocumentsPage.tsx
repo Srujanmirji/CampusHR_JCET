@@ -30,6 +30,7 @@ import {
 import { toast } from 'sonner';
 import { useCan } from '@/features/auth/hooks/useCan';
 import {
+  downloadDocument,
   DOCUMENT_CATEGORY_MAP,
   useDocuments,
   usePendingDocumentsCount,
@@ -62,7 +63,10 @@ export default function DocumentsPage() {
 
   // Queries
   const { data: documentsData, isLoading } = useDocuments({
-    category: categoryFilter !== 'ALL' ? (categoryFilter as DocumentCategoryKey) : undefined,
+    category:
+      categoryFilter !== 'ALL'
+        ? (categoryFilter as DocumentCategoryKey)
+        : undefined,
     status:
       activeTab === 'pending'
         ? 'PENDING'
@@ -76,7 +80,10 @@ export default function DocumentsPage() {
   const { data: pendingCount = 0 } = usePendingDocumentsCount();
   const deleteMutation = useDeleteDocument();
 
-  const documents = useMemo(() => documentsData?.data ?? [], [documentsData?.data]);
+  const documents = useMemo(
+    () => documentsData?.data ?? [],
+    [documentsData?.data],
+  );
 
   // Metrics
   const metrics = useMemo(() => {
@@ -134,7 +141,10 @@ export default function DocumentsPage() {
           action={
             <div className="flex items-center gap-2">
               {canUpload && (
-                <Button onClick={() => setUploadOpen(true)} className="gap-2 shadow-sm">
+                <Button
+                  onClick={() => setUploadOpen(true)}
+                  className="gap-2 shadow-sm"
+                >
                   <Upload className="h-4 w-4" />
                   Upload Document
                 </Button>
@@ -215,7 +225,8 @@ export default function DocumentsPage() {
 
             {/* Total Results Counter */}
             <span className="text-xs text-muted-foreground">
-              Showing {documents.length} document{documents.length === 1 ? '' : 's'}
+              Showing {documents.length} document
+              {documents.length === 1 ? '' : 's'}
             </span>
           </div>
 
@@ -291,7 +302,9 @@ export default function DocumentsPage() {
         ) : documents.length === 0 ? (
           <div className="bg-card border rounded-xl p-12 text-center space-y-3 shadow-sm">
             <Files className="h-12 w-12 text-muted-foreground mx-auto" />
-            <h3 className="text-base font-semibold text-foreground">No documents found</h3>
+            <h3 className="text-base font-semibold text-foreground">
+              No documents found
+            </h3>
             <p className="text-sm text-muted-foreground max-w-sm mx-auto">
               {activeTab === 'pending'
                 ? 'Great job! There are currently no pending documents awaiting HR verification.'
@@ -307,7 +320,6 @@ export default function DocumentsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {documents.map((doc) => {
-              const fullFileUrl = `${import.meta.env.VITE_API_URL}${doc.fileUrl}`;
               return (
                 <div
                   key={doc.id}
@@ -327,13 +339,19 @@ export default function DocumentsPage() {
                         </Badge>
                       )}
                       {doc.status === 'PENDING' && (
-                        <Badge variant="outline" className="text-amber-700 bg-amber-50 text-[11px] gap-1">
+                        <Badge
+                          variant="outline"
+                          className="text-amber-700 bg-amber-50 text-[11px] gap-1"
+                        >
                           <Clock className="h-3 w-3" />
                           Pending
                         </Badge>
                       )}
                       {doc.status === 'REJECTED' && (
-                        <Badge variant="destructive" className="text-[11px] gap-1">
+                        <Badge
+                          variant="destructive"
+                          className="text-[11px] gap-1"
+                        >
                           <XCircle className="h-3 w-3" />
                           Rejected
                         </Badge>
@@ -342,10 +360,15 @@ export default function DocumentsPage() {
 
                     {/* Title & Document Type */}
                     <div>
-                      <h4 className="font-bold text-sm text-foreground line-clamp-1" title={doc.title}>
+                      <h4
+                        className="font-bold text-sm text-foreground line-clamp-1"
+                        title={doc.title}
+                      >
                         {doc.title}
                       </h4>
-                      <p className="text-xs text-muted-foreground">{doc.documentType}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {doc.documentType}
+                      </p>
                     </div>
 
                     {/* Employee Info */}
@@ -354,7 +377,8 @@ export default function DocumentsPage() {
                         {doc.employee.firstName} {doc.employee.lastName}
                       </span>
                       <span className="text-muted-foreground font-mono">
-                        {doc.employee.employeeCode} · {doc.employee.department.code}
+                        {doc.employee.employeeCode} ·{' '}
+                        {doc.employee.department.code}
                       </span>
                     </div>
 
@@ -388,13 +412,14 @@ export default function DocumentsPage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        asChild
-                        className="h-8 px-2 text-xs gap-1"
+                        className="h-11 px-2 text-xs gap-1"
+                        onClick={() =>
+                          void downloadDocument(doc).catch(() =>
+                            toast.error('Document download failed. Try again.'),
+                          )
+                        }
                       >
-                        <a href={fullFileUrl} download target="_blank" rel="noopener noreferrer">
-                          <Download className="h-3.5 w-3.5" />
-                          Download
-                        </a>
+                        <Download className="h-3.5 w-3.5" /> Download
                       </Button>
                     </div>
 

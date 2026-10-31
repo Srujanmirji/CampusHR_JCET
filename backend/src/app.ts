@@ -28,6 +28,10 @@ import { createEmployeeService } from './modules/employees/employee.service.js';
 import { createLeaveRepository } from './modules/leave/leave.repository.js';
 import { createLeaveRouter } from './modules/leave/leave.routes.js';
 import { createLeaveService } from './modules/leave/leave.service.js';
+import {
+  createPushRepository,
+  createPushRouter,
+} from './modules/notifications/notifications.push.js';
 import { createNotificationRepository } from './modules/notifications/notifications.repository.js';
 import type { Realtime } from './modules/notifications/notifications.realtime.js';
 import { createNotificationRouter } from './modules/notifications/notifications.routes.js';
@@ -70,7 +74,7 @@ export function createApp(
 ) {
   const auth = createAuthService(authRepository, env.JWT_ACCESS_SECRET);
   const notifications = createNotificationService(
-    createNotificationRepository(prisma),
+    createNotificationRepository(prisma, env.PUSH_ENABLED),
     realtime,
   );
   const departments = createDepartmentService(
@@ -84,9 +88,29 @@ export function createApp(
   app.use(helmet());
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
   app.use(express.json({ limit: '1mb' }));
-  // Liveness only: database readiness is added when domain models are finalized.
+  // Liveness stays independent from database readiness.
   app.get('/api/v1/health', (_req, res) => {
     res.json({ status: 'ok', service: 'campushr-api' });
+  });
+  app.get('/api/v1/ready', async (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        prisma.$queryRaw`SELECT 1`,
+        new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error('Readiness timeout')),
+            3000,
+          );
+        }),
+      ]);
+      res.json({ status: 'ready', service: 'campushr-api' });
+    } catch {
+      res.status(503).json({ status: 'unavailable', service: 'campushr-api' });
+    } finally {
+      clearTimeout(timeout);
+    }
   });
   app.use(
     '/api/v1/auth',
@@ -106,19 +130,30 @@ export function createApp(
     '/api/v1/attendance',
     createAttendanceRouter(
       auth,
-      createAttendanceService(createAttendanceRepository(prisma), notifications.notifier),
+      createAttendanceService(
+        createAttendanceRepository(prisma),
+        notifications.notifier,
+      ),
     ),
   );
   app.use(
     '/api/v1/documents',
     createDocumentsRouter(
       auth,
-      createDocumentsService(createDocumentsRepository(prisma), notifications.notifier),
+      createDocumentsService(
+        createDocumentsRepository(prisma),
+        notifications.notifier,
+      ),
+      env.DOCUMENTS_DIR,
     ),
   );
-  app.use(
-    '/uploads/documents',
-    express.static(join(process.cwd(), 'uploads', 'documents')),
+  app.use('/uploads/documents', (_req, res) =>
+    res.status(404).json({
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Use authenticated document access.',
+      },
+    }),
   );
   app.use('/api/v1/departments', createDepartmentRouter(auth, departments));
   app.use('/api/v1/designations', createDesignationRouter(auth, departments));
@@ -130,12 +165,22 @@ export function createApp(
     ),
   );
   app.use(
+    '/api/v1/notifications/push',
+    createPushRouter(auth, createPushRepository(prisma), {
+      enabled: env.PUSH_ENABLED,
+      projectId: env.EXPO_PROJECT_ID,
+    }),
+  );
+  app.use(
     '/api/v1/notifications',
     createNotificationRouter(auth, notifications),
   );
   app.use(
     '/api/v1/reports',
-    createReportsRouter(auth, createReportsService(createReportsRepository(prisma))),
+    createReportsRouter(
+      auth,
+      createReportsService(createReportsRepository(prisma)),
+    ),
   );
   app.use(
     '/api/v1/substitution',

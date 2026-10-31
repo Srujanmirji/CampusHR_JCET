@@ -4,6 +4,8 @@ import { envSchema } from './config/env.js';
 import { createPrismaClient } from './database/prisma.js';
 import { createPrismaAuthRepository } from './modules/auth/auth.repository.js';
 import { createAuthService } from './modules/auth/auth.service.js';
+import { createPushRepository } from './modules/notifications/notifications.push.js';
+import { createPushWorker } from './modules/notifications/notifications.push-worker.js';
 import { createRealtime } from './modules/notifications/notifications.realtime.js';
 
 const parsed = envSchema.safeParse(process.env);
@@ -25,6 +27,12 @@ const server = createApp(parsed.data, {
 }).listen(parsed.data.PORT, () => {
   console.log(`CampusHR API listening on port ${parsed.data.PORT}`);
 });
+const stopPush = parsed.data.PUSH_ENABLED
+  ? createPushWorker(
+      createPushRepository(prisma, parsed.data.EXPO_PROJECT_ID),
+      parsed.data.EXPO_ACCESS_TOKEN,
+    ).start()
+  : async () => {};
 const auth = createAuthService(authRepository, parsed.data.JWT_ACCESS_SECRET);
 realtime.attach(server, {
   origin: parsed.data.CORS_ORIGIN,
@@ -40,6 +48,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     const timeout = setTimeout(() => process.exit(1), 10_000).unref();
     server.close(async (error) => {
       clearTimeout(timeout);
+      await stopPush();
       await prisma.$disconnect();
       process.exit(error ? 1 : 0);
     });

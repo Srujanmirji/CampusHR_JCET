@@ -24,6 +24,10 @@ export function createNotificationRouter(
     .get('/unread-count', ...canRead, async (_req, res) => {
       res.json({ data: { count: await notifications.unread(access(res)) } });
     })
+    .get('/:id', ...canRead, async (req, res) => {
+      const id = parse(z.uuid(), req.params.id);
+      res.json({ data: await notifications.find(access(res), id) });
+    })
     .patch('/read-all', ...canRead, async (_req, res) => {
       await notifications.markAllRead(access(res));
       res.status(204).end();
@@ -38,10 +42,8 @@ export function createNotificationRouter(
     })
     .post('/announcements', ...canAnnounce, async (req, res) => {
       const input = parse(announcementSchema, req.body);
-      res
-        .status(201)
-        .json({
-          data: await notifications.announce(access(res), input, req.ip),
-        });
+      res.status(201).json({
+        data: await notifications.announce(access(res), input, req.ip),
+      });
     });
 }

@@ -48,7 +48,12 @@ export function Sidebar({
   const groups = isFaculty
     ? ['Overview', 'My Academics', 'My Services', 'Communication']
     : isHod
-      ? ['Overview', 'Academic Operations', 'Department Staff', 'Administration']
+      ? [
+          'Overview',
+          'Academic Operations',
+          'Department Staff',
+          'Administration',
+        ]
       : isPrincipal
         ? [
             'Overview',

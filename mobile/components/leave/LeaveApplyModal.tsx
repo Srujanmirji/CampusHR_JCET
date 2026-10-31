@@ -1,22 +1,57 @@
-import React, { useState } from 'react';
+import { Alert } from '../../lib/dialogs';
+import { useReducedMotion } from 'react-native-reanimated';
+import React, { useRef, useState } from 'react';
 import {
   Modal,
-  Pressable,
+  Switch,
+  useWindowDimensions,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  initialWindowMetrics,
+} from 'react-native-safe-area-context';
+import { DateField } from '../ui/DateField';
+import { Icon } from '../ui/Icon';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
+import { SegmentedControl } from '../ui/SegmentedControl';
+import { useRouter } from 'expo-router';
 import { Input } from '../ui/Input';
-import { applyForLeave, type LeaveTypeDto } from '../../lib/leave-api';
+import {
+  applyForLeave,
+  getLeaveRequests,
+  leaveInputSchema,
+  uncertainLeaveWrite,
+  type LeaveTypeDto,
+  type LeaveRequestDto,
+} from '../../lib/leave-api';
+import { getSession } from '../../lib/session';
+import { leaveDates, LeaveStatus } from './LeavePresentation';
+import {
+  findRecordedLeaveIntent,
+  isAmbiguousLeaveIntent,
+  leaveSubmissionFingerprint,
+  leaveSubmissionIntent,
+  retainAmbiguousLeaveIntent,
+  type LeaveSubmissionIntent,
+} from './leave-submission-recovery';
+import { campusClock } from '../../lib/home-api';
+import { committedFeedback } from '../../lib/feedback';
 import { theme } from '../../lib/theme';
 
 interface LeaveApplyModalProps {
   visible: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (
+    request: LeaveRequestDto,
+    source?: 'submitted' | 'existing',
+  ) => void;
   token: string | null;
   currentUser: {
     id: string;
@@ -35,13 +70,18 @@ export function LeaveApplyModal({
   currentUser,
   leaveTypes,
 }: LeaveApplyModalProps) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [tomorrow] = useState(() =>
-    new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+  const { fontScale } = useWindowDimensions();
+  const router = useRouter();
+  const [typesOpen, setTypesOpen] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const reduceMotion = useReducedMotion();
+  const today = campusClock().date;
+  const [tomorrow] = useState(
+    () => campusClock(new Date(Date.now() + 86400000)).date,
   );
 
-  const [selectedTypeId, setSelectedTypeId] = useState<number>(
-    leaveTypes[0]?.id || 1,
+  const [selectedTypeId, setSelectedTypeId] = useState<number | undefined>(
+    leaveTypes[0]?.id,
   );
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
@@ -51,469 +91,605 @@ export function LeaveApplyModal({
   );
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const selectedType =
     leaveTypes.find((t) => t.id === selectedTypeId) || leaveTypes[0];
-
-  function validate(): boolean {
-    setError(null);
-    if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
-      setError('Start date must be in YYYY-MM-DD format.');
-      return false;
-    }
-    if (!endDate || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
-      setError('End date must be in YYYY-MM-DD format.');
-      return false;
-    }
-    if (startDate > endDate) {
-      setError('End date cannot be earlier than start date.');
-      return false;
-    }
-    if (isHalfDay && startDate !== endDate) {
-      setError('Half-day leave must cover one single date only.');
-      return false;
-    }
-    if (!reason.trim() || reason.trim().length < 3) {
-      setError('Please provide a reason (minimum 3 characters).');
-      return false;
-    }
-    return true;
-  }
+  const busy = useRef(false);
+  const [blockedIntents, setBlockedIntents] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const blockedIntentsRef = useRef<ReadonlySet<string>>(new Set());
+  const [recoveryIntent, setRecoveryIntent] =
+    useState<LeaveSubmissionIntent | null>(null);
+  const [recoveryCheck, setRecoveryCheck] = useState<{
+    fingerprint: string;
+    record?: LeaveRequestDto;
+    message: string;
+  } | null>(null);
+  const draftIntent = selectedType
+    ? leaveSubmissionIntent(currentUser.id, {
+        leaveTypeId: selectedType.id,
+        startDate,
+        endDate,
+        halfDay: isHalfDay && selectedType.allowHalfDay ? halfDaySession : null,
+        reason,
+      })
+    : null;
+  const activeRecovery =
+    recoveryIntent ??
+    (draftIntent && isAmbiguousLeaveIntent(blockedIntents, draftIntent)
+      ? draftIntent
+      : null);
+  const blocked = !!activeRecovery;
+  const working = loading || checking;
+  const checkedRecovery =
+    activeRecovery &&
+    recoveryCheck?.fingerprint === leaveSubmissionFingerprint(activeRecovery)
+      ? recoveryCheck
+      : null;
 
   async function handleSubmit() {
-    if (!validate()) return;
+    if (busy.current || activeRecovery) return;
+    setError(null);
+    setFieldErrors({});
+    const value = leaveInputSchema.safeParse({
+      leaveTypeId: selectedType?.id,
+      startDate,
+      endDate,
+      halfDay: isHalfDay && selectedType?.allowHalfDay ? halfDaySession : null,
+      reason,
+    });
+    if (!value.success) {
+      setError(value.error.issues[0].message);
+      setFieldErrors(
+        Object.fromEntries(
+          value.error.issues
+            .filter((issue) => issue.path.length)
+            .map((issue) => [String(issue.path[0]), issue.message]),
+        ),
+      );
+      return;
+    }
+    if (!selectedType?.active) {
+      setError('Choose an active leave type.');
+      return;
+    }
+    const intent = leaveSubmissionIntent(currentUser.id, value.data);
+    if (isAmbiguousLeaveIntent(blockedIntentsRef.current, intent)) {
+      setRecoveryIntent(intent);
+      setError(
+        'This exact request has an unknown submission outcome. Check its history before proceeding.',
+      );
+      return;
+    }
+    busy.current = true;
     setLoading(true);
     try {
-      await applyForLeave(
-        token,
-        {
-          leaveTypeId: selectedTypeId,
-          startDate,
-          endDate,
-          halfDay: isHalfDay ? halfDaySession : null,
-          reason: reason.trim(),
-        },
-        currentUser,
-      );
+      const result = await applyForLeave(token, value.data, currentUser);
+      committedFeedback();
       // Reset form
       setReason('');
       setIsHalfDay(false);
-      onSuccess();
+      onSuccess(result, 'submitted');
       onClose();
     } catch (err) {
+      if (uncertainLeaveWrite(err)) {
+        const guarded = retainAmbiguousLeaveIntent(
+          blockedIntentsRef.current,
+          intent,
+        );
+        blockedIntentsRef.current = guarded;
+        setBlockedIntents(guarded);
+        setRecoveryIntent(intent);
+        setRecoveryCheck(null);
+        setError(
+          'Submission outcome unknown. Your draft is retained. Check request history before proceeding. This exact request will stay protected against another submission.',
+        );
+        return;
+      }
       setError(
         err instanceof Error ? err.message : 'Failed to submit leave request.',
       );
     } finally {
+      busy.current = false;
       setLoading(false);
     }
   }
 
+  async function checkRequestHistory() {
+    if (!activeRecovery || busy.current) return;
+    const intent = activeRecovery;
+    const fingerprint = leaveSubmissionFingerprint(intent);
+    const accountId = getSession().user?.id;
+    if (
+      !accountId ||
+      getSession().user?.employeeId !== intent.employeeId ||
+      currentUser.id !== intent.employeeId
+    ) {
+      setRecoveryCheck({
+        fingerprint,
+        message:
+          'Your session changed. Reopen Leave with the original account to check this request.',
+      });
+      return;
+    }
+    busy.current = true;
+    setChecking(true);
+    try {
+      const records = await getLeaveRequests(token, {
+        employeeId: intent.employeeId,
+        year: Number(intent.startDate.slice(0, 4)),
+      });
+      if (
+        getSession().user?.id !== accountId ||
+        getSession().user?.employeeId !== intent.employeeId
+      )
+        return;
+      const record = findRecordedLeaveIntent(intent, records);
+      if (record) {
+        setRecoveryCheck({
+          fingerprint,
+          record,
+          message:
+            'A matching request is already recorded. This check does not establish whether the earlier submission created it. Open the record to review its status.',
+        });
+        onSuccess(record, 'existing');
+      } else {
+        setRecoveryCheck({
+          fingerprint,
+          message: `No exact match was found in the returned history${records.length === 500 ? ' (limited to the newest 500 matching records)' : ''}. The earlier outcome remains unknown. This exact request is still blocked; you can check again or discard this draft and start a different request.`,
+        });
+      }
+    } catch (err) {
+      if (getSession().user?.id !== accountId) return;
+      setRecoveryCheck({
+        fingerprint,
+        message: `Request history could not be checked. ${err instanceof Error ? err.message : 'Try checking again.'} The earlier outcome remains unknown, and this exact request stays blocked.`,
+      });
+    } finally {
+      busy.current = false;
+      setChecking(false);
+    }
+  }
+
+  function startDifferentRequest() {
+    if (working) return;
+    Alert.alert(
+      'Discard this draft?',
+      'The previous request may already be recorded. Its exact details will remain protected against resubmission. You can start a different request.',
+      [
+        { text: 'Keep draft', style: 'cancel' },
+        {
+          text: 'Start different request',
+          onPress: () => {
+            setSelectedTypeId(leaveTypes[0]?.id);
+            setStartDate(today);
+            setEndDate(today);
+            setIsHalfDay(false);
+            setHalfDaySession('FIRST');
+            setReason('');
+            setRecoveryIntent(null);
+            setRecoveryCheck(null);
+            setError(null);
+            setFieldErrors({});
+            setTypesOpen(false);
+          },
+        },
+      ],
+    );
+  }
+
+  function close() {
+    if (working) return;
+    if (reason.trim() || blocked)
+      Alert.alert(
+        'Close leave request?',
+        blocked
+          ? 'The outcome is unknown. Check your request history before submitting again.'
+          : 'Your unfinished request will remain here until you leave this screen.',
+        [
+          { text: 'Keep editing', style: 'cancel' },
+          { text: 'Close', onPress: onClose },
+        ],
+      );
+    else onClose();
+  }
   return (
     <Modal
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      presentationStyle="fullScreen"
+      animationType={reduceMotion ? 'none' : 'slide'}
+      onRequestClose={() => {
+        if (!working) close();
+      }}
     >
-      <View style={styles.overlay}>
-        <View style={styles.modalSheet}>
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+        <SafeAreaView style={styles.screen}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.screen}
           >
             <View style={styles.headerRow}>
-              <View>
-                <Text style={styles.modalTitle}>Apply for Leave</Text>
-                <Text style={styles.modalSubtitle}>
-                  Submit request for HOD academic approval
-                </Text>
-              </View>
-              <Pressable onPress={onClose} style={styles.closeBtn}>
-                <Text style={styles.closeBtnText}>✕</Text>
-              </Pressable>
-            </View>
-
-            {error && (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            )}
-
-            {/* Leave Type Selector */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Select Leave Type</Text>
-              <View style={styles.typeSelectorRow}>
-                {leaveTypes.map((type) => {
-                  const isSelected = type.id === selectedTypeId;
-                  return (
-                    <Pressable
-                      key={type.id}
-                      onPress={() => setSelectedTypeId(type.id)}
-                      style={[
-                        styles.typeChip,
-                        isSelected && styles.typeChipSelected,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.typeChipText,
-                          isSelected && styles.typeChipTextSelected,
-                        ]}
-                      >
-                        {type.code}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.typeChipName,
-                          isSelected && styles.typeChipNameSelected,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {type.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Quick Date Shortcuts */}
-            <View style={styles.shortcutsRow}>
-              <Text style={styles.shortcutsLabel}>Quick dates:</Text>
-              <Pressable
-                onPress={() => {
-                  setStartDate(today);
-                  setEndDate(today);
-                }}
-                style={styles.shortcutBtn}
+              <Text accessibilityRole="header" style={styles.modalTitle}>
+                Apply for leave
+              </Text>
+              <Button
+                variant="text"
+                accessibilityLabel="Close leave application"
+                disabled={working}
+                onPress={close}
               >
-                <Text style={styles.shortcutBtnText}>Today</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  setStartDate(tomorrow);
-                  setEndDate(tomorrow);
-                }}
-                style={styles.shortcutBtn}
-              >
-                <Text style={styles.shortcutBtnText}>Tomorrow</Text>
-              </Pressable>
+                <Icon name="close" />
+              </Button>
             </View>
-
-            {/* Date Inputs */}
-            <View style={styles.dateInputsRow}>
-              <View style={styles.dateCol}>
-                <Input
-                  label="Start Date"
-                  value={startDate}
-                  onChangeText={setStartDate}
-                  placeholder="YYYY-MM-DD"
-                />
-              </View>
-              <View style={styles.dateCol}>
-                <Input
-                  label="End Date"
-                  value={endDate}
-                  onChangeText={setEndDate}
-                  placeholder="YYYY-MM-DD"
-                />
-              </View>
-            </View>
-
-            {/* Half Day Option */}
-            {selectedType?.allowHalfDay && (
-              <Card style={styles.halfDayCard}>
-                <Pressable
-                  onPress={() => setIsHalfDay(!isHalfDay)}
-                  style={styles.halfDayCheckboxRow}
-                >
-                  <View
-                    style={[
-                      styles.checkbox,
-                      isHalfDay && styles.checkboxActive,
-                    ]}
-                  >
-                    {isHalfDay && <Text style={styles.checkmark}>✓</Text>}
-                  </View>
-                  <Text style={styles.halfDayLabel}>
-                    Apply as Half-Day Leave
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              automaticallyAdjustKeyboardInsets
+            >
+              {!!activeRecovery && (
+                <View style={styles.recovery}>
+                  <Text accessibilityRole="header" style={styles.sectionLabel}>
+                    Check your earlier request
                   </Text>
-                </Pressable>
-
-                {isHalfDay && (
-                  <View style={styles.sessionToggleRow}>
-                    <Pressable
-                      onPress={() => setHalfDaySession('FIRST')}
-                      style={[
-                        styles.sessionBtn,
-                        halfDaySession === 'FIRST' && styles.sessionBtnActive,
-                      ]}
+                  <Text style={styles.detail}>
+                    {leaveTypes.find(
+                      (type) => type.id === activeRecovery.leaveTypeId,
+                    )?.name ?? 'Leave request'}{' '}
+                    ·{' '}
+                    {leaveDates(
+                      activeRecovery.startDate,
+                      activeRecovery.endDate,
+                    )}
+                    {activeRecovery.halfDay
+                      ? ` · ${activeRecovery.halfDay === 'FIRST' ? 'First' : 'Second'} half`
+                      : ''}
+                  </Text>
+                  <Text style={styles.body}>{activeRecovery.reason}</Text>
+                  <Text accessibilityLiveRegion="polite" style={styles.detail}>
+                    This exact request may already be recorded. Submitting it
+                    again stays disabled, including after you close and reopen
+                    this form.
+                  </Text>
+                  <Button
+                    variant="secondary"
+                    onPress={() => void checkRequestHistory()}
+                    loading={checking}
+                    disabled={working}
+                  >
+                    Check request history
+                  </Button>
+                  {!!checkedRecovery && (
+                    <Text
+                      accessibilityLiveRegion="polite"
+                      style={styles.detail}
                     >
-                      <Text
-                        style={[
-                          styles.sessionText,
-                          halfDaySession === 'FIRST' &&
-                            styles.sessionTextActive,
-                        ]}
+                      {checkedRecovery.message}
+                    </Text>
+                  )}
+                  {!!checkedRecovery?.record && (
+                    <>
+                      <LeaveStatus status={checkedRecovery.record.status} />
+                      <Button
+                        variant="outline"
+                        disabled={working}
+                        onPress={() => {
+                          onClose();
+                          router.push({
+                            pathname: '/leave/[id]',
+                            params: { id: checkedRecovery.record!.id },
+                          });
+                        }}
                       >
-                        Morning Session (First)
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setHalfDaySession('SECOND')}
-                      style={[
-                        styles.sessionBtn,
-                        halfDaySession === 'SECOND' && styles.sessionBtnActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.sessionText,
-                          halfDaySession === 'SECOND' &&
-                            styles.sessionTextActive,
-                        ]}
+                        View recorded request
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    variant="text"
+                    disabled={working}
+                    onPress={startDifferentRequest}
+                  >
+                    Start a different request
+                  </Button>
+                </View>
+              )}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Leave type</Text>
+                <Button
+                  variant="outline"
+                  disabled={working}
+                  accessibilityLabel={`Leave type: ${selectedType?.name ?? 'Choose a leave type'}. ${typesOpen ? 'Hide options' : 'Show options'}`}
+                  onPress={() => setTypesOpen(!typesOpen)}
+                >
+                  <Icon name="leave" color={theme.colors.violet} />
+                  <Text style={[styles.body, styles.grow]}>
+                    {selectedType?.name ?? 'Choose a leave type'}
+                  </Text>
+                  <Icon
+                    name="next"
+                    color={theme.colors.mutedForeground}
+                    size={theme.spacing.lg}
+                  />
+                </Button>
+                {typesOpen && (
+                  <View style={styles.typeOptions}>
+                    {leaveTypes.map((type) => (
+                      <Button
+                        key={type.id}
+                        variant={
+                          type.id === selectedType?.id ? 'secondary' : 'text'
+                        }
+                        disabled={working}
+                        accessibilityLabel={`${type.name}, ${type.code}${type.id === selectedType?.id ? ', selected' : ''}`}
+                        onPress={() => {
+                          setSelectedTypeId(type.id);
+                          setTypesOpen(false);
+                          if (!type.allowHalfDay) setIsHalfDay(false);
+                        }}
                       >
-                        Afternoon Session (Second)
-                      </Text>
-                    </Pressable>
+                        {type.code} · {type.name}
+                      </Button>
+                    ))}
                   </View>
                 )}
-              </Card>
-            )}
-
-            {/* Reason Input */}
-            <Input
-              label="Reason for Leave"
-              value={reason}
-              onChangeText={setReason}
-              placeholder="e.g. Attending VTU conference, personal work, medical"
-              helperText="Minimum 3 characters. This will be reviewed by your HOD."
-            />
-
-            {/* Actions */}
-            <View style={styles.actionsRow}>
-              <Button
-                variant="outline"
-                onPress={onClose}
-                style={styles.cancelBtn}
+              </View>
+              <View style={styles.shortcutsRow}>
+                <Text style={styles.detail}>Quick dates</Text>
+                <Button
+                  variant="text"
+                  disabled={working}
+                  onPress={() => {
+                    setStartDate(today);
+                    setEndDate(today);
+                  }}
+                >
+                  Today
+                </Button>
+                <Button
+                  variant="text"
+                  disabled={working}
+                  onPress={() => {
+                    setStartDate(tomorrow);
+                    setEndDate(tomorrow);
+                  }}
+                >
+                  Tomorrow
+                </Button>
+              </View>
+              <View
+                style={[styles.dateInputsRow, fontScale > 1.3 && styles.column]}
               >
-                Cancel
-              </Button>
+                <View style={styles.dateCol}>
+                  <DateField
+                    disabled={working}
+                    label="Start date"
+                    value={startDate}
+                    onChangeText={setStartDate}
+                  />
+                </View>
+                <View style={styles.dateCol}>
+                  <DateField
+                    disabled={working}
+                    label="End date"
+                    value={endDate}
+                    onChangeText={setEndDate}
+                  />
+                </View>
+              </View>
+              {selectedType?.allowHalfDay && (
+                <View style={styles.section}>
+                  <View style={styles.halfDayRow}>
+                    <View style={styles.grow}>
+                      <Text style={styles.sectionLabel}>Half day</Text>
+                      <Text style={styles.detail}>
+                        Mark this if applying for half a day.
+                      </Text>
+                    </View>
+                    <Switch
+                      value={isHalfDay}
+                      disabled={working}
+                      onValueChange={setIsHalfDay}
+                      accessibilityLabel="Apply for half-day leave"
+                      hitSlop={theme.spacing.sm}
+                      trackColor={{ true: theme.colors.violet }}
+                    />
+                  </View>
+                  {isHalfDay &&
+                    (working ? (
+                      <Text style={styles.detail}>
+                        {halfDaySession === 'FIRST'
+                          ? 'First half'
+                          : 'Second half'}
+                      </Text>
+                    ) : (
+                      <SegmentedControl
+                        options={[
+                          { value: 'FIRST', label: 'First half' },
+                          { value: 'SECOND', label: 'Second half' },
+                        ]}
+                        value={halfDaySession}
+                        onChange={setHalfDaySession}
+                        label="Half-day session"
+                      />
+                    ))}
+                </View>
+              )}
+              <Input
+                disabled={working}
+                multiline
+                maxLength={500}
+                autoCapitalize="sentences"
+                label="Reason"
+                value={reason}
+                onChangeText={setReason}
+                placeholder="Tell your reviewer why you need leave"
+                error={fieldErrors.reason}
+                helperText="At least 3 characters. Your reason is recorded with the request."
+              />
+              <View style={styles.impact}>
+                <Icon name="school" color={theme.colors.primary} />
+                <View style={styles.grow}>
+                  <Text style={styles.impactTitle}>Academic impact</Text>
+                  <Text style={styles.impactDetail}>
+                    Dated class impact and coverage are confirmed after final
+                    approval. Review your timetable before submitting.
+                  </Text>
+                </View>
+              </View>
+              {!!error && (
+                <View style={styles.errorBox}>
+                  <Text
+                    accessibilityRole="alert"
+                    accessibilityLiveRegion="polite"
+                    style={styles.errorText}
+                  >
+                    {error}
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+            <View style={styles.footer}>
               <Button
-                variant="primary"
-                onPress={handleSubmit}
+                variant="accent"
+                onPress={() => void handleSubmit()}
                 loading={loading}
-                disabled={loading}
-                style={styles.submitBtn}
+                disabled={working || blocked}
               >
-                Submit Application
+                Submit request
               </Button>
+              <Text style={styles.footerNote}>
+                {currentUser.role === 'FACULTY'
+                  ? 'Sends to HOD, then HR · Sundays excluded'
+                  : 'Follows your approval chain · Sundays excluded'}
+              </Text>
             </View>
-          </ScrollView>
-        </View>
-      </View>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(5, 31, 91, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: theme.colors.surface,
-    borderTopLeftRadius: theme.radius.modal,
-    borderTopRightRadius: theme.radius.modal,
-    maxHeight: '90%',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  scrollContent: {
-    padding: theme.spacing.page,
-    gap: theme.spacing.section,
-  },
+  screen: { flex: 1, backgroundColor: theme.colors.surface },
   headerRow: {
+    width: '100%',
+    maxWidth: theme.sizes.contentMax,
+    alignSelf: 'center',
+    paddingHorizontal: theme.spacing.page,
+    paddingVertical: theme.spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: theme.spacing.md,
   },
   modalTitle: {
+    flex: 1,
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.subheading,
-    color: theme.colors.primary,
+    fontWeight: '600',
+    fontSize: theme.typography.title,
+    color: theme.colors.foreground,
   },
-  modalSubtitle: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
+  scrollContent: {
+    width: '100%',
+    maxWidth: theme.sizes.contentMax,
+    alignSelf: 'center',
+    padding: theme.spacing.page,
+    gap: theme.spacing.page,
   },
-  closeBtn: {
-    padding: 6,
-    borderRadius: 6,
+  section: { gap: theme.spacing.sm },
+  recovery: {
+    padding: theme.spacing.section,
+    gap: theme.spacing.md,
+    borderRadius: theme.radius.field,
     backgroundColor: theme.colors.muted,
-  },
-  closeBtnText: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 14,
-    color: theme.colors.primary,
-  },
-  errorBox: {
-    backgroundColor: '#FEE2E2',
-    borderColor: '#FCA5A5',
-    borderWidth: 1,
-    borderRadius: theme.radius.control,
-    padding: theme.spacing.md,
-  },
-  errorText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.error,
-  },
-  section: {
-    gap: theme.spacing.sm,
   },
   sectionLabel: {
     fontFamily: theme.typography.headingFamily,
+    fontWeight: '600',
     fontSize: theme.typography.label,
     color: theme.colors.foreground,
   },
-  typeSelectorRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-  },
-  typeChip: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: theme.colors.background,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.control,
-    padding: theme.spacing.md,
-    gap: 2,
-  },
-  typeChipSelected: {
-    backgroundColor: '#EBF1FC',
-    borderColor: theme.colors.primary,
-  },
-  typeChipText: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.label,
+  body: {
+    fontSize: theme.typography.body,
+    lineHeight: theme.typography.lineHeight,
     color: theme.colors.foreground,
   },
-  typeChipTextSelected: {
-    color: theme.colors.primary,
-  },
-  typeChipName: {
-    fontFamily: theme.typography.bodyFamily,
+  detail: {
     fontSize: theme.typography.caption,
+    lineHeight: theme.typography.captionLineHeight,
     color: theme.colors.mutedForeground,
   },
-  typeChipNameSelected: {
-    color: theme.colors.primary,
+  grow: { flex: 1, gap: theme.spacing.xs },
+  typeOptions: {
+    gap: theme.spacing.xs,
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.radius.field,
+    padding: theme.spacing.xs,
   },
   shortcutsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: theme.spacing.sm,
   },
-  shortcutsLabel: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
+  dateInputsRow: { flexDirection: 'row', gap: theme.spacing.md },
+  dateCol: { flex: 1 },
+  column: { flexDirection: 'column' },
+  halfDayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: theme.sizes.tapTarget,
+    gap: theme.spacing.md,
   },
-  shortcutBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: theme.colors.muted,
+  impact: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.md,
+    padding: theme.spacing.section,
+    backgroundColor: theme.colors.blueContainer,
+    borderRadius: theme.radius.field,
   },
-  shortcutBtnText: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.caption,
+  impactTitle: {
+    fontSize: theme.typography.body,
+    fontWeight: '600',
     color: theme.colors.primary,
   },
-  dateInputsRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
+  impactDetail: {
+    fontSize: theme.typography.caption,
+    lineHeight: theme.typography.captionLineHeight,
+    color: theme.colors.primary,
   },
-  dateCol: {
-    flex: 1,
+  errorBox: {
+    backgroundColor: theme.colors.coralContainer,
+    borderRadius: theme.radius.field,
+    padding: theme.spacing.section,
   },
-  halfDayCard: {
+  errorText: {
+    fontSize: theme.typography.secondary,
+    lineHeight: theme.typography.secondaryLineHeight,
+    color: theme.colors.errorInk,
+  },
+  footer: {
+    width: '100%',
+    maxWidth: theme.sizes.contentMax,
+    alignSelf: 'center',
+    paddingHorizontal: theme.spacing.page,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.section,
     gap: theme.spacing.sm,
-    backgroundColor: '#F8FAFC',
-  },
-  halfDayCheckboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: theme.colors.input,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
   },
-  checkboxActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  checkmark: {
-    color: theme.colors.surface,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  halfDayLabel: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.foreground,
-  },
-  sessionToggleRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-    marginTop: 4,
-  },
-  sessionBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-  },
-  sessionBtnActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  sessionText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: 11,
-    color: theme.colors.foreground,
-  },
-  sessionTextActive: {
-    color: theme.colors.surface,
-    fontFamily: theme.typography.headingFamily,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-    marginTop: theme.spacing.sm,
-  },
-  cancelBtn: {
-    flex: 1,
-  },
-  submitBtn: {
-    flex: 2,
+  footerNote: {
+    fontSize: theme.typography.caption,
+    lineHeight: theme.typography.captionLineHeight,
+    color: theme.colors.mutedForeground,
+    textAlign: 'center',
   },
 });

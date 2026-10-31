@@ -4,6 +4,20 @@ import { mock, test } from 'node:test';
 mock.module('../lib/api-config.ts', {
   exports: { API_BASE_URL: 'https://api.test/api/v1' },
 });
+mock.module('../lib/session.ts', {
+  exports: {
+    apiFetch: async (path) => {
+      const response = await globalThis.fetch(
+        `https://api.test/api/v1${path}`,
+        {
+          headers: { Authorization: 'Bearer real-token' },
+        },
+      );
+      if (!response.ok) throw new Error('Unable to load schedule.');
+      return response;
+    },
+  },
+});
 const { getPeriods, getTimetableEntries } =
   await import('../lib/timetable-api.ts');
 

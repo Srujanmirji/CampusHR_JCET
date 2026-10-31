@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -8,10 +9,19 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import Animated, {
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
+import { selectionFeedback } from '../../lib/feedback';
 import { theme } from '../../lib/theme';
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export type ButtonVariant =
-  'primary' | 'accent' | 'outline' | 'secondary' | 'danger';
+  'primary' | 'accent' | 'outline' | 'secondary' | 'danger' | 'text';
 
 interface ButtonProps {
   children: React.ReactNode;
@@ -42,6 +52,12 @@ export function Button({
   fullWidth = false,
   accessibilityLabel,
 }: ButtonProps) {
+  const [focused, setFocused] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const scale = useSharedValue(1);
+  const motion = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
   const isInteractive = !disabled && !loading;
 
   const resolvedAccessibilityLabel =
@@ -54,36 +70,62 @@ export function Button({
         : undefined);
 
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={resolvedAccessibilityLabel}
       accessibilityState={{ disabled: !isInteractive, busy: loading }}
       disabled={!isInteractive}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       onPress={onPress}
-      style={({ pressed }) => [
+      onPressIn={() => {
+        setPressed(true);
+        if (isInteractive) selectionFeedback();
+        scale.set(
+          withSpring(theme.motion.pressScale, {
+            stiffness: 350,
+            damping: 25,
+            reduceMotion: ReduceMotion.System,
+          }),
+        );
+      }}
+      onPressOut={() => {
+        setPressed(false);
+        scale.set(
+          withSpring(1, {
+            stiffness: 350,
+            damping: 25,
+            reduceMotion: ReduceMotion.System,
+          }),
+        );
+      }}
+      style={[
         styles.base,
-        styles[variant],
+        motion,
+        focused &&
+          Platform.OS === 'web' && {
+            outlineWidth: 2,
+            outlineColor: theme.colors.primary,
+            outlineStyle: 'solid',
+            outlineOffset: 3,
+          },
+        styles[variant === 'text' ? 'textButton' : variant],
         fullWidth && styles.fullWidth,
         pressed && isInteractive && styles.pressed,
-        disabled && styles.disabled,
+        (disabled || loading) && styles.disabled,
         style,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator
-          size="small"
-          color={
-            variant === 'outline' || variant === 'secondary'
-              ? theme.colors.primary
-              : theme.colors.surface
-          }
-        />
-      ) : isTextContent(children) ? (
+      {loading && (
+        <ActivityIndicator size="small" color={theme.colors.mutedForeground} />
+      )}
+      {isTextContent(children) ? (
         <Text
           style={[
             styles.text,
-            variant === 'outline' && styles.textOutline,
-            variant === 'secondary' && styles.textSecondary,
+            ['outline', 'secondary', 'text'].includes(variant) &&
+              styles.textSecondary,
+            (disabled || loading) && { color: theme.colors.mutedForeground },
           ]}
         >
           {children}
@@ -91,13 +133,15 @@ export function Button({
       ) : (
         children
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
 const styles = StyleSheet.create({
   base: {
     minHeight: theme.sizes.tapTarget,
+    minWidth: theme.sizes.tapTarget,
+    paddingVertical: theme.spacing.md,
     borderRadius: theme.radius.control,
     alignItems: 'center',
     justifyContent: 'center',
@@ -110,31 +154,45 @@ const styles = StyleSheet.create({
   },
   primary: {
     backgroundColor: theme.colors.primary,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 2,
   },
   accent: {
     backgroundColor: theme.colors.accentInk,
+    shadowColor: theme.colors.accentInk,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 2,
   },
   outline: {
     backgroundColor: theme.colors.surface,
-    borderWidth: 1.5,
-    borderColor: theme.colors.primary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   secondary: {
-    backgroundColor: theme.colors.muted,
+    backgroundColor: theme.colors.blueContainer,
   },
   danger: {
     backgroundColor: theme.colors.errorInk,
   },
-  pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.99 }],
-  },
+  pressed: { opacity: 0.85 },
   disabled: {
-    opacity: 0.5,
+    backgroundColor: theme.colors.muted,
+    shadowOpacity: 0,
+    elevation: 0,
   },
+  textButton: { backgroundColor: 'transparent' },
   text: {
+    flexShrink: 1,
+    minWidth: 0,
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.body,
+    fontWeight: '600',
+    fontSize: theme.typography.button,
+    letterSpacing: -0.2,
     color: theme.colors.surface,
     textAlign: 'center',
   },

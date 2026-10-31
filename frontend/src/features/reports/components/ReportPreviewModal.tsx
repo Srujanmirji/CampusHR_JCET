@@ -41,18 +41,30 @@ export function ReportPreviewModal({
   const isWorkload = report?.id === 'faculty-workload';
   const isContinuity = report?.id === 'academic-continuity';
 
-  const { data: attendanceData, isLoading: loadingAttendance } = useAttendanceReport(
-    isAttendance && open ? {} : undefined,
-  );
-  const { data: leaveData, isLoading: loadingLeave } = useLeaveReport(
-    isLeave && open ? {} : undefined,
-  );
-  const { data: workloadData, isLoading: loadingWorkload } = useWorkloadReport(
-    isWorkload && open ? {} : undefined,
-  );
-  const { data: continuityData, isLoading: loadingContinuity } = useContinuityReport(
-    isContinuity && open ? {} : undefined,
-  );
+  const {
+    data: attendanceData,
+    isLoading: loadingAttendance,
+    isError: errorAttendance,
+    refetch: retryAttendance,
+  } = useAttendanceReport(isAttendance && open ? {} : undefined);
+  const {
+    data: leaveData,
+    isLoading: loadingLeave,
+    isError: errorLeave,
+    refetch: retryLeave,
+  } = useLeaveReport(isLeave && open ? {} : undefined);
+  const {
+    data: workloadData,
+    isLoading: loadingWorkload,
+    isError: errorWorkload,
+    refetch: retryWorkload,
+  } = useWorkloadReport(isWorkload && open ? {} : undefined);
+  const {
+    data: continuityData,
+    isLoading: loadingContinuity,
+    isError: errorContinuity,
+    refetch: retryContinuity,
+  } = useContinuityReport(isContinuity && open ? {} : undefined);
 
   if (!report) return null;
 
@@ -78,16 +90,31 @@ export function ReportPreviewModal({
     }
   }
 
-  function handlePrintPdf() {
-    toast.info('Opening print layout for official JCET report...');
-    setTimeout(() => {
-      window.print();
-    }, 300);
-  }
+  const queryError = isAttendance
+    ? errorAttendance
+    : isLeave
+      ? errorLeave
+      : isWorkload
+        ? errorWorkload
+        : errorContinuity;
+  const loading = isAttendance
+    ? loadingAttendance
+    : isLeave
+      ? loadingLeave
+      : isWorkload
+        ? loadingWorkload
+        : loadingContinuity;
+  const records = isAttendance
+    ? attendanceData?.records
+    : isLeave
+      ? leaveData?.records
+      : isWorkload
+        ? workloadData?.records
+        : continuityData?.records;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="report-print sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="border-b pb-3">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -112,6 +139,24 @@ export function ReportPreviewModal({
           </div>
         </DialogHeader>
 
+        {queryError && (
+          <div role="alert">
+            Report unavailable.{' '}
+            <Button
+              onClick={() => {
+                if (isAttendance) void retryAttendance();
+                if (isLeave) void retryLeave();
+                if (isWorkload) void retryWorkload();
+                if (isContinuity) void retryContinuity();
+              }}
+            >
+              Retry
+            </Button>
+          </div>
+        )}
+        {!loading && !queryError && records?.length === 0 && (
+          <p role="status">No records found for this report.</p>
+        )}
         <div className="space-y-4 py-2 text-xs">
           {/* Executive Metric Callout */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -124,9 +169,9 @@ export function ReportPreviewModal({
               </div>
             </div>
             <div className="rounded-lg border bg-muted/20 p-3 text-center">
-              <span className="text-muted-foreground">Audit Status</span>
+              <span className="text-muted-foreground">Data Status</span>
               <div className="mt-1 text-sm font-bold text-emerald-600">
-                Verified
+                {queryError ? 'Unavailable' : loading ? 'Loading' : 'Loaded'}
               </div>
             </div>
             <div className="rounded-lg border bg-muted/20 p-3 text-center">
@@ -135,7 +180,9 @@ export function ReportPreviewModal({
             </div>
             <div className="rounded-lg border bg-muted/20 p-3 text-center">
               <span className="text-muted-foreground">Mode</span>
-              <div className="mt-1 text-sm font-bold text-primary">Live Query</div>
+              <div className="mt-1 text-sm font-bold text-primary">
+                Live Query
+              </div>
             </div>
           </div>
 
@@ -148,13 +195,14 @@ export function ReportPreviewModal({
                   Smart Substitution & Syllabus Continuity
                 </h4>
                 <Badge variant="secondary">
-                  Coverage: {continuityData?.summary.coverageRate ?? 94}%
+                  Coverage: {continuityData?.summary.coverageRate ?? '—'}%
                 </Badge>
               </div>
 
               {loadingContinuity ? (
                 <div className="py-8 text-center text-muted-foreground flex justify-center items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading live records...
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />{' '}
+                  Loading live records...
                 </div>
               ) : (
                 <div className="rounded-lg border overflow-hidden">
@@ -169,28 +217,35 @@ export function ReportPreviewModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {(continuityData?.records ?? []).slice(0, 8).map((row: ContinuityReportDto['records'][number]) => (
-                        <tr key={row.id}>
-                          <td className="p-2.5 font-mono text-[11px]">{row.date}</td>
-                          <td className="p-2.5 font-medium">{row.subject}</td>
-                          <td className="p-2.5">{row.originalFaculty}</td>
-                          <td className="p-2.5 font-semibold text-primary">
-                            {row.substituteFaculty ?? 'Supervised / Self-Study'}
-                          </td>
-                          <td className="p-2.5 text-right">
-                            <Badge
-                              variant="outline"
-                              className={
-                                row.status === 'COVERED'
-                                  ? 'border-emerald-500 text-emerald-600'
-                                  : 'border-amber-500 text-amber-600'
-                              }
-                            >
-                              {row.status}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
+                      {(continuityData?.records ?? []).map(
+                        (row: ContinuityReportDto['records'][number]) => (
+                          <tr key={row.id}>
+                            <td className="p-2.5 font-mono text-[11px]">
+                              {row.date}
+                            </td>
+                            <td className="p-2.5 font-medium">{row.subject}</td>
+                            <td className="p-2.5">{row.originalFaculty}</td>
+                            <td className="p-2.5 font-semibold text-primary">
+                              {row.substituteFaculty ??
+                                (row.kind === 'NOT_NEEDED'
+                                  ? 'Not needed'
+                                  : 'Unassigned')}
+                            </td>
+                            <td className="p-2.5 text-right">
+                              <Badge
+                                variant="outline"
+                                className={
+                                  row.status === 'COVERED'
+                                    ? 'border-emerald-500 text-emerald-600'
+                                    : 'border-amber-500 text-amber-600'
+                                }
+                              >
+                                {row.status}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ),
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -213,7 +268,8 @@ export function ReportPreviewModal({
 
               {loadingAttendance ? (
                 <div className="py-8 text-center text-muted-foreground flex justify-center items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading attendance...
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />{' '}
+                  Loading attendance...
                 </div>
               ) : (
                 <div className="rounded-lg border overflow-hidden">
@@ -230,17 +286,31 @@ export function ReportPreviewModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {(attendanceData?.records ?? []).slice(0, 8).map((row: AttendanceReportDto['records'][number]) => (
-                        <tr key={row.employeeId}>
-                          <td className="p-2.5 font-mono text-[11px]">{row.employeeCode}</td>
-                          <td className="p-2.5 font-medium">{row.name}</td>
-                          <td className="p-2.5 font-semibold text-primary">{row.department}</td>
-                          <td className="p-2.5 text-center text-emerald-600 font-semibold">{row.present}</td>
-                          <td className="p-2.5 text-center text-amber-600">{row.late}</td>
-                          <td className="p-2.5 text-center text-rose-600">{row.absent}</td>
-                          <td className="p-2.5 text-right font-bold">{row.attendanceRate}%</td>
-                        </tr>
-                      ))}
+                      {(attendanceData?.records ?? []).map(
+                        (row: AttendanceReportDto['records'][number]) => (
+                          <tr key={row.employeeId}>
+                            <td className="p-2.5 font-mono text-[11px]">
+                              {row.employeeCode}
+                            </td>
+                            <td className="p-2.5 font-medium">{row.name}</td>
+                            <td className="p-2.5 font-semibold text-primary">
+                              {row.department}
+                            </td>
+                            <td className="p-2.5 text-center text-emerald-600 font-semibold">
+                              {row.present}
+                            </td>
+                            <td className="p-2.5 text-center text-amber-600">
+                              {row.late}
+                            </td>
+                            <td className="p-2.5 text-center text-rose-600">
+                              {row.absent}
+                            </td>
+                            <td className="p-2.5 text-right font-bold">
+                              {row.attendanceRate}%
+                            </td>
+                          </tr>
+                        ),
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -263,7 +333,8 @@ export function ReportPreviewModal({
 
               {loadingLeave ? (
                 <div className="py-8 text-center text-muted-foreground flex justify-center items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading leave records...
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />{' '}
+                  Loading leave records...
                 </div>
               ) : (
                 <div className="rounded-lg border overflow-hidden">
@@ -280,17 +351,25 @@ export function ReportPreviewModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {(leaveData?.records ?? []).slice(0, 8).map((row: LeaveReportDto['records'][number]) => (
-                        <tr key={row.employeeId}>
-                          <td className="p-2.5 font-mono text-[11px]">{row.employeeCode}</td>
-                          <td className="p-2.5 font-medium">{row.name}</td>
-                          <td className="p-2.5 font-semibold text-primary">{row.department}</td>
-                          <td className="p-2.5 text-center">{row.clDays}</td>
-                          <td className="p-2.5 text-center">{row.mlDays}</td>
-                          <td className="p-2.5 text-center">{row.elDays}</td>
-                          <td className="p-2.5 text-right font-bold text-rose-600">{row.totalApprovedDays}</td>
-                        </tr>
-                      ))}
+                      {(leaveData?.records ?? []).map(
+                        (row: LeaveReportDto['records'][number]) => (
+                          <tr key={row.employeeId}>
+                            <td className="p-2.5 font-mono text-[11px]">
+                              {row.employeeCode}
+                            </td>
+                            <td className="p-2.5 font-medium">{row.name}</td>
+                            <td className="p-2.5 font-semibold text-primary">
+                              {row.department}
+                            </td>
+                            <td className="p-2.5 text-center">{row.clDays}</td>
+                            <td className="p-2.5 text-center">{row.mlDays}</td>
+                            <td className="p-2.5 text-center">{row.elDays}</td>
+                            <td className="p-2.5 text-right font-bold text-rose-600">
+                              {row.totalApprovedDays}
+                            </td>
+                          </tr>
+                        ),
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -313,7 +392,8 @@ export function ReportPreviewModal({
 
               {loadingWorkload ? (
                 <div className="py-8 text-center text-muted-foreground flex justify-center items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading workload data...
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />{' '}
+                  Loading workload data...
                 </div>
               ) : (
                 <div className="rounded-lg border overflow-hidden">
@@ -330,28 +410,40 @@ export function ReportPreviewModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {(workloadData?.records ?? []).slice(0, 8).map((row: WorkloadReportDto['records'][number]) => (
-                        <tr key={row.facultyId}>
-                          <td className="p-2.5 font-mono text-[11px]">{row.employeeCode}</td>
-                          <td className="p-2.5 font-medium">{row.name}</td>
-                          <td className="p-2.5 font-semibold text-primary">{row.department}</td>
-                          <td className="p-2.5 text-center">{row.theoryHours}</td>
-                          <td className="p-2.5 text-center">{row.labHours}</td>
-                          <td className="p-2.5 text-center font-bold">{row.totalHours} hrs</td>
-                          <td className="p-2.5 text-right">
-                            <Badge
-                              variant="outline"
-                              className={
-                                row.status === 'NORMAL'
-                                  ? 'border-emerald-500 text-emerald-600'
-                                  : 'border-amber-500 text-amber-600'
-                              }
-                            >
-                              {row.status}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
+                      {(workloadData?.records ?? []).map(
+                        (row: WorkloadReportDto['records'][number]) => (
+                          <tr key={row.facultyId}>
+                            <td className="p-2.5 font-mono text-[11px]">
+                              {row.employeeCode}
+                            </td>
+                            <td className="p-2.5 font-medium">{row.name}</td>
+                            <td className="p-2.5 font-semibold text-primary">
+                              {row.department}
+                            </td>
+                            <td className="p-2.5 text-center">
+                              {row.theoryHours}
+                            </td>
+                            <td className="p-2.5 text-center">
+                              {row.labHours}
+                            </td>
+                            <td className="p-2.5 text-center font-bold">
+                              {row.totalHours} hrs
+                            </td>
+                            <td className="p-2.5 text-right">
+                              <Badge
+                                variant="outline"
+                                className={
+                                  row.status === 'NORMAL'
+                                    ? 'border-emerald-500 text-emerald-600'
+                                    : 'border-amber-500 text-amber-600'
+                                }
+                              >
+                                {row.status}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ),
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -378,15 +470,18 @@ export function ReportPreviewModal({
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t pt-3">
+        <div
+          data-report-controls
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t pt-3"
+        >
           <span className="text-[11px] text-muted-foreground">
-            Export generated reports in official JCET college letterhead format.
+            Download recorded report data as CSV.
           </span>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={downloading}
+              disabled={downloading || loading || queryError}
               onClick={handleExportCsv}
             >
               {downloading ? (
@@ -396,7 +491,11 @@ export function ReportPreviewModal({
               )}
               Export CSV / Excel
             </Button>
-            <Button size="sm" onClick={handlePrintPdf}>
+            <Button
+              size="sm"
+              disabled={loading || queryError}
+              onClick={() => window.print()}
+            >
               <Printer className="mr-1.5 h-3.5 w-3.5" />
               Print / PDF
             </Button>

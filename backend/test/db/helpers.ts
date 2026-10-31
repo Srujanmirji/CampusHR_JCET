@@ -14,7 +14,9 @@ import type { RoleName } from '../../src/modules/auth/permissions.js';
 
 export const password = 'db-test-password';
 
-export async function startTestApp() {
+export async function startTestApp(
+  push: { PUSH_ENABLED?: 'true' | 'false'; EXPO_PROJECT_ID?: string } = {},
+) {
   const prisma = createPrismaClient(process.env.DATABASE_URL!);
   await seedReferenceData(prisma);
   const env = envSchema.parse({
@@ -22,6 +24,7 @@ export async function startTestApp() {
     DATABASE_URL: process.env.DATABASE_URL,
     JWT_ACCESS_SECRET: 'a'.repeat(32),
     CORS_ORIGIN: 'http://localhost:5173',
+    ...push,
   });
   const authRepository = createPrismaAuthRepository(prisma);
   const realtime = createRealtime();

@@ -1,1038 +1,888 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
+  AppState,
+  Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
-import { Badge } from '../../components/ui/Badge';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useReducedMotion } from 'react-native-reanimated';
+import { useLocalSearchParams, usePathname } from 'expo-router';
+import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
+import { Icon } from '../../components/ui/Icon';
+import { SegmentedControl } from '../../components/ui/SegmentedControl';
+import {
+  FacultyInitials,
+  LeaveStatus,
+  leaveDates,
+} from '../../components/leave/LeavePresentation';
+import { Input } from '../../components/ui/Input';
 import { ScreenContainer } from '../../components/ui/ScreenContainer';
 import { LeaveApplyModal } from '../../components/leave/LeaveApplyModal';
 import { LeaveDecisionModal } from '../../components/leave/LeaveDecisionModal';
-import { SmartSubstitutionModal } from '../../components/substitution/SmartSubstitutionModal';
 import { useAuth } from '../../lib/auth-context';
+import { canReadHome, campusClock, homeUnavailable } from '../../lib/home-api';
+import { getSession } from '../../lib/session';
 import {
   cancelLeaveRequest,
   getLeaveBalances,
   getLeaveRequests,
+  getLeaveRequest,
   getLeaveTypes,
-  type LeaveBalanceDto,
+  uncertainLeaveWrite,
   type LeaveRequestDto,
-  type LeaveTypeDto,
 } from '../../lib/leave-api';
-import { getSubstitutionAssignments } from '../../lib/substitution-store';
-import {
-  getTimetableEntries,
-  type TimetableEntryDto,
-} from '../../lib/timetable-api';
+import { CoveragePanel } from '../../components/substitution/CoveragePanel';
+import { coverageUnavailable } from '../../lib/substitution-api';
 import { theme } from '../../lib/theme';
 
 export default function LeaveScreen() {
   const { user, accessToken } = useAuth();
-  const isDemo = !!accessToken?.startsWith('demo-');
-  const isHod = user?.role === 'HOD';
-
-  const [activeTab, setActiveTab] = useState<'MY_LEAVES' | 'HOD_APPROVALS'>(
-    isHod ? 'HOD_APPROVALS' : 'MY_LEAVES',
+  // Account changes discard drafts and any uncertain-action guard together.
+  return (
+    <LeaveRecords
+      key={user?.id ?? 'signed-out'}
+      user={user}
+      token={accessToken}
+    />
   );
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [types, setTypes] = useState<LeaveTypeDto[]>([]);
-  const [balances, setBalances] = useState<LeaveBalanceDto[]>([]);
-  const [myRequests, setMyRequests] = useState<LeaveRequestDto[]>([]);
-  const [hodPendingRequests, setHodPendingRequests] = useState<
-    LeaveRequestDto[]
-  >([]);
-  const [hodApprovedRequests, setHodApprovedRequests] = useState<
-    LeaveRequestDto[]
-  >([]);
-  const [timetableEntries, setTimetableEntries] = useState<TimetableEntryDto[]>(
-    [],
+}
+function LeaveRecords({
+  user,
+  token,
+}: {
+  user: ReturnType<typeof useAuth>['user'];
+  token: string | null;
+}) {
+  const router = useRouter();
+  const reduceMotion = useReducedMotion();
+  const { fontScale } = useWindowDimensions();
+  const [showYear, setShowYear] = useState(false);
+  const [search, setSearch] = useState('');
+  const client = useQueryClient();
+  const path = usePathname();
+  const params = useLocalSearchParams<{ personal?: string }>();
+  const inApprovals = path.endsWith('/approvals');
+  const unavailable = homeUnavailable(user, token, 'leave.read');
+  const live = !!user && !!token && !token.startsWith('demo-');
+  const approvals =
+    live &&
+    user.role === 'HOD' &&
+    user.departmentId !== null &&
+    canReadHome(user, 'leave.read') &&
+    canReadHome(user, 'leave.approve');
+  const [tab, setTab] = useState<'mine' | 'approvals' | 'coverage'>(
+    inApprovals && approvals && params.personal !== '1' ? 'approvals' : 'mine',
   );
-
-  // Filter state for My Requests
-  const [statusFilter, setStatusFilter] = useState<
-    'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
-  >('ALL');
-
-  // Modals state
-  const [showApplyModal, setShowApplyModal] = useState(false);
-  const [substitutionModalConfig, setSubstitutionModalConfig] = useState<{
-    visible: boolean;
-    request: LeaveRequestDto | null;
-  }>({
-    visible: false,
-    request: null,
-  });
-  const [decisionModalConfig, setDecisionModalConfig] = useState<{
-    visible: boolean;
-    request: LeaveRequestDto | null;
+  const canCover = !coverageUnavailable(user, token);
+  const [approvalFilter, setApprovalFilter] = useState('PENDING');
+  const [year, setYear] = useState(String(campusClock().year));
+  const validYear = /^20\d{2}$/.test(year) || year === '2100';
+  const [filter, setFilter] = useState('ALL');
+  const [apply, setApply] = useState(false);
+  const [decision, setDecision] = useState<{
+    request: LeaveRequestDto;
     mode: 'APPROVE' | 'REJECT';
-  }>({
-    visible: false,
-    request: null,
-    mode: 'APPROVE',
+  } | null>(null);
+  const [cancel, setCancel] = useState<LeaveRequestDto | null>(null);
+  const [sending, setSending] = useState(false);
+  const busy = useRef(false);
+  const [blocked, setBlocked] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
+  const types = useQuery({
+    queryKey: ['leave', user?.id, 'types'],
+    queryFn: () => getLeaveTypes(token),
+    enabled: live && canReadHome(user, 'leave.read'),
   });
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const balances = useQuery({
+    queryKey: ['leave', user?.id, 'balances', year],
+    queryFn: () => getLeaveBalances(token, user!.employeeId!, Number(year)),
+    enabled: !unavailable && validYear,
+  });
+  const mine = useQuery({
+    queryKey: ['leave', user?.id, 'mine', year],
+    queryFn: () =>
+      getLeaveRequests(token, {
+        employeeId: user!.employeeId!,
+        year: Number(year),
+      }),
+    enabled: !unavailable && validYear,
+  });
+  const queue = useQuery({
+    queryKey: ['leave', user?.id, 'awaiting', approvalFilter],
+    queryFn: async () => {
+      const records = await getLeaveRequests(
+        token,
+        approvalFilter === 'PENDING'
+          ? { awaitingMe: true }
+          : { status: approvalFilter },
+      );
+      if (
+        records.some(
+          (r) =>
+            (approvalFilter === 'PENDING' &&
+              r.employee.id === user?.employeeId) ||
+            r.department.id !== user?.departmentId ||
+            (approvalFilter === 'PENDING' &&
+              (r.pendingRole !== 'HOD' || r.status !== 'PENDING')),
+        )
+      )
+        throw new Error(
+          'The approval queue returned requests outside your department or step.',
+        );
+      return records.filter((r) => r.employee.id !== user?.employeeId);
+    },
+    enabled: approvals,
+  });
+  const refresh = useCallback(
+    () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['leave', user?.id] }),
+        client.invalidateQueries({ queryKey: ['coverage', user?.id] }),
+      ]),
+    [client, user?.id],
+  );
+  useFocusEffect(
+    useCallback(() => {
+      void refresh();
+    }, [refresh]),
+  );
+  useEffect(() => {
+    const listener = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refresh();
+    });
+    return () => listener.remove();
+  }, [refresh]);
+  function changed(request?: LeaveRequestDto, submitted = false) {
+    if (getSession().user?.id !== user?.id) return;
+    void refresh();
+    void client.invalidateQueries({ queryKey: ['home'] });
+    void client.invalidateQueries({ queryKey: ['notifications'] });
+    if (request)
+      setNotice(
+        request.status === 'PENDING'
+          ? submitted
+            ? `Leave request submitted. Waiting for ${request.pendingRole}.`
+            : `Recommendation recorded. Waiting for ${request.pendingRole}.`
+          : `Request ${request.status.toLowerCase()}.`,
+      );
+  }
+  async function confirmCancel() {
+    if (!cancel || busy.current || blocked === cancel.id) return;
+    busy.current = true;
+    setSending(true);
+    setNotice('');
     try {
-      const [fetchedTypes, fetchedBalances, allRequests, entries] =
-        await Promise.all([
-          getLeaveTypes(accessToken),
-          getLeaveBalances(accessToken, user?.employeeId || undefined),
-          getLeaveRequests(accessToken),
-          isDemo ? getTimetableEntries(accessToken) : Promise.resolve([]),
-        ]);
-
-      setTypes(fetchedTypes);
-      setBalances(fetchedBalances);
-      setTimetableEntries(entries);
-
-      // Separate personal requests and HOD department approvals
-      if (isHod) {
-        const myEmpId = user?.employeeId || user?.id;
-        const pendingForHod = allRequests.filter(
-          (r) =>
-            r.status === 'PENDING' &&
-            r.pendingRole === 'HOD' &&
-            r.employee.id !== myEmpId &&
-            r.employee.id !== user?.id,
-        );
-        setHodPendingRequests(pendingForHod);
-
-        const approvedForHod = allRequests.filter(
-          (r) =>
-            r.status === 'APPROVED' && r.department.id === user?.departmentId,
-        );
-        setHodApprovedRequests(approvedForHod);
-
-        setMyRequests(
-          allRequests.filter(
-            (r) =>
-              r.employee.id === myEmpId ||
-              r.employee.id === user?.id ||
-              (!!user?.employeeCode &&
-                r.employee.employeeCode.trim().toLowerCase() ===
-                  user.employeeCode.trim().toLowerCase()),
-          ),
-        );
+      const result = await cancelLeaveRequest(token, cancel.id);
+      changed(result);
+      setCancel(null);
+    } catch (error) {
+      if (uncertainLeaveWrite(error)) setBlocked(cancel.id);
+      setNotice(
+        uncertainLeaveWrite(error)
+          ? 'Cancellation outcome unknown. Refresh request history before doing anything else.'
+          : error instanceof Error
+            ? error.message
+            : 'Could not cancel request.',
+      );
+      void refresh();
+    } finally {
+      busy.current = false;
+      setSending(false);
+    }
+  }
+  async function checkCancellation() {
+    if (!cancel || busy.current) return;
+    busy.current = true;
+    setSending(true);
+    try {
+      const record = await getLeaveRequest(token, cancel.id);
+      if (record.employee.id !== user?.employeeId)
+        throw new Error('Leave response belongs to another employee.');
+      if (getSession().user?.id !== user?.id) return;
+      setBlocked(null);
+      if (record.status === 'CANCELLED') {
+        changed(record);
+        setCancel(null);
       } else {
-        setMyRequests(allRequests);
+        setCancel(record.status === 'PENDING' ? record : null);
+        setNotice(
+          record.status === 'PENDING'
+            ? 'The request is still pending. You can try cancellation again.'
+            : `Request is now ${record.status.toLowerCase()}.`,
+        );
+        void refresh();
       }
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to load leave records.',
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : 'Could not check cancellation.',
       );
     } finally {
-      setLoading(false);
+      busy.current = false;
+      setSending(false);
     }
-  }, [accessToken, isDemo, isHod, user]);
-
-  useEffect(() => {
-    // The initial load updates loading state before awaiting the API.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadData();
-  }, [loadData]);
-
-  async function handleCancelRequest(request: LeaveRequestDto) {
-    Alert.alert(
-      'Cancel Leave Request',
-      `Are you sure you want to cancel your ${request.leaveType.name} request for ${request.startDate}?`,
-      [
-        { text: 'Keep Request', style: 'cancel' },
-        {
-          text: 'Yes, Cancel',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await cancelLeaveRequest(accessToken, request.id);
-              await loadData();
-            } catch (err) {
-              Alert.alert(
-                'Error',
-                err instanceof Error
-                  ? err.message
-                  : 'Could not cancel request.',
-              );
-            }
-          },
-        },
-      ],
-    );
   }
-
-  const filteredMyRequests = myRequests.filter((r) => {
-    if (statusFilter === 'ALL') return true;
-    return r.status === statusFilter;
+  const activeTypes = (types.data ?? []).filter((type) => type.active);
+  const records = tab === 'approvals' && approvals ? queue : mine;
+  const personal = tab !== 'approvals' || !approvals;
+  const visibleRecords = (records.data ?? []).filter((request) => {
+    if (personal) return filter === 'ALL' || request.status === filter;
+    const needle = search.trim().toLocaleLowerCase();
+    return (
+      !needle ||
+      [
+        request.employee.name,
+        request.employee.employeeCode,
+        request.leaveType.name,
+        request.leaveType.code,
+        request.department.name,
+      ].some((value) => value.toLocaleLowerCase().includes(needle))
+    );
   });
-
   return (
-    <ScreenContainer>
-      {/* Page Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.pageTitle}>Leave Management</Text>
-          <Text style={styles.pageSubtitle}>
-            {isHod
-              ? 'Department Approvals & Personal Quotas'
-              : 'JCET Faculty Leave Portal'}
+    <ScreenContainer
+      testID="leave-screen"
+      refreshControl={
+        <RefreshControl
+          refreshing={records.isRefetching}
+          onRefresh={() => void refresh()}
+        />
+      }
+      contentContainerStyle={styles.stack}
+    >
+      <View style={styles.row}>
+        <View style={styles.grow}>
+          <Text accessibilityRole="header" style={styles.title}>
+            {tab === 'coverage'
+              ? 'Class coverage'
+              : personal
+                ? 'Leave'
+                : 'Approvals'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {tab === 'coverage'
+              ? 'Keep teaching on track.'
+              : personal
+                ? 'Time for what matters.'
+                : queue.isSuccess && approvalFilter === 'PENDING'
+                  ? `${queue.data.length} ${queue.data.length === 1 ? 'request needs' : 'requests need'} your attention`
+                  : 'Your department’s leave requests.'}
           </Text>
         </View>
-
-        <Pressable
-          onPress={loadData}
-          style={styles.refreshBtn}
-          accessibilityLabel="Refresh leave data"
+        <Button
+          variant="text"
+          accessibilityLabel="Refresh leave records"
+          onPress={() => void refresh()}
         >
-          <Text style={styles.refreshBtnText}>↻</Text>
-        </Pressable>
+          <Icon name="refresh" color={theme.colors.primary} />
+        </Button>
       </View>
-
-      {/* Role Segments for HOD */}
-      {isHod && (
-        <View style={styles.tabSegments}>
-          <Pressable
-            onPress={() => setActiveTab('HOD_APPROVALS')}
-            style={[
-              styles.segmentBtn,
-              activeTab === 'HOD_APPROVALS' && styles.segmentBtnActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                activeTab === 'HOD_APPROVALS' && styles.segmentTextActive,
-              ]}
-            >
-              Department Approvals
-            </Text>
-            {hodPendingRequests.length > 0 && (
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>
-                  {hodPendingRequests.length}
-                </Text>
-              </View>
-            )}
-          </Pressable>
-
-          <Pressable
-            onPress={() => setActiveTab('MY_LEAVES')}
-            style={[
-              styles.segmentBtn,
-              activeTab === 'MY_LEAVES' && styles.segmentBtnActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                activeTab === 'MY_LEAVES' && styles.segmentTextActive,
-              ]}
-            >
-              My Leave Records
-            </Text>
-          </Pressable>
-        </View>
+      {!live && (
+        <Text style={styles.subtitle}>
+          Sign in with a real account to view leave records. Demo leave actions
+          are unavailable here.
+        </Text>
       )}
-
-      {error && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
-
-      {loading ? (
-        <View style={styles.loaderCenter}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loaderText}>
-            Loading leave balances and history…
-          </Text>
-        </View>
-      ) : activeTab === 'HOD_APPROVALS' ? (
-        /* =================== HOD APPROVALS VIEW =================== */
-        <View style={styles.tabContent}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>
-              Requests Awaiting Recommendation
-            </Text>
-            <Badge
-              label={`${hodPendingRequests.length} Pending`}
-              variant={hodPendingRequests.length > 0 ? 'warning' : 'secondary'}
-            />
-          </View>
-
-          {hodPendingRequests.length === 0 ? (
-            <Card style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>All Caught Up!</Text>
-              <Text style={styles.emptySubtitle}>
-                There are no pending leave requests from department faculty
-                waiting for your decision.
-              </Text>
-            </Card>
-          ) : (
-            hodPendingRequests.map((req) => (
-              <Card key={req.id} style={styles.approvalCard}>
-                <View style={styles.approvalHeader}>
-                  <View style={styles.applicantInfo}>
-                    <Text style={styles.applicantName}>
-                      {req.employee.name}
-                    </Text>
-                    <Text style={styles.applicantCode}>
-                      {req.employee.employeeCode} · {req.department.code} Dept.
-                    </Text>
-                  </View>
-                  <Badge label="PENDING HOD" variant="warning" />
-                </View>
-
-                <View style={styles.leaveDetailsBox}>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Type:</Text>
-                    <Text style={styles.detailValue}>
-                      {req.leaveType.name} ({req.leaveType.code})
-                    </Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Duration:</Text>
-                    <Text style={styles.detailValue}>
-                      {req.startDate}{' '}
-                      {req.startDate !== req.endDate ? `to ${req.endDate}` : ''}{' '}
-                      ({req.days} {req.days === 1 ? 'day' : 'days'})
-                    </Text>
-                  </View>
-                  {req.halfDay && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Session:</Text>
-                      <Text style={styles.detailValue}>{req.halfDay} Half</Text>
-                    </View>
-                  )}
-                  <View style={styles.reasonBlock}>
-                    <Text style={styles.reasonHeading}>Faculty Reason:</Text>
-                    <Text style={styles.reasonBody}>"{req.reason}"</Text>
-                  </View>
-                </View>
-
-                {/* HOD Action Buttons */}
-                <View style={styles.approvalActionsRow}>
-                  <Button
-                    variant="danger"
-                    onPress={() =>
-                      setDecisionModalConfig({
-                        visible: true,
-                        request: req,
-                        mode: 'REJECT',
-                      })
-                    }
-                    style={styles.decisionBtn}
-                  >
-                    Reject
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onPress={() =>
-                      setDecisionModalConfig({
-                        visible: true,
-                        request: req,
-                        mode: 'APPROVE',
-                      })
-                    }
-                    style={styles.decisionBtn}
-                  >
-                    Approve Request
-                  </Button>
-                </View>
-              </Card>
-            ))
+      {(approvals || canCover) && (
+        <View style={styles.navigation}>
+          {approvals && (
+            <Button
+              variant="text"
+              onPress={() => setTab(personal ? 'approvals' : 'mine')}
+            >
+              {personal ? 'Department approvals' : 'My leave'}
+            </Button>
           )}
-
-          {/* =================== SMART SUBSTITUTION COVERAGE SECTION =================== */}
-          <View style={styles.substitutionSectionHeaderRow}>
-            <View>
-              <Text style={styles.sectionTitle}>
-                Smart Faculty Substitution
-              </Text>
-              <Text style={styles.sectionSubtitle}>
-                Department Leave Coverage & Timetable Adjustments
-              </Text>
-            </View>
-            <Badge
-              label={`${hodApprovedRequests.length} Approved`}
-              variant={
-                hodApprovedRequests.length > 0 ? 'secondary' : 'secondary'
+          {canCover && (
+            <Button
+              variant="text"
+              onPress={() =>
+                setTab(
+                  tab === 'coverage'
+                    ? inApprovals
+                      ? 'approvals'
+                      : 'mine'
+                    : 'coverage',
+                )
               }
-            />
-          </View>
-
-          {!isDemo ? (
-            <Card>
-              <Text style={styles.emptySubtitle}>
-                Assign and review coverage on the web substitution page. The
-                mobile assignment preview is available only in demo sessions.
-              </Text>
-            </Card>
-          ) : hodApprovedRequests.length === 0 ? (
-            <Card style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>
-                No Approved Leaves Pending Coverage
-              </Text>
-              <Text style={styles.emptySubtitle}>
-                When faculty leave requests are approved, affected timetable
-                classes will appear here for smart substitute assignment.
-              </Text>
-            </Card>
-          ) : (
-            hodApprovedRequests.map((req) => {
-              const assignments = getSubstitutionAssignments({
-                leaveRequestId: req.id,
-              });
-
-              return (
-                <Card key={req.id} style={styles.substitutionCoverageCard}>
-                  <View style={styles.approvalHeader}>
-                    <View style={styles.applicantInfo}>
-                      <Text style={styles.applicantName}>
-                        {req.employee.name}
-                      </Text>
-                      <Text style={styles.applicantCode}>
-                        {req.employee.employeeCode} · {req.department.name}
-                      </Text>
-                    </View>
-                    <Badge
-                      label={
-                        assignments.length > 0
-                          ? `${assignments.length} Sub Assigned`
-                          : 'Needs Review'
-                      }
-                      variant={assignments.length > 0 ? 'success' : 'warning'}
-                    />
-                  </View>
-
-                  <View style={styles.leaveDetailsBox}>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Approved Leave:</Text>
-                      <Text style={styles.detailValue}>
-                        {req.startDate}{' '}
-                        {req.startDate !== req.endDate
-                          ? `to ${req.endDate}`
-                          : ''}{' '}
-                        ({req.days} {req.days === 1 ? 'day' : 'days'})
-                      </Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Type:</Text>
-                      <Text style={styles.detailValue}>
-                        {req.leaveType.name} ({req.leaveType.code})
-                      </Text>
-                    </View>
-                    <View style={styles.reasonBlock}>
-                      <Text style={styles.reasonHeading}>Approved Reason:</Text>
-                      <Text style={styles.reasonBody}>"{req.reason}"</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.substitutionActionRow}>
-                    <Button
-                      variant="primary"
-                      onPress={() =>
-                        setSubstitutionModalConfig({
-                          visible: true,
-                          request: req,
-                        })
-                      }
-                      style={styles.manageSubstitutionBtn}
-                    >
-                      {`★ Smart Substitution (${assignments.length} Assigned)`}
-                    </Button>
-                  </View>
-                </Card>
-              );
-            })
+            >
+              {tab === 'coverage'
+                ? inApprovals
+                  ? 'Back to approvals'
+                  : 'Back to my leave'
+                : 'Class coverage'}
+            </Button>
           )}
         </View>
+      )}
+      {tab === 'coverage' && canCover ? (
+        <CoveragePanel user={user!} token={token!} />
       ) : (
-        /* =================== FACULTY / MY LEAVES VIEW =================== */
-        <View style={styles.tabContent}>
-          {/* Leave Balances Carousel / Grid */}
-          <Text style={styles.sectionTitle}>
-            Available Leave Balances ({new Date().getFullYear()})
-          </Text>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.balanceScroll}
-          >
-            {balances.map((b) => (
-              <Card key={b.leaveType.id} style={styles.balanceCard}>
-                <View style={styles.balanceCardHeader}>
-                  <Text style={styles.balanceCode}>{b.leaveType.code}</Text>
-                  <Badge label="Active" variant="secondary" />
-                </View>
-                <Text style={styles.balanceName} numberOfLines={1}>
-                  {b.leaveType.name}
-                </Text>
-                <Text style={styles.balanceRemaining}>
-                  {b.remaining ?? '∞'}
-                </Text>
-                <Text style={styles.balanceMeta}>
-                  {b.entitled !== null
-                    ? `Entitled: ${b.entitled} · Used: ${b.used}`
-                    : 'No limit quota'}
-                </Text>
-              </Card>
-            ))}
-          </ScrollView>
-
-          {/* Primary Action Button */}
-          <Button
-            variant="primary"
-            onPress={() => setShowApplyModal(true)}
-            style={styles.applyBtn}
-          >
-            + Apply for New Leave
-          </Button>
-
-          {/* Request History Section */}
-          <View style={styles.historyHeaderRow}>
-            <Text style={styles.sectionTitle}>My Leave Applications</Text>
-            {/* Filter Tabs */}
-            <View style={styles.filterPills}>
-              {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map(
-                (filter) => (
-                  <Pressable
-                    key={filter}
-                    onPress={() => setStatusFilter(filter)}
-                    style={[
-                      styles.filterPill,
-                      statusFilter === filter && styles.filterPillActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.filterPillText,
-                        statusFilter === filter && styles.filterPillTextActive,
-                      ]}
-                    >
-                      {filter === 'ALL' ? 'All' : filter}
-                    </Text>
-                  </Pressable>
-                ),
-              )}
-            </View>
-          </View>
-
-          {filteredMyRequests.length === 0 ? (
-            <Card style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>No Leave Applications Found</Text>
-              <Text style={styles.emptySubtitle}>
-                {statusFilter === 'ALL'
-                  ? 'You have not submitted any leave requests yet.'
-                  : `You have no leave requests with status ${statusFilter}.`}
+        <>
+          {!!notice && !cancel && (
+            <View style={styles.notice}>
+              <Text accessibilityLiveRegion="polite" style={styles.text}>
+                {notice}
               </Text>
-            </Card>
-          ) : (
-            filteredMyRequests.map((req) => {
-              const statusVariant =
-                req.status === 'APPROVED'
-                  ? 'success'
-                  : req.status === 'PENDING'
-                    ? 'warning'
-                    : req.status === 'REJECTED'
-                      ? 'default'
-                      : 'secondary';
-
-              return (
-                <Card key={req.id} style={styles.requestCard}>
-                  <View style={styles.requestCardHeader}>
-                    <View>
-                      <Text style={styles.requestType}>
-                        {req.leaveType.name} ({req.leaveType.code})
+            </View>
+          )}
+          {personal ? (
+            <>
+              {!!unavailable && (
+                <Text style={styles.subtitle}>{unavailable}</Text>
+              )}
+              {!unavailable && (
+                <>
+                  <View style={styles.balanceSection}>
+                    <View style={styles.row}>
+                      <Text
+                        accessibilityRole="header"
+                        style={[styles.sectionTitle, styles.grow]}
+                      >
+                        Your balances · {year}
                       </Text>
-                      <Text style={styles.requestDates}>
-                        {req.startDate}{' '}
-                        {req.startDate !== req.endDate
-                          ? `to ${req.endDate}`
-                          : ''}{' '}
-                        ({req.days} {req.days === 1 ? 'day' : 'days'})
-                      </Text>
+                      <Button
+                        variant="text"
+                        onPress={() => setShowYear(!showYear)}
+                        accessibilityLabel={
+                          showYear
+                            ? 'Hide leave year control'
+                            : 'Change leave year'
+                        }
+                      >
+                        {showYear ? 'Done' : 'Year'}
+                      </Button>
                     </View>
-                    <Badge label={req.status} variant={statusVariant} />
-                  </View>
-
-                  <View style={styles.requestBody}>
-                    <Text style={styles.requestReasonLabel}>Reason:</Text>
-                    <Text style={styles.requestReasonText}>"{req.reason}"</Text>
-                  </View>
-
-                  {/* Decision Remarks from Approver */}
-                  {req.decisions.length > 0 && (
-                    <View style={styles.decisionsList}>
-                      {req.decisions.map((dec, idx) => (
-                        <View key={idx} style={styles.decisionItem}>
-                          <Text style={styles.decisionAuthor}>
-                            {dec.role} Decision:{' '}
-                            {dec.approved ? '✓ Approved' : '✕ Rejected'}
-                          </Text>
-                          {dec.note && (
-                            <Text style={styles.decisionNote}>
-                              "{dec.note}"
+                    {showYear && (
+                      <Input
+                        label="Leave year"
+                        value={year}
+                        onChangeText={setYear}
+                        keyboardType="number-pad"
+                        error={
+                          !validYear
+                            ? 'Choose a year from 2000 to 2100.'
+                            : undefined
+                        }
+                      />
+                    )}
+                    {!validYear && !showYear && (
+                      <Text style={styles.error}>
+                        Choose a year from 2000 to 2100.
+                      </Text>
+                    )}
+                    {balances.isFetching && (
+                      <Text style={styles.subtitle}>Loading balances…</Text>
+                    )}
+                    {balances.isError ? (
+                      <Text accessibilityRole="alert" style={styles.error}>
+                        Balances unavailable. {balances.error.message}
+                      </Text>
+                    ) : (
+                      validYear &&
+                      balances.isSuccess && (
+                        <View style={styles.balances}>
+                          {balances.data.length === 0 && (
+                            <Text style={styles.subtitle}>
+                              No leave balances for this year.
                             </Text>
                           )}
+                          {balances.data.map((balance) => (
+                            <View
+                              key={balance.leaveType.id}
+                              style={[
+                                styles.balance,
+                                fontScale > 1.3 && styles.balanceLarge,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.balanceValue,
+                                  balance.remaining === null &&
+                                    styles.unlimited,
+                                ]}
+                              >
+                                {balance.remaining === null
+                                  ? 'Unlimited'
+                                  : balance.remaining}
+                              </Text>
+                              <Text style={styles.balanceCode}>
+                                {balance.leaveType.code}
+                                {!balance.active ? ' · Inactive' : ''}
+                              </Text>
+                              <Text style={styles.caption}>
+                                {balance.leaveType.name} (days)
+                              </Text>
+                              <Text style={styles.caption}>
+                                Used {balance.used} · Pending {balance.pending}{' '}
+                                · Carried {balance.carriedIn}
+                              </Text>
+                            </View>
+                          ))}
                         </View>
-                      ))}
-                    </View>
+                      )
+                    )}
+                  </View>
+                  {types.isError && (
+                    <Text accessibilityRole="alert" style={styles.error}>
+                      Leave types unavailable. {types.error.message}
+                    </Text>
                   )}
-
-                  {/* Cancel Button if Still Pending */}
-                  {req.status === 'PENDING' && (
-                    <View style={styles.requestFooter}>
-                      <Text style={styles.pendingHint}>
-                        Waiting for: {req.pendingRole || 'HOD'}
-                      </Text>
-                      <Pressable
-                        onPress={() => handleCancelRequest(req)}
-                        style={styles.cancelRequestBtn}
-                      >
-                        <Text style={styles.cancelRequestText}>
-                          Cancel Request
-                        </Text>
-                      </Pressable>
-                    </View>
+                  {canReadHome(user, 'leave.apply') && (
+                    <Button
+                      variant="accent"
+                      disabled={!types.isSuccess || activeTypes.length === 0}
+                      onPress={() => setApply(true)}
+                    >
+                      Apply for leave
+                    </Button>
                   )}
-                </Card>
-              );
-            })
+                  {types.isSuccess && activeTypes.length === 0 && (
+                    <Text style={styles.subtitle}>
+                      No active leave types are available.
+                    </Text>
+                  )}
+                  <View style={styles.requestHeading}>
+                    <Text
+                      accessibilityRole="header"
+                      style={styles.sectionTitle}
+                    >
+                      Your requests
+                    </Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.filterScroll}
+                    >
+                      <View style={styles.personalFilters}>
+                        <SegmentedControl
+                          label="Filter your leave requests"
+                          options={[
+                            { value: 'ALL', label: 'All' },
+                            { value: 'PENDING', label: 'Pending' },
+                            { value: 'APPROVED', label: 'Approved' },
+                            { value: 'REJECTED', label: 'Rejected' },
+                            { value: 'CANCELLED', label: 'Cancelled' },
+                          ]}
+                          value={filter}
+                          onChange={setFilter}
+                        />
+                      </View>
+                    </ScrollView>
+                  </View>
+                </>
+              )}
+            </>
+          ) : (
+            <View style={styles.queueTools}>
+              <SegmentedControl
+                label="Filter department requests"
+                options={[
+                  { value: 'PENDING', label: 'Pending' },
+                  { value: 'APPROVED', label: 'Approved' },
+                  { value: 'REJECTED', label: 'Rejected' },
+                ]}
+                value={approvalFilter}
+                onChange={setApprovalFilter}
+              />
+              <Input
+                label="Search requests"
+                placeholder="Faculty name or leave type"
+                value={search}
+                onChangeText={setSearch}
+              />
+            </View>
           )}
-        </View>
+          {((!personal && approvals) || (!unavailable && validYear)) && (
+            <View style={styles.requestList}>
+              {records.isFetching && (
+                <Text style={styles.subtitle}>Loading leave requests…</Text>
+              )}
+              {records.isError ? (
+                <View style={styles.stack}>
+                  <Text accessibilityRole="alert" style={styles.error}>
+                    Requests unavailable. {records.error.message}
+                  </Text>
+                  <Button variant="secondary" onPress={() => void refresh()}>
+                    Retry requests
+                  </Button>
+                </View>
+              ) : (
+                records.isSuccess && (
+                  <>
+                    {visibleRecords.length === 0 && (
+                      <View style={styles.empty}>
+                        <Icon
+                          name="leave"
+                          color={theme.colors.violet}
+                          size={theme.spacing.xl}
+                        />
+                        <Text style={styles.sectionTitle}>
+                          {search.trim() && !personal
+                            ? 'No matching requests'
+                            : personal
+                              ? 'No requests here yet'
+                              : 'You’re up to date'}
+                        </Text>
+                        <Text style={styles.subtitle}>
+                          {search.trim() && !personal
+                            ? 'Try a different faculty name or leave type.'
+                            : personal
+                              ? 'Your leave requests will appear here for this selection.'
+                              : 'No department requests match this status.'}
+                        </Text>
+                      </View>
+                    )}
+                    {records.data.length === 500 && (
+                      <Text style={styles.caption}>
+                        Showing the newest 500 matching requests. Older records
+                        may be omitted by the API.
+                      </Text>
+                    )}
+                    {visibleRecords.map((request) => (
+                      <View key={request.id} style={styles.requestRow}>
+                        {!personal && (
+                          <FacultyInitials name={request.employee.name} />
+                        )}
+                        {personal && (
+                          <View style={styles.typeIcon}>
+                            <Icon
+                              name="leave"
+                              color={theme.colors.violet}
+                              size={theme.spacing.lg}
+                            />
+                          </View>
+                        )}
+                        <View style={styles.requestBody}>
+                          <View style={styles.requestMeta}>
+                            <Text style={[styles.requestTitle, styles.grow]}>
+                              {personal
+                                ? request.leaveType.name
+                                : request.employee.name}
+                            </Text>
+                            <LeaveStatus status={request.status} />
+                          </View>
+                          {!personal && (
+                            <Text style={styles.caption}>
+                              {request.department.code} ·{' '}
+                              {request.employee.employeeCode}
+                            </Text>
+                          )}
+                          {!personal && (
+                            <Text style={styles.leaveType}>
+                              {request.leaveType.name}
+                            </Text>
+                          )}
+                          <Text style={styles.text}>
+                            {leaveDates(request.startDate, request.endDate)} ·{' '}
+                            {request.days} {request.days === 1 ? 'day' : 'days'}
+                            {request.halfDay
+                              ? ` · ${request.halfDay === 'FIRST' ? 'First' : 'Second'} half`
+                              : ''}
+                          </Text>
+                          <Text style={styles.caption}>{request.reason}</Text>
+                          {!!request.pendingRole && personal && (
+                            <Text style={styles.caption}>
+                              Awaiting {request.pendingRole}
+                            </Text>
+                          )}
+                          <View style={styles.rowActions}>
+                            {personal ? (
+                              <Button
+                                variant="text"
+                                onPress={() =>
+                                  router.push({
+                                    pathname: '/leave/[id]',
+                                    params: { id: request.id },
+                                  })
+                                }
+                              >
+                                View details
+                              </Button>
+                            ) : (
+                              <Button
+                                onPress={() =>
+                                  setDecision({ request, mode: 'APPROVE' })
+                                }
+                              >
+                                Review
+                              </Button>
+                            )}
+                            {personal &&
+                              request.status === 'PENDING' &&
+                              canReadHome(user, 'leave.cancel') && (
+                                <Button
+                                  variant="text"
+                                  onPress={() => setCancel(request)}
+                                >
+                                  Cancel request
+                                </Button>
+                              )}
+                          </View>
+                        </View>
+                      </View>
+                    ))}
+                  </>
+                )
+              )}
+            </View>
+          )}
+          {cancel && (
+            <Modal
+              visible
+              transparent
+              animationType={reduceMotion ? 'none' : 'fade'}
+              onRequestClose={() => {
+                if (!sending) setCancel(null);
+              }}
+            >
+              <View style={styles.cancelOverlay}>
+                <SafeAreaView
+                  edges={['bottom']}
+                  style={styles.cancelPanel}
+                  accessibilityViewIsModal
+                >
+                  <ScrollView contentContainerStyle={styles.cancelContent}>
+                    <Text style={styles.sectionTitle}>
+                      Cancel leave for{' '}
+                      {leaveDates(cancel.startDate, cancel.endDate)}?
+                    </Text>
+                    <Text style={styles.subtitle}>
+                      Only a pending request can be cancelled.
+                    </Text>
+                    {!!notice && (
+                      <Text
+                        accessibilityLiveRegion="polite"
+                        style={styles.text}
+                      >
+                        {notice}
+                      </Text>
+                    )}
+                    {blocked === cancel.id && (
+                      <Button
+                        onPress={() => void checkCancellation()}
+                        disabled={sending}
+                      >
+                        Check cancellation status
+                      </Button>
+                    )}
+                    <Button
+                      variant="danger"
+                      onPress={() => void confirmCancel()}
+                      loading={sending}
+                      disabled={sending || blocked === cancel.id}
+                    >
+                      Confirm cancellation
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={sending}
+                      onPress={() => setCancel(null)}
+                    >
+                      Keep request
+                    </Button>
+                  </ScrollView>
+                </SafeAreaView>
+              </View>
+            </Modal>
+          )}
+        </>
       )}
-
-      {/* Leave Application Modal */}
-      <LeaveApplyModal
-        visible={showApplyModal}
-        onClose={() => setShowApplyModal(false)}
-        onSuccess={loadData}
-        token={accessToken}
-        currentUser={{
-          id: user?.employeeId || user?.id || 'demo-faculty-021',
-          name: user?.name || 'Prof. Asha Patil',
-          employeeCode: user?.employeeCode || 'JCET-CSE-021',
-          role: user?.role || 'FACULTY',
-        }}
-        leaveTypes={types}
-      />
-
-      {/* HOD Decision Modal */}
-      <LeaveDecisionModal
-        visible={decisionModalConfig.visible}
-        request={decisionModalConfig.request}
-        mode={decisionModalConfig.mode}
-        onClose={() =>
-          setDecisionModalConfig({
-            visible: false,
-            request: null,
-            mode: 'APPROVE',
-          })
-        }
-        onSuccess={loadData}
-        token={accessToken}
-        deciderName={user?.name}
-      />
-
-      {/* Smart Faculty Substitution Modal */}
-      {isDemo && (
-        <SmartSubstitutionModal
-          visible={substitutionModalConfig.visible}
-          leaveRequest={substitutionModalConfig.request}
-          onClose={() =>
-            setSubstitutionModalConfig({
-              visible: false,
-              request: null,
-            })
-          }
-          onAssigned={() => void loadData()}
-          timetableEntries={timetableEntries}
-          currentUser={{
-            id: user?.id || 'demo-hod-001',
-            name: user?.name || 'Dr. Ramesh K (HOD)',
-            role: user?.role || 'HOD',
-            employeeCode: user?.employeeCode || 'JCET-CSE-001',
+      {!!user && (
+        <LeaveApplyModal
+          visible={apply}
+          onClose={() => setApply(false)}
+          onSuccess={(request, source) => {
+            if (source === 'existing') {
+              changed();
+              setNotice(
+                `Matching leave request already recorded · ${request.status.toLowerCase()}. Review the existing record before starting another request.`,
+              );
+            } else changed(request, true);
           }}
+          token={token}
+          currentUser={{
+            id: user.employeeId ?? '',
+            name: user.name,
+            employeeCode: user.employeeCode,
+            role: user.role,
+          }}
+          leaveTypes={activeTypes}
         />
       )}
+      <LeaveDecisionModal
+        key={decision?.request.id ?? 'none'}
+        visible={!!decision}
+        request={decision?.request ?? null}
+        mode={decision?.mode ?? 'APPROVE'}
+        onClose={() => {
+          setDecision(null);
+          void refresh();
+        }}
+        onSuccess={changed}
+        token={token}
+        deciderName={user?.name}
+      />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.section,
-  },
-  pageTitle: {
+  stack: { gap: theme.spacing.lg },
+  row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
+  grow: { flex: 1 },
+  title: {
     fontFamily: theme.typography.headingFamily,
+    fontWeight: '600',
     fontSize: theme.typography.heading,
-    color: theme.colors.primary,
+    color: theme.colors.foreground,
   },
-  pageSubtitle: {
+  subtitle: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.label,
+    fontSize: theme.typography.secondary,
+    lineHeight: theme.typography.secondaryLineHeight,
     color: theme.colors.mutedForeground,
-  },
-  refreshBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
-    backgroundColor: theme.colors.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  refreshBtnText: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 18,
-    color: theme.colors.primary,
-  },
-  tabSegments: {
-    flexDirection: 'row',
-    backgroundColor: theme.colors.muted,
-    borderRadius: theme.radius.control,
-    padding: 4,
-    marginBottom: theme.spacing.section,
-    gap: 4,
-  },
-  segmentBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: theme.radius.control - 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 6,
-  },
-  segmentBtnActive: {
-    backgroundColor: theme.colors.surface,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-  },
-  segmentText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-  },
-  segmentTextActive: {
-    fontFamily: theme.typography.headingFamily,
-    color: theme.colors.primary,
-  },
-  countBadge: {
-    backgroundColor: theme.colors.accent,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 10,
-  },
-  countBadgeText: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 10,
-    color: theme.colors.surface,
-  },
-  errorBox: {
-    backgroundColor: '#FEE2E2',
-    borderColor: '#FCA5A5',
-    borderWidth: 1,
-    borderRadius: theme.radius.control,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.section,
-  },
-  errorText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.errorInk,
-  },
-  loaderCenter: {
-    padding: theme.spacing.xl,
-    alignItems: 'center',
-    gap: theme.spacing.md,
-  },
-  loaderText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-  },
-  tabContent: {
-    gap: theme.spacing.section,
-    paddingBottom: theme.spacing.xl,
   },
   sectionTitle: {
     fontFamily: theme.typography.headingFamily,
+    fontWeight: '600',
     fontSize: theme.typography.title,
-    color: theme.colors.primary,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  balanceScroll: {
-    gap: theme.spacing.md,
-    paddingVertical: 4,
-  },
-  balanceCard: {
-    width: 155,
-    padding: theme.spacing.md,
-    gap: 2,
-  },
-  balanceCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  balanceCode: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.body,
-    color: theme.colors.primary,
-  },
-  balanceName: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-    marginTop: 2,
-  },
-  balanceRemaining: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 26,
-    color: theme.colors.foreground,
-    marginVertical: 4,
-  },
-  balanceMeta: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: 11,
-    color: theme.colors.mutedForeground,
-  },
-  applyBtn: {
-    marginVertical: theme.spacing.xs,
-  },
-  historyHeaderRow: {
-    gap: theme.spacing.sm,
-    marginTop: theme.spacing.xs,
-  },
-  filterPills: {
-    flexDirection: 'row',
-    gap: theme.spacing.xs,
-  },
-  filterPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.muted,
-  },
-  filterPillActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  filterPillText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-  },
-  filterPillTextActive: {
-    fontFamily: theme.typography.headingFamily,
-    color: theme.colors.surface,
-  },
-  emptyCard: {
-    padding: theme.spacing.page,
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F8FAFC',
-  },
-  emptyTitle: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.body,
-    color: theme.colors.primary,
-  },
-  emptySubtitle: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-    textAlign: 'center',
-  },
-  approvalCard: {
-    padding: theme.spacing.section,
-    gap: theme.spacing.md,
-  },
-  approvalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  applicantInfo: {
-    gap: 2,
-  },
-  applicantName: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.body,
     color: theme.colors.foreground,
   },
-  applicantCode: {
+  text: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-  },
-  leaveDetailsBox: {
-    backgroundColor: '#F8FAFC',
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.control,
-    gap: 4,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  detailLabel: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-  },
-  detailValue: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.caption,
+    fontSize: theme.typography.secondary,
+    lineHeight: theme.typography.secondaryLineHeight,
     color: theme.colors.foreground,
   },
-  reasonBlock: {
-    marginTop: 6,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  reasonHeading: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 11,
+  caption: {
+    fontSize: theme.typography.caption,
+    lineHeight: theme.typography.captionLineHeight,
     color: theme.colors.mutedForeground,
   },
-  reasonBody: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.foreground,
-    fontStyle: 'italic',
-    marginTop: 2,
-  },
-  approvalActionsRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-  },
-  decisionBtn: {
-    flex: 1,
-  },
-  requestCard: {
-    padding: theme.spacing.section,
-    gap: theme.spacing.sm,
-  },
-  requestCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  requestType: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.body,
-    color: theme.colors.foreground,
-  },
-  requestDates: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-    marginTop: 2,
-  },
-  requestBody: {
-    backgroundColor: '#F8FAFC',
-    padding: theme.spacing.sm,
-    borderRadius: 6,
-  },
-  requestReasonLabel: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 10,
-    color: theme.colors.mutedForeground,
-  },
-  requestReasonText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.foreground,
-    fontStyle: 'italic',
-    marginTop: 1,
-  },
-  decisionsList: {
-    gap: 4,
-    paddingTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  decisionItem: {
-    gap: 2,
-  },
-  decisionAuthor: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.primary,
-  },
-  decisionNote: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: 11,
-    color: theme.colors.foreground,
-    fontStyle: 'italic',
-  },
-  requestFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  pendingHint: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: 11,
-    color: theme.colors.accentInk,
-  },
-  cancelRequestBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  cancelRequestText: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 11,
+  error: {
+    fontSize: theme.typography.secondary,
+    lineHeight: theme.typography.secondaryLineHeight,
     color: theme.colors.errorInk,
   },
-  substitutionSectionHeaderRow: {
+  navigation: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: theme.spacing.lg,
-    paddingTop: theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
   },
-  sectionSubtitle: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-    marginTop: 2,
+  balanceSection: { gap: theme.spacing.section },
+  balances: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.section,
+    paddingBottom: theme.spacing.sm,
   },
-  substitutionCoverageCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: theme.colors.primary,
+  balance: {
+    flexGrow: 1,
+    flexBasis: '42%',
+    gap: theme.spacing.xs,
+    padding: theme.spacing.section,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    ...theme.shadows.card,
+  },
+  balanceLarge: { flexBasis: '100%' },
+  balanceValue: {
+    fontSize: theme.typography.greeting,
+    fontWeight: '600',
+    color: theme.colors.foreground,
+    fontVariant: ['tabular-nums'],
+  },
+  unlimited: { fontSize: theme.typography.title },
+  balanceCode: {
+    fontSize: theme.typography.secondary,
+    fontWeight: '600',
+    color: theme.colors.violet,
+  },
+  requestHeading: { gap: theme.spacing.xs, paddingTop: theme.spacing.section },
+  filterScroll: { flexGrow: 1 },
+  personalFilters: { minWidth: theme.sizes.tapTarget * 10, flex: 1 },
+  queueTools: { gap: theme.spacing.sm },
+  requestList: {
+    gap: 0,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.card,
+    paddingHorizontal: theme.spacing.section,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    ...theme.shadows.card,
+  },
+  requestRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
   },
-  substitutionActionRow: {
-    marginTop: theme.spacing.xs,
+  requestBody: { flex: 1, gap: theme.spacing.sm },
+  requestMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+    alignItems: 'center',
   },
-  manageSubstitutionBtn: {
+  requestTitle: {
+    fontSize: theme.typography.body,
+    fontWeight: '600',
+    color: theme.colors.foreground,
+  },
+  typeIcon: {
+    minWidth: theme.spacing.xl,
+    minHeight: theme.spacing.xl,
+    backgroundColor: theme.colors.violetContainer,
+    borderRadius: theme.radius.control,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaveType: {
+    fontSize: theme.typography.caption,
+    color: theme.colors.violet,
+    fontWeight: '500',
+  },
+  rowActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+    justifyContent: 'flex-end',
+  },
+  empty: { gap: theme.spacing.md, paddingVertical: theme.spacing.xl },
+  notice: {
+    backgroundColor: theme.colors.blueContainer,
+    borderRadius: theme.radius.field,
+    padding: theme.spacing.section,
+  },
+  cancelPanel: {
     width: '100%',
+    maxWidth: theme.sizes.contentMax,
+    maxHeight: '90%',
+    alignSelf: 'center',
+    backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: theme.radius.modal,
+    borderTopRightRadius: theme.radius.modal,
   },
+  cancelOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: theme.colors.scrim,
+  },
+  cancelContent: { padding: theme.spacing.page, gap: theme.spacing.section },
 });

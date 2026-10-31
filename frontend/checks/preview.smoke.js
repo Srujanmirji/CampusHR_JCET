@@ -456,7 +456,7 @@ try {
   await page.getByRole('button', { name: 'Login', exact: true }).click();
   await page.waitForURL('**/dashboard');
   const facultyNav = await page.locator('nav a.sidebar-link').allTextContents();
-  assert.equal(facultyNav.length, 9, `Faculty sidebar: ${facultyNav}`);
+  assert.equal(facultyNav.length, 6, `Faculty sidebar: ${facultyNav}`);
   assert.ok(!facultyNav.some((label) => /Reports|Settings/.test(label)));
   await page.goto(`${base}/reports`);
   await page.getByText('You don’t have access to this page').waitFor();

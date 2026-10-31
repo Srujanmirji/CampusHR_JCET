@@ -93,16 +93,20 @@ export function createAuthService(
     user: AuthUser,
     meta: ClientMeta,
     persistent: boolean,
+    replacesSessionId?: string,
   ): Promise<AuthResult> {
     const refreshToken = randomBytes(32).toString('base64url');
-    await repo.createSession({
-      userId: user.id,
-      tokenHash: hashToken(refreshToken),
-      expiresAt: new Date(now().getTime() + REFRESH_TOKEN_TTL_MS),
-      persistent,
-      userAgent: meta.userAgent?.slice(0, 512),
-      ip: meta.ip,
-    });
+    await repo.createSession(
+      {
+        userId: user.id,
+        tokenHash: hashToken(refreshToken),
+        expiresAt: new Date(now().getTime() + REFRESH_TOKEN_TTL_MS),
+        persistent,
+        userAgent: meta.userAgent?.slice(0, 512),
+        ip: meta.ip,
+      },
+      replacesSessionId,
+    );
     const accessToken = jwt.sign({ role: user.role }, accessSecret, {
       ...JWT_OPTIONS,
       subject: user.id,
@@ -160,7 +164,7 @@ export function createAuthService(
       }
       const user = await repo.findUserById(session.userId);
       if (!user || user.status !== 'ACTIVE') throw invalidSession();
-      return issue(user, meta, session.persistent);
+      return issue(user, meta, session.persistent, session.id);
     },
 
     async logout(refreshToken: string | undefined) {

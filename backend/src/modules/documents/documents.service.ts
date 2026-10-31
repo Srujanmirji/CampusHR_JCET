@@ -1,10 +1,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { documentFormat } from './documents.files.js';
 import { HttpError } from '../../common/http-error.js';
 import type { Access } from '../auth/auth.service.js';
 import type { Notifier } from '../notifications/notifications.service.js';
-import type { DocumentsRepository, DocumentWithRelations } from './documents.repository.js';
-import type { ListDocumentsQuery, ReviewDocumentInput, UploadDocumentInput } from './documents.schema.js';
+import type {
+  DocumentsRepository,
+  DocumentWithRelations,
+} from './documents.repository.js';
+import type {
+  ListDocumentsQuery,
+  ReviewDocumentInput,
+  UploadDocumentInput,
+} from './documents.schema.js';
 
 export interface DocumentsService {
   uploadDocument(
@@ -16,7 +24,12 @@ export interface DocumentsService {
   listDocuments(
     access: Access,
     query: ListDocumentsQuery,
-  ): Promise<{ data: DocumentWithRelations[]; total: number; page: number; totalPages: number }>;
+  ): Promise<{
+    data: DocumentWithRelations[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }>;
 
   getDocumentById(access: Access, id: string): Promise<DocumentWithRelations>;
 
@@ -41,7 +54,9 @@ export function createDocumentsService(
         throw new HttpError(400, 'BAD_REQUEST', 'No file uploaded');
       }
 
-      const ext = file.originalname ? path.extname(file.originalname).toLowerCase() : '';
+      const ext = file.originalname
+        ? path.extname(file.originalname).toLowerCase()
+        : '';
       const validExts = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'];
       const allowedMimes = [
         'application/pdf',
@@ -54,7 +69,8 @@ export function createDocumentsService(
       ];
 
       const isAllowedMime = allowedMimes.includes(file.mimetype);
-      const isOctetWithValidExt = file.mimetype === 'application/octet-stream' && validExts.includes(ext);
+      const isOctetWithValidExt =
+        file.mimetype === 'application/octet-stream' && validExts.includes(ext);
 
       if (!isAllowedMime && !isOctetWithValidExt) {
         if (file.path && fs.existsSync(file.path)) {
@@ -73,7 +89,11 @@ export function createDocumentsService(
         if (file.path && fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
         }
-        throw new HttpError(400, 'FILE_TOO_LARGE', 'File size exceeds maximum allowed size of 10MB.');
+        throw new HttpError(
+          400,
+          'FILE_TOO_LARGE',
+          'File size exceeds maximum allowed size of 10MB.',
+        );
       }
 
       const employeeId = access.employeeId;
@@ -81,22 +101,59 @@ export function createDocumentsService(
         if (file.path && fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
         }
-        throw new HttpError(403, 'FORBIDDEN', 'Your account is not linked to an employee profile.');
+        throw new HttpError(
+          403,
+          'FORBIDDEN',
+          'Your account is not linked to an employee profile.',
+        );
       }
 
+      let detected: ReturnType<typeof documentFormat>;
+      try {
+        detected = documentFormat(file.path);
+        if (
+          !file.size ||
+          (detected.ext !== ext.slice(1) &&
+            !(detected.ext === 'jpg' && ext === '.jpeg'))
+        )
+          throw new HttpError(
+            400,
+            'INVALID_FILE_TYPE',
+            'The file contents do not match its extension.',
+          );
+      } catch (error) {
+        if (file.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
+        if (error instanceof HttpError) throw error;
+        throw new HttpError(
+          400,
+          'INVALID_FILE_TYPE',
+          'The uploaded file could not be read.',
+        );
+      }
       const fileUrl = `/uploads/documents/${path.basename(file.path)}`;
 
-      const doc = await repo.create({
-        employeeId,
-        category: metadata.category,
-        title: metadata.title,
-        documentType: metadata.documentType,
-        fileUrl,
-        fileName: file.originalname,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-        expiryDate: metadata.expiryDate ? new Date(metadata.expiryDate) : null,
-      });
+      const doc = await repo
+        .create({
+          employeeId,
+          category: metadata.category,
+          title: metadata.title,
+          documentType: metadata.documentType,
+          fileUrl,
+          fileName: file.originalname,
+          fileSize: file.size,
+          mimeType: detected.mime,
+          expiryDate: metadata.expiryDate
+            ? new Date(metadata.expiryDate)
+            : null,
+        })
+        .catch(() => {
+          // shortcut: retain the private file after uncertain DB writes; reconcile orphans as storage grows.
+          throw new HttpError(
+            503,
+            'UPLOAD_UNCONFIRMED',
+            'Document upload could not be confirmed. Refresh your documents before trying again.',
+          );
+        });
 
       // Notify HR Admin of new document submission (non-blocking)
       if (notifier) {
@@ -117,6 +174,12 @@ export function createDocumentsService(
 
     async listDocuments(access, query) {
       const hasAllScope = access.scope === 'all';
+      if (!hasAllScope && !access.employeeId)
+        throw new HttpError(
+          403,
+          'FORBIDDEN',
+          'Your account is not linked to an employee profile.',
+        );
 
       let targetEmployeeId = query.employeeId;
       if (!hasAllScope) {
@@ -141,7 +204,11 @@ export function createDocumentsService(
 
       const hasAllScope = access.scope === 'all';
       if (!hasAllScope && doc.employeeId !== access.employeeId) {
-        throw new HttpError(403, 'FORBIDDEN', 'You do not have permission to view this document.');
+        throw new HttpError(
+          403,
+          'FORBIDDEN',
+          'You do not have permission to view this document.',
+        );
       }
 
       return doc;
@@ -150,7 +217,11 @@ export function createDocumentsService(
     async reviewDocument(access, id, input) {
       const hasVerifyPermission = access.scope === 'all';
       if (!hasVerifyPermission) {
-        throw new HttpError(403, 'FORBIDDEN', 'Only HR Administrators can verify or reject documents.');
+        throw new HttpError(
+          403,
+          'FORBIDDEN',
+          'Only HR Administrators can verify or reject documents.',
+        );
       }
 
       const existing = await repo.findById(id);
@@ -191,12 +262,20 @@ export function createDocumentsService(
       const isAdmin = access.scope === 'all';
 
       if (!isOwner && !isAdmin) {
-        throw new HttpError(403, 'FORBIDDEN', 'You do not have permission to delete this document.');
+        throw new HttpError(
+          403,
+          'FORBIDDEN',
+          'You do not have permission to delete this document.',
+        );
       }
 
       // If document was already verified, faculty cannot delete it without admin
       if (doc.status === 'VERIFIED' && !isAdmin) {
-        throw new HttpError(400, 'BAD_REQUEST', 'Verified documents cannot be deleted. Please contact HR.');
+        throw new HttpError(
+          400,
+          'BAD_REQUEST',
+          'Verified documents cannot be deleted. Please contact HR.',
+        );
       }
 
       await repo.delete(id);
@@ -217,8 +296,16 @@ export function createDocumentsService(
     },
 
     async getPendingCount(access) {
+      if (access.scope !== 'all' && !access.employeeId)
+        throw new HttpError(
+          403,
+          'FORBIDDEN',
+          'Your account is not linked to an employee profile.',
+        );
       const hasAllScope = access.scope === 'all';
-      const count = await repo.countPending(hasAllScope ? undefined : access.employeeId ?? undefined);
+      const count = await repo.countPending(
+        hasAllScope ? undefined : (access.employeeId ?? undefined),
+      );
       return { count };
     },
   };

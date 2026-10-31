@@ -1,0 +1,59 @@
+{
+  "verifiedAt": "2026-10-24T11:21:58.341Z",
+  "account": "faculty-check@jcet.test",
+  "mode": "interactive",
+  "attendance": {
+    "id": "7778181e-c9c1-4057-abb3-9282cf7ad637",
+    "date": "2026-10-24T00:00:00.000Z",
+    "checkIn": "2026-10-24T11:14:14.151Z",
+    "checkOut": "2026-10-24T11:14:16.948Z",
+    "source": "MOBILE",
+    "status": "HALF_DAY",
+    "historyMatches": true
+  },
+  "leave": {
+    "id": "e35bfa02-b5ad-433c-8f5b-991d2323dc60",
+    "employee": {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "employeeCode": "IOS004",
+      "name": "Home Test"
+    },
+    "department": {
+      "id": 1,
+      "code": "CSE",
+      "name": "Computer Science"
+    },
+    "leaveType": {
+      "id": 1,
+      "code": "CL",
+      "name": "Casual Leave"
+    },
+    "startDate": "2026-10-26",
+    "endDate": "2026-10-26",
+    "halfDay": null,
+    "days": 1,
+    "reason": "Faculty demo test - personal appointment",
+    "status": "PENDING",
+    "approverRoles": [
+      "HOD",
+      "HR Admin"
+    ],
+    "pendingRole": "HOD",
+    "decisions": [],
+    "createdAt": "2026-10-24T11:20:43.355Z"
+  },
+  "balance": {
+    "leaveType": {
+      "id": 1,
+      "code": "CL",
+      "name": "Casual Leave"
+    },
+    "active": true,
+    "year": 2026,
+    "entitled": 15,
+    "carriedIn": 0,
+    "used": 0,
+    "pending": 3,
+    "remaining": 12
+  }
+}

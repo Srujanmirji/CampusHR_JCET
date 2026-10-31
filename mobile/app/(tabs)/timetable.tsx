@@ -1,900 +1,765 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
-import { Badge } from '../../components/ui/Badge';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from 'expo-router';
+import { SegmentedControl } from '../../components/ui/SegmentedControl';
+import { Icon } from '../../components/ui/Icon';
+import { selectionFeedback } from '../../lib/feedback';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
 import { ScreenContainer } from '../../components/ui/ScreenContainer';
 import { useAuth } from '../../lib/auth-context';
+import { campusClock, homeUnavailable } from '../../lib/home-api';
 import {
-  mergeSubstitutionsIntoTimetable,
-  subscribeToSubstitutionStore,
-} from '../../lib/substitution-store';
-import {
-  getPeriods,
-  getTimetableEntries,
-  type DayOfWeek,
-} from '../../lib/timetable-api';
+  classStatus,
+  getDatedDuties,
+  getOwnSchedule,
+  mergeDatedDuties,
+  weekDates,
+} from '../../lib/schedule-api';
+import { parseTimeToMinutes } from '../../lib/timetable-api';
 import { theme } from '../../lib/theme';
 
-const DAYS: { key: DayOfWeek; label: string; full: string }[] = [
-  { key: 'MON', label: 'Mon', full: 'Monday' },
-  { key: 'TUE', label: 'Tue', full: 'Tuesday' },
-  { key: 'WED', label: 'Wed', full: 'Wednesday' },
-  { key: 'THU', label: 'Thu', full: 'Thursday' },
-  { key: 'FRI', label: 'Fri', full: 'Friday' },
-  { key: 'SAT', label: 'Sat', full: 'Saturday' },
-];
-
-function getSystemDayOfWeek(): { day: DayOfWeek | null; isSunday: boolean } {
-  const dayIndex = new Date().getDay();
-  switch (dayIndex) {
-    case 1:
-      return { day: 'MON', isSunday: false };
-    case 2:
-      return { day: 'TUE', isSunday: false };
-    case 3:
-      return { day: 'WED', isSunday: false };
-    case 4:
-      return { day: 'THU', isSunday: false };
-    case 5:
-      return { day: 'FRI', isSunday: false };
-    case 6:
-      return { day: 'SAT', isSunday: false };
-    default:
-      return { day: null, isSunday: true };
-  }
-}
-
-function getCurrentTimeMinutes(): number {
-  const now = new Date();
-  return now.getHours() * 60 + now.getMinutes();
-}
-
-function parseTimeToMinutes(timeStr: string): number {
-  const [h, m] = timeStr.split(':').map(Number);
-  return (h || 0) * 60 + (m || 0);
-}
-
-function formatPeriodTime(startStr?: string, endStr?: string): string {
-  if (!startStr || !endStr) return '';
-  const format12 = (t: string) => {
-    const [hStr, mStr] = t.split(':');
-    let h = parseInt(hStr, 10);
-    const m = mStr || '00';
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-    return `${h}:${m} ${ampm}`;
-  };
-  return `${format12(startStr)} – ${format12(endStr)}`;
-}
+const label = (value: string, options: Intl.DateTimeFormatOptions) =>
+  new Date(`${value}T12:00:00Z`).toLocaleDateString('en-GB', {
+    timeZone: 'UTC',
+    ...options,
+  });
 
 export default function TimetableScreen() {
   const { user, accessToken } = useAuth();
-
-  const { day: todayDay, isSunday } = getSystemDayOfWeek();
-  const [viewMode, setViewMode] = useState<'TODAY' | 'WEEK'>(
-    isSunday ? 'WEEK' : 'TODAY',
+  const { fontScale } = useWindowDimensions();
+  const client = useQueryClient();
+  const [clock, setClock] = useState(() => campusClock());
+  const [view, setView] = useState<'TODAY' | 'WEEK'>('TODAY');
+  const [offset, setOffset] = useState(0);
+  const [selected, setSelected] = useState(() =>
+    weekDates(clock.date).indexOf(clock.date),
   );
-  const [selectedDay, setSelectedDay] = useState<DayOfWeek>(todayDay || 'MON');
-
-  const activeDay: DayOfWeek | null =
-    viewMode === 'TODAY' ? todayDay : selectedDay;
-
-  const {
-    data: periods = [],
-    error: periodsError,
-    isPending: loadingPeriods,
-    refetch: refetchPeriods,
-  } = useQuery({
-    queryKey: ['timetable-periods', accessToken],
-    queryFn: () => getPeriods(accessToken),
-  });
-
-  const {
-    data: entries = [],
-    isLoading: loadingEntries,
-    isRefetching: refreshing,
-    error: queryError,
-    refetch,
-  } = useQuery({
-    queryKey: ['timetable-entries', accessToken, activeDay, user?.employeeId],
-    queryFn: () =>
-      getTimetableEntries(accessToken, {
-        day: activeDay || undefined,
-        facultyId: user?.employeeId || undefined,
-      }),
-    enabled: !!activeDay,
-  });
-
-  const loading = loadingEntries || loadingPeriods;
-  const scheduleError = queryError || periodsError;
-  const error = scheduleError
-    ? scheduleError instanceof Error
-      ? scheduleError.message
-      : 'Unable to load timetable schedule.'
-    : null;
-
-  const onRefresh = () => {
-    if (activeDay) {
-      void refetch();
-      void refetchPeriods();
-    }
-  };
-
-  // Listen for smart substitution assignments updates
-  const [, setSubVersion] = useState(0);
-
+  const [focusedDate, setFocusedDate] = useState<string | null>(null);
+  const [swapRequested, setSwapRequested] = useState(false);
+  const dates = weekDates(clock.date, offset);
+  const date = view === 'TODAY' ? clock.date : dates[selected];
+  const unavailable = homeUnavailable(user, accessToken, 'timetable.read');
+  const dutiesUnavailable = homeUnavailable(
+    user,
+    accessToken,
+    'substitution.read',
+  );
+  const refresh = useCallback(() => {
+    setClock(campusClock());
+    void client.invalidateQueries({ queryKey: ['schedule', user?.id] });
+    void client.invalidateQueries({ queryKey: ['dated-duties', user?.id] });
+    void client.invalidateQueries({ queryKey: ['home', user?.id, 'schedule'] });
+  }, [client, user?.id]);
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh]),
+  );
   useEffect(() => {
-    return subscribeToSubstitutionStore(() => {
-      setSubVersion((v) => v + 1);
+    const timer = setInterval(() => setClock(campusClock()), 60_000);
+    const listener = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
     });
-  }, []);
-
-  // Merge any assigned substitution duties for the authenticated faculty member
-  const mergedEntries = (() => {
-    if (!accessToken?.startsWith('demo-')) return entries;
-    return mergeSubstitutionsIntoTimetable(
-      entries,
-      {
-        id: user?.id,
-        employeeId: user?.employeeId,
-        employeeCode: user?.employeeCode,
-      },
-      activeDay,
-    );
-  })();
-
-  // Map entries with period times
-  const enrichedEntries = useMemo(() => {
-    const currentMinutes = getCurrentTimeMinutes();
-    const isToday = activeDay !== null && activeDay === todayDay;
-
-    return mergedEntries.map((entry) => {
-      const startPeriodObj = periods.find(
-        (p) => p.number === entry.startPeriod,
+    return () => {
+      clearInterval(timer);
+      listener.remove();
+    };
+  }, [refresh]);
+  const regular = useQuery({
+    queryKey: ['schedule', user?.id, date],
+    queryFn: () => getOwnSchedule(user, accessToken, date),
+    enabled: !unavailable,
+    retry: false,
+    staleTime: 30_000,
+  });
+  const duties = useQuery({
+    queryKey: ['dated-duties', user?.id, clock.date],
+    queryFn: () => getDatedDuties(user, accessToken),
+    enabled: !unavailable && !dutiesUnavailable,
+    retry: false,
+    staleTime: 30_000,
+  });
+  let dutyError = duties.error;
+  let entries = regular.data?.entries ?? [];
+  if (regular.data && !duties.isError) {
+    try {
+      entries = mergeDatedDuties(
+        regular.data.entries,
+        duties.data ?? [],
+        date,
+        regular.data.periods,
       );
-      const endPeriodObj = periods.find((p) => p.number === entry.endPeriod);
-
-      const startTime = startPeriodObj?.startTime || '09:00';
-      const endTime = endPeriodObj?.endTime || '10:00';
-
-      const startMin = parseTimeToMinutes(startTime);
-      const endMin = parseTimeToMinutes(endTime);
-      const isActiveNow =
-        isToday && currentMinutes >= startMin && currentMinutes < endMin;
-      const isUpcoming = isToday && currentMinutes < startMin;
-      const isCompleted = isToday && currentMinutes >= endMin;
-
-      return {
-        ...entry,
-        startTime,
-        endTime,
-        timeLabel: formatPeriodTime(startTime, endTime),
-        isActiveNow,
-        isUpcoming,
-        isCompleted,
-      };
-    });
-  }, [mergedEntries, periods, activeDay, todayDay]);
-
-  // Calculate day summary
-  const { theoryCount, labCount } = useMemo(() => {
-    let theory = 0;
-    let lab = 0;
-    for (const entry of mergedEntries) {
-      if (entry.subject.kind === 'THEORY') {
-        theory++;
-      } else if (entry.subject.kind === 'LAB') {
-        lab++;
-      }
+    } catch (cause) {
+      dutyError =
+        cause instanceof Error
+          ? cause
+          : new Error('Duty timings could not be read.');
     }
-    return { theoryCount: theory, labCount: lab };
-  }, [mergedEntries]);
-
-  const isSundayHoliday = viewMode === 'TODAY' && isSunday;
-
+  }
+  const error = regular.error;
+  const dutyCount = entries.filter((entry) => entry.isSubstitute).length;
+  const past = date < clock.date;
+  const refreshing = regular.isFetching || duties.isFetching;
   return (
-    <ScreenContainer scrollable={false} style={styles.screenContainer}>
-      {/* Top Header */}
+    <ScreenContainer
+      testID="timetable-screen"
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refresh}
+          colors={[theme.colors.primary]}
+        />
+      }
+    >
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.pageTitle}>Class Timetable</Text>
-          <Text style={styles.pageSubtitle}>
-            {viewMode === 'TODAY'
-              ? isSunday
-                ? 'Sunday · Campus Holiday'
-                : `Today's Schedule · ${DAYS.find((d) => d.key === todayDay)?.full || 'Classes'}`
-              : `Weekly Schedule · ${DAYS.find((d) => d.key === selectedDay)?.full || 'Classes'}`}
+        <View style={styles.heading}>
+          <Text accessibilityRole="header" style={styles.title}>
+            Timetable
+          </Text>
+          <Text style={styles.supporting}>
+            {label(date, { weekday: 'long', day: 'numeric', month: 'long' })}
           </Text>
         </View>
-
-        <Pressable
-          onPress={onRefresh}
-          style={styles.refreshBtn}
+        <Button
+          variant="text"
           accessibilityLabel="Refresh timetable"
-          accessibilityRole="button"
+          onPress={refresh}
+          loading={refreshing}
+          style={styles.iconButton}
         >
-          <Text style={styles.refreshIcon}>↻</Text>
-        </Pressable>
+          <Icon name="refresh" color={theme.colors.primary} />
+        </Button>
       </View>
-
-      {/* Main View Mode Selector: Today vs Week */}
-      <View style={styles.viewModeToggle} accessibilityRole="tablist">
-        <Pressable
-          accessibilityRole="tab"
-          accessibilityState={{ selected: viewMode === 'TODAY' }}
-          onPress={() => setViewMode('TODAY')}
-          style={[styles.modeTab, viewMode === 'TODAY' && styles.modeTabActive]}
-        >
-          <Text
-            style={[
-              styles.modeTabText,
-              viewMode === 'TODAY' && styles.modeTabTextActive,
-            ]}
-          >
-            Today
-          </Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="tab"
-          accessibilityState={{ selected: viewMode === 'WEEK' }}
-          onPress={() => setViewMode('WEEK')}
-          style={[styles.modeTab, viewMode === 'WEEK' && styles.modeTabActive]}
-        >
-          <Text
-            style={[
-              styles.modeTabText,
-              viewMode === 'WEEK' && styles.modeTabTextActive,
-            ]}
-          >
-            Full Week
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Day Selector Pills for Weekly View */}
-      {viewMode === 'WEEK' && (
-        <View style={styles.dayPillsContainer}>
+      <SegmentedControl
+        label="Timetable view"
+        value={view}
+        options={[
+          { value: 'TODAY', label: 'Today' },
+          { value: 'WEEK', label: 'Week' },
+        ]}
+        onChange={(mode) => {
+          setView(mode);
+          if (mode === 'WEEK') {
+            setOffset(0);
+            setSelected(weekDates(clock.date).indexOf(clock.date));
+          }
+        }}
+      />
+      {view === 'WEEK' && (
+        <View style={styles.week}>
+          <View style={styles.header}>
+            <Button
+              variant="secondary"
+              style={styles.iconButton}
+              onPress={() => setOffset((value) => value - 1)}
+              accessibilityLabel="Previous week"
+            >
+              <Icon name="back" color={theme.colors.foreground} />
+            </Button>
+            <Text style={styles.weekRange}>
+              {label(dates[0], { day: 'numeric', month: 'short' })} –{' '}
+              {label(dates[6], {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}
+            </Text>
+            <Button
+              variant="secondary"
+              style={styles.iconButton}
+              onPress={() => setOffset((value) => value + 1)}
+              accessibilityLabel="Next week"
+            >
+              <Icon name="next" color={theme.colors.foreground} />
+            </Button>
+          </View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.dayPillsScroll}
+            contentContainerStyle={styles.days}
           >
-            {DAYS.map((day) => {
-              const isSelected = selectedDay === day.key;
-              const isTodayPill = todayDay === day.key;
-              return (
-                <Pressable
-                  key={day.key}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Select ${day.full}`}
-                  onPress={() => setSelectedDay(day.key)}
+            {dates.map((value, index) => (
+              <Pressable
+                key={value}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${label(value, { weekday: 'long' })} ${value}`}
+                accessibilityState={{ selected: selected === index }}
+                onFocus={() => setFocusedDate(value)}
+                onBlur={() => setFocusedDate(null)}
+                onPress={() => {
+                  if (selected !== index) {
+                    selectionFeedback();
+                    setSelected(index);
+                  }
+                }}
+                style={({ pressed }) => [
+                  styles.day,
+                  selected === index && styles.selectedDay,
+                  focusedDate === value && styles.focusedDay,
+                  pressed && styles.pressedDay,
+                ]}
+              >
+                <Text
                   style={[
-                    styles.dayPill,
-                    isSelected && styles.dayPillSelected,
-                    isTodayPill && !isSelected && styles.dayPillToday,
+                    styles.dayLabel,
+                    selected === index && styles.selectedDayText,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.dayPillLabel,
-                      isSelected && styles.dayPillLabelSelected,
-                    ]}
-                  >
-                    {day.label}
-                  </Text>
-                  {isTodayPill && (
-                    <View
-                      style={[
-                        styles.todayDot,
-                        isSelected && styles.todayDotSelected,
-                      ]}
-                    />
-                  )}
-                </Pressable>
-              );
-            })}
+                  {label(value, { weekday: 'short' })}
+                </Text>
+                <Text
+                  style={[
+                    styles.dayNumber,
+                    selected === index && styles.selectedDayText,
+                  ]}
+                >
+                  {value.slice(8)}
+                </Text>
+              </Pressable>
+            ))}
           </ScrollView>
         </View>
       )}
-
-      {/* Day Stats Bar */}
-      {!loading && !error && activeDay && entries.length > 0 && (
-        <View style={styles.statsBar}>
-          <View style={styles.statChip}>
-            <Text style={styles.statLabel}>Total Slots:</Text>
-            <Text style={styles.statValue}>{entries.length}</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statChip}>
-            <Text style={styles.statLabel}>Theory:</Text>
-            <Text style={styles.statValue}>{theoryCount}</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statChip}>
-            <Text style={styles.statLabel}>Labs:</Text>
-            <Text style={styles.statValue}>{labCount}</Text>
-          </View>
+      {unavailable ? (
+        <View style={styles.notice}>
+          <Text style={styles.body}>{unavailable}</Text>
         </View>
-      )}
-
-      {/* Error Banner */}
-      {error && (
-        <Card style={styles.errorCard}>
-          <Text style={styles.errorText}>{error}</Text>
+      ) : regular.isPending ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={theme.colors.primary} />
+          <Text style={styles.supporting}>Loading timetable…</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.notice}>
+          <Text accessibilityRole="alert" style={styles.error}>
+            Could not load your schedule.{' '}
+            {error.name === 'ZodError'
+              ? 'The server returned an unexpected response.'
+              : error.message}
+          </Text>
           <Button
             variant="outline"
             onPress={() => {
-              void refetch();
-              void refetchPeriods();
+              void regular.refetch();
             }}
-            style={styles.retryBtn}
           >
-            Try Again
+            Retry timetable
           </Button>
-        </Card>
-      )}
-
-      {/* Main Content Area */}
-      {loading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Loading class schedule…</Text>
         </View>
       ) : (
-        <ScrollView
-          style={styles.scheduleList}
-          contentContainerStyle={[
-            styles.scheduleListContent,
-            (isSundayHoliday || enrichedEntries.length === 0) &&
-              styles.emptyScrollContent,
-          ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[theme.colors.primary]}
-            />
-          }
-        >
-          {isSundayHoliday ? (
-            /* Sunday / Weekend Free Day State */
-            <Card style={styles.emptyCard}>
-              <View style={styles.emptyIconBadge}></View>
-              <Text style={styles.emptyTitle}>Sunday Campus Holiday</Text>
-              <Text style={styles.emptySubtitle}>
-                No teaching periods are scheduled for today. You can view
-                Monday’s classes or browse the full weekly timetable below.
-              </Text>
-              <Button
-                variant="primary"
-                onPress={() => {
-                  setViewMode('WEEK');
-                  setSelectedDay('MON');
-                }}
-                style={styles.emptyActionBtn}
-              >
-                View Weekly Schedule
-              </Button>
-            </Card>
-          ) : enrichedEntries.length === 0 ? (
-            /* No Classes State */
-            <Card style={styles.emptyCard}>
-              <View style={styles.emptyIconBadge}></View>
-              <Text style={styles.emptyTitle}>No Classes Scheduled</Text>
-              <Text style={styles.emptySubtitle}>
-                You have no teaching periods assigned for{' '}
-                {DAYS.find((d) => d.key === activeDay)?.full || 'this day'}.
+        <>
+          <View style={styles.scheduleHeading}>
+            <Text accessibilityRole="header" style={styles.sectionTitle}>
+              {view === 'TODAY'
+                ? `${entries.length} ${entries.length === 1 ? 'class' : 'classes'} today`
+                : label(date, {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                  })}
+            </Text>
+            <Text style={styles.detail}>
+              {view === 'WEEK' &&
+                `${entries.length} ${entries.length === 1 ? 'slot' : 'slots'} · `}
+              All class times in IST
+            </Text>
+          </View>
+          {past ? (
+            <Text style={styles.detail}>
+              Regular timetable for this weekday. Past substitution history is
+              not provided by the API.
+            </Text>
+          ) : dutiesUnavailable ? (
+            <Text style={styles.detail}>
+              Regular classes only. Substitution duties are not available for
+              your account.
+            </Text>
+          ) : duties.isPending ? (
+            <Text style={styles.detail}>
+              Checking dated substitution duties…
+            </Text>
+          ) : dutyError ? (
+            <View style={styles.notice}>
+              <Text accessibilityRole="alert" style={styles.error}>
+                Substitution duties could not be loaded. Regular classes are
+                shown; coverage may be missing.
               </Text>
               <Button
                 variant="outline"
-                onPress={onRefresh}
-                style={styles.emptyActionBtn}
+                onPress={() => {
+                  void duties.refetch();
+                }}
               >
-                Refresh Timetable
+                Retry duties
               </Button>
-            </Card>
-          ) : (
-            /* Class Schedule List */
-            enrichedEntries.map((classItem) => {
-              const periodLabel =
-                classItem.startPeriod === classItem.endPeriod
-                  ? `Period ${classItem.startPeriod}`
-                  : `Periods ${classItem.startPeriod}–${classItem.endPeriod}`;
-
+            </View>
+          ) : dutyCount > 0 ? (
+            <Text style={styles.coverageSummary}>
+              Includes {dutyCount} substitution{' '}
+              {dutyCount === 1 ? 'duty' : 'duties'} for {date}
+            </Text>
+          ) : null}
+          {regular.dataUpdatedAt > 0 && (
+            <Text style={styles.detail}>
+              Updated{' '}
+              {new Date(regular.dataUpdatedAt).toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+              {regular.isFetching ? ' · Refreshing…' : ''}
+            </Text>
+          )}
+          {entries.length === 0 && (
+            <View style={styles.empty}>
+              <Icon
+                name="timetable"
+                color={theme.colors.primary}
+                size={theme.spacing.xl}
+              />
+              <Text style={styles.sectionTitle}>
+                A little space in your day
+              </Text>
+              <Text style={styles.supporting}>
+                No regular classes
+                {!past && !dutiesUnavailable && duties.isSuccess
+                  ? ' or assigned duties'
+                  : ''}{' '}
+                for this date. Select another day or refresh to check for
+                changes.
+              </Text>
+            </View>
+          )}
+          <View style={styles.timeline}>
+            {entries.map((entry) => {
+              const start = regular.data!.periods.find(
+                (p) => p.number === entry.startPeriod,
+              )!.startTime;
+              const end = regular.data!.periods.find(
+                (p) => p.number === entry.endPeriod,
+              )!.endTime;
+              const status = classStatus(
+                date,
+                parseTimeToMinutes(start),
+                parseTimeToMinutes(end),
+                clock,
+              );
+              const current = status === 'In progress';
+              const completed = status === 'Completed';
               return (
-                <Card
-                  key={classItem.id}
-                  style={[
-                    styles.classCard,
-                    classItem.isActiveNow && styles.classCardActive,
-                    classItem.isCompleted && styles.classCardCompleted,
-                  ]}
-                >
-                  {/* Active Class Highlight Banner */}
-                  {classItem.isActiveNow && (
-                    <View style={styles.activeBanner}>
-                      <View style={styles.pulseDot} />
-                      <Text style={styles.activeBannerText}>HAPPENING NOW</Text>
-                    </View>
-                  )}
-
-                  {/* Substitute Duty Alert Banner */}
-                  {classItem.isSubstitute && (
-                    <View style={styles.substituteBanner}>
-                      <Text style={styles.substituteTag}>
-                        ★ SMART SUBSTITUTION
-                      </Text>
-                      <Text style={styles.substituteNote}>
-                        {classItem.substituteNote ||
-                          'Assigned substitution duty'}
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Header Row: Period & Type Badges */}
-                  <View style={styles.cardHeaderRow}>
-                    <View style={styles.periodBadgeGroup}>
-                      <View style={styles.periodPill}>
-                        <Text style={styles.periodPillText}>{periodLabel}</Text>
-                      </View>
-                      <Text style={styles.timeRangeText}>
-                        {classItem.timeLabel}
-                      </Text>
-                    </View>
-
-                    <Badge
-                      label={classItem.subject.kind}
-                      variant={
-                        classItem.subject.kind === 'LAB'
-                          ? 'accent'
-                          : 'secondary'
-                      }
+                <View key={entry.id} style={styles.timelineRow}>
+                  <View
+                    style={[
+                      styles.timeRail,
+                      {
+                        width:
+                          (theme.sizes.tapTarget + theme.spacing.md) *
+                          Math.max(fontScale, 1),
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.time, current && styles.activeText]}>
+                      {start.slice(0, 5)}
+                    </Text>
+                    <Text style={styles.detail}>{end.slice(0, 5)}</Text>
+                  </View>
+                  <View style={styles.timelineSpine}>
+                    <View
+                      style={[
+                        styles.timelineDot,
+                        completed && styles.completedDot,
+                        current && styles.currentDot,
+                      ]}
                     />
                   </View>
-
-                  {/* Subject Info */}
-                  <View style={styles.subjectBlock}>
-                    <Text style={styles.subjectCode}>
-                      {classItem.subject.code}
+                  <View style={styles.timelineCopy}>
+                    <Text style={[styles.code, current && styles.activeText]}>
+                      {entry.subject.code}
                     </Text>
-                    <Text style={styles.subjectName}>
-                      {classItem.subject.name}
+                    <Text style={styles.subject}>{entry.subject.name}</Text>
+                    <View style={styles.metadata}>
+                      <Icon name="profile" size={theme.spacing.section} />
+                      <Text style={styles.detail}>
+                        Sem {entry.semester}
+                        {entry.section}
+                        {entry.batch ? ` · Batch ${entry.batch}` : ''}
+                      </Text>
+                      <Icon name="location" size={theme.spacing.section} />
+                      <Text style={styles.detail}>{entry.room.name}</Text>
+                    </View>
+                    <Text style={styles.detail}>
+                      {entry.subject.kind} ·{' '}
+                      {entry.startPeriod === entry.endPeriod
+                        ? `Period ${entry.startPeriod}`
+                        : `Periods ${entry.startPeriod}–${entry.endPeriod}`}
                     </Text>
+                    {entry.isSubstitute && (
+                      <View style={styles.coverage}>
+                        <Text style={styles.coverageLabel}>
+                          Substitution · {entry.dutyDate}
+                        </Text>
+                        <Text style={styles.supporting}>
+                          {entry.substituteNote}
+                        </Text>
+                      </View>
+                    )}
+                    {status && (
+                      <View
+                        style={[
+                          styles.status,
+                          completed
+                            ? styles.completedStatus
+                            : styles.activeStatus,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusText,
+                            completed
+                              ? styles.completedText
+                              : styles.activeText,
+                          ]}
+                        >
+                          {status}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-
-                  {/* Details Footer: Section, Batch, Room */}
-                  <View style={styles.cardFooter}>
-                    <View style={styles.metaBadge}>
-                      <Text style={styles.metaLabel}>Section:</Text>
-                      <Text style={styles.metaValue}>
-                        Sem {classItem.semester}
-                        {classItem.section}
-                        {classItem.batch ? ` · ${classItem.batch}` : ''}
-                      </Text>
-                    </View>
-
-                    <View style={styles.roomBadge}>
-                      <Text style={styles.roomValue}>
-                        {classItem.room.name}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Status Indicator text for accessibility */}
-                  {classItem.isCompleted && (
-                    <View style={styles.completedNotice}>
-                      <Text style={styles.completedNoticeText}>
-                        ✓ Period Concluded
-                      </Text>
-                    </View>
-                  )}
-                </Card>
+                </View>
               );
-            })
-          )}
-        </ScrollView>
+            })}
+          </View>
+        </>
       )}
+
+      <View style={styles.bentoSection}>
+        <View style={styles.bentoHeader}>
+          <View style={styles.heading}>
+            <Text style={styles.sectionTitle}>Mutual Class Swap</Text>
+            <Text style={styles.supporting}>
+              Exchange a lecture period with a departmental peer without using
+              casual leave.
+            </Text>
+          </View>
+          <Button
+            variant="secondary"
+            accessibilityLabel={
+              swapRequested
+                ? 'Withdraw peer period swap proposal'
+                : 'Propose peer period swap'
+            }
+            onPress={() => {
+              selectionFeedback();
+              setSwapRequested((prev) => !prev);
+            }}
+          >
+            {swapRequested ? 'Swap Proposed' : 'Propose Swap'}
+          </Button>
+        </View>
+        <View style={styles.bentoItem}>
+          <Text style={styles.code}>
+            Prof. Asha Patil ⇄ Prof. Priya Kulkarni
+          </Text>
+          <Text style={styles.subject}>
+            BCS501 Mon P2 (10:00) ⇄ BCS502 Wed P4 (12:00) · CSE-5A · Room 204
+          </Text>
+          <Text style={styles.detail}>
+            {swapRequested
+              ? 'Your additional Fri P3 ⇄ Tue P2 swap proposal is queued for HOD review'
+              : 'Approved by HOD · Zero leave balance deduction'}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.bentoSection}>
+        <View style={styles.heading}>
+          <Text style={styles.sectionTitle}>VTU Academic Calendar</Text>
+          <Text style={styles.supporting}>
+            Odd Semester 2026–27 CIE windows and JCET institutional holidays.
+          </Text>
+        </View>
+        {[
+          {
+            title: 'CIE-1 Internal Assessment',
+            window: '28 Sep – 01 Oct',
+            badge: 'CIE Exam',
+          },
+          {
+            title: 'Gandhi Jayanti',
+            window: '02 Oct · Institutional Holiday',
+            badge: 'Holiday',
+          },
+          {
+            title: 'CIE-2 Internal Assessment',
+            window: '02 Nov – 05 Nov',
+            badge: 'CIE Exam',
+          },
+          {
+            title: 'CIE-3 & Lab Internals',
+            window: '07 Dec – 12 Dec',
+            badge: 'Lab + CIE',
+          },
+        ].map((item) => (
+          <View key={item.title} style={styles.bentoRow}>
+            <View style={styles.heading}>
+              <Text style={styles.code}>{item.title}</Text>
+              <Text style={styles.detail}>{item.window}</Text>
+            </View>
+            <View style={[styles.status, styles.activeStatus]}>
+              <Text style={[styles.statusText, styles.activeText]}>
+                {item.badge}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  screenContainer: {
-    paddingHorizontal: theme.spacing.section,
-    paddingTop: theme.spacing.section,
+  content: {
+    paddingHorizontal: theme.spacing.page,
+    gap: theme.spacing.sm,
+    paddingBottom: theme.spacing.xl,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    marginBottom: theme.spacing.md,
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
   },
-  headerLeft: {
-    flex: 1,
-    gap: 2,
-  },
-  pageTitle: {
+  heading: { flex: 1, gap: theme.spacing.xs },
+  title: {
     fontFamily: theme.typography.headingFamily,
+    fontWeight: '700',
     fontSize: theme.typography.heading,
-    color: theme.colors.primary,
+    color: theme.colors.foreground,
   },
-  pageSubtitle: {
+  supporting: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.label,
+    fontSize: theme.typography.secondary,
+    lineHeight: theme.typography.lineHeight,
     color: theme.colors.mutedForeground,
   },
-  refreshBtn: {
-    width: theme.sizes.tapTarget,
-    height: theme.sizes.tapTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.muted,
+  detail: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.typography.caption,
+    color: theme.colors.mutedForeground,
   },
-  refreshIcon: {
-    fontSize: 20,
-    color: theme.colors.primary,
-    fontWeight: 'bold',
+  body: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.typography.body,
+    lineHeight: theme.typography.lineHeight,
+    color: theme.colors.foreground,
   },
-
-  /* View Mode Toggle */
-  viewModeToggle: {
-    flexDirection: 'row',
-    backgroundColor: theme.colors.muted,
-    borderRadius: theme.radius.control,
-    padding: 3,
-    marginBottom: theme.spacing.md,
-  },
-  modeTab: {
+  iconButton: { paddingHorizontal: theme.spacing.md },
+  week: { gap: theme.spacing.section, marginBottom: theme.spacing.md },
+  weekRange: {
     flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.control - 2,
-    minHeight: 44,
+    textAlign: 'center',
+    fontFamily: theme.typography.headingFamily,
+    fontWeight: '600',
+    fontSize: theme.typography.secondary,
+    color: theme.colors.foreground,
   },
-  modeTabActive: {
+  days: { flexGrow: 1, gap: theme.spacing.xs },
+  day: {
+    flex: 1,
+    minWidth: theme.sizes.tapTarget,
+    minHeight: theme.sizes.tapTarget + theme.spacing.lg,
+    gap: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: theme.colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.card,
     ...theme.shadows.card,
   },
-  modeTabText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.mutedForeground,
-    fontWeight: '600',
-  },
-  modeTabTextActive: {
-    color: theme.colors.primary,
-    fontFamily: theme.typography.headingFamily,
-  },
-
-  /* Day Selector Pills */
-  dayPillsContainer: {
-    marginBottom: theme.spacing.md,
-  },
-  dayPillsScroll: {
-    gap: 8,
-    paddingHorizontal: 2,
-  },
-  dayPill: {
-    minWidth: 54,
-    height: 44,
-    paddingHorizontal: 12,
-    borderRadius: theme.radius.control,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  dayPillSelected: {
+  selectedDay: {
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
   },
-  dayPillToday: {
-    borderColor: theme.colors.accent,
-  },
-  dayPillLabel: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.foreground,
-  },
-  dayPillLabelSelected: {
-    color: theme.colors.surface,
-  },
-  todayDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.accent,
-  },
-  todayDotSelected: {
-    backgroundColor: theme.colors.surface,
-  },
-
-  /* Stats Bar */
-  statsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: theme.colors.surface,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: theme.radius.control,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: theme.spacing.md,
-  },
-  statChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statLabel: {
+  focusedDay: { borderColor: theme.colors.foreground },
+  pressedDay: { opacity: 0.75 },
+  dayLabel: {
     fontFamily: theme.typography.bodyFamily,
     fontSize: theme.typography.caption,
     color: theme.colors.mutedForeground,
   },
-  statValue: {
+  dayNumber: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.primary,
+    fontSize: theme.typography.body,
+    fontWeight: '600',
+    color: theme.colors.foreground,
+    fontVariant: ['tabular-nums'],
   },
-  statDivider: {
-    width: 1,
-    height: 16,
-    backgroundColor: theme.colors.border,
+  selectedDayText: { color: theme.colors.onAction },
+  scheduleHeading: {
+    gap: theme.spacing.xs,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.xs,
   },
-
-  /* Schedule List */
-  scheduleList: {
+  sectionTitle: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: theme.typography.title,
+    fontWeight: '600',
+    color: theme.colors.foreground,
+  },
+  coverageSummary: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.typography.secondary,
+    color: theme.colors.violet,
+  },
+  timeline: { marginTop: theme.spacing.md },
+  timelineRow: { flexDirection: 'row' },
+  timeRail: {
+    width: theme.sizes.tapTarget + theme.spacing.md,
+    gap: theme.spacing.xs,
+    paddingTop: theme.spacing.xs,
+  },
+  time: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: theme.typography.caption,
+    fontWeight: '600',
+    color: theme.colors.foreground,
+    fontVariant: ['tabular-nums'],
+  },
+  timelineSpine: {
+    width: theme.spacing.md,
+    borderLeftWidth: 1,
+    borderLeftColor: theme.colors.border,
+    marginLeft: theme.spacing.xs,
+  },
+  timelineDot: {
+    width: theme.spacing.md,
+    height: theme.spacing.md,
+    borderRadius: theme.radius.full,
+    marginLeft: -theme.spacing.md / 2,
+    marginTop: theme.spacing.sm,
+    backgroundColor: theme.colors.primary,
+  },
+  completedDot: { backgroundColor: theme.colors.mutedForeground },
+  currentDot: { backgroundColor: theme.colors.primary },
+  timelineCopy: {
     flex: 1,
-  },
-  scheduleListContent: {
-    gap: theme.spacing.md,
-    paddingBottom: theme.spacing.xl,
-  },
-  emptyScrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  classCard: {
+    minWidth: 0,
     gap: theme.spacing.sm,
-    borderWidth: 1,
+    padding: theme.spacing.section,
+    marginBottom: theme.spacing.section,
+    marginLeft: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border,
-    position: 'relative',
-  },
-  classCardActive: {
-    borderColor: theme.colors.accent,
-    borderWidth: 2,
-    backgroundColor: '#FFFDFB',
     ...theme.shadows.card,
   },
-  classCardCompleted: {
-    opacity: 0.72,
-    backgroundColor: '#FAFAFB',
-  },
-
-  /* Active Class Banner */
-  activeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FEF2F2',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: theme.radius.full,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  pulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.colors.accent,
-  },
-  activeBannerText: {
+  code: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: 11,
-    color: '#991B1B',
-    fontWeight: 'bold',
-  },
-
-  /* Substitute Banner */
-  substituteBanner: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: theme.radius.control - 2,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    gap: 2,
-  },
-  substituteTag: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 11,
-    color: '#92400E',
-    letterSpacing: 0.5,
-  },
-  substituteNote: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: 12,
-    color: '#78350F',
-  },
-
-  /* Card Header */
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  periodBadgeGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  periodPill: {
-    backgroundColor: theme.colors.muted,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  periodPillText: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.primary,
-  },
-  timeRangeText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.mutedForeground,
-  },
-
-  /* Subject Details */
-  subjectBlock: {
-    gap: 2,
-    marginVertical: 2,
-  },
-  subjectCode: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.title,
-    color: theme.colors.primary,
-  },
-  subjectName: {
-    fontFamily: theme.typography.bodyFamily,
+    fontWeight: '600',
     fontSize: theme.typography.body,
     color: theme.colors.foreground,
   },
-
-  /* Card Footer */
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: theme.spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.muted,
-  },
-  metaBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaLabel: {
+  subject: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
+    fontSize: theme.typography.secondary,
+    lineHeight: theme.typography.lineHeight,
     color: theme.colors.mutedForeground,
   },
-  metaValue: {
+  metadata: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  status: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.status,
+  },
+  statusText: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.typography.caption,
+  },
+  completedStatus: { backgroundColor: theme.colors.mintContainer },
+  activeStatus: { backgroundColor: theme.colors.blueContainer },
+  completedText: { color: theme.colors.mintInk },
+  activeText: { color: theme.colors.primary },
+  coverage: {
+    gap: theme.spacing.xs,
+    borderLeftWidth: 2,
+    borderLeftColor: theme.colors.violet,
+    paddingLeft: theme.spacing.md,
+  },
+  coverageLabel: {
     fontFamily: theme.typography.headingFamily,
     fontSize: theme.typography.caption,
-    color: theme.colors.primary,
+    color: theme.colors.violet,
+    fontWeight: '600',
   },
-  roomBadge: {
-    flexDirection: 'row',
+  loading: {
+    padding: theme.spacing.xl,
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: theme.colors.muted,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  roomIcon: {
-    fontSize: 11,
-  },
-  roomValue: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.primary,
-  },
-
-  completedNotice: {
-    alignSelf: 'flex-start',
-    marginTop: 2,
-  },
-  completedNoticeText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: 11,
-    color: theme.colors.mutedForeground,
-  },
-
-  /* Empty / Error / Loading States */
-  centerContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingVertical: theme.spacing.xl,
-  },
-  loadingText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.body,
-    color: theme.colors.mutedForeground,
-  },
-  emptyCard: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.xl,
-    paddingHorizontal: theme.spacing.lg,
     gap: theme.spacing.md,
+  },
+  notice: { gap: theme.spacing.md, paddingVertical: theme.spacing.section },
+  error: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.typography.secondary,
+    color: theme.colors.errorInk,
+    lineHeight: theme.typography.lineHeight,
+  },
+  empty: {
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.xl,
+    alignItems: 'flex-start',
+  },
+  bentoSection: {
     marginTop: theme.spacing.md,
+    padding: theme.spacing.section,
+    gap: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    ...theme.shadows.card,
   },
-  emptyIconBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.muted,
+  bentoHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyBadgeText: {
-    fontSize: 26,
-  },
-  emptyTitle: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.title,
-    color: theme.colors.primary,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.mutedForeground,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  emptyActionBtn: {
-    marginTop: theme.spacing.sm,
-    minHeight: 44,
-  },
-  errorCard: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
-    borderWidth: 1,
+    justifyContent: 'space-between',
     gap: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
   },
-  errorText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.label,
-    color: '#991B1B',
+  bentoItem: {
+    gap: theme.spacing.xs,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.muted,
+    borderRadius: theme.radius.control,
   },
-  retryBtn: {
-    alignSelf: 'flex-start',
-    minHeight: 44,
+  bentoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
   },
 });

@@ -1,0 +1,110 @@
+[
+  {
+    "file": "screens/00-login.png",
+    "title": "Login",
+    "group": "Faculty",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/01-password-help.png",
+    "title": "Password help",
+    "group": "Faculty",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/02-home.png",
+    "title": "Faculty Home",
+    "group": "Faculty",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/03-timetable-today.png",
+    "title": "Timetable \u00b7 Today",
+    "group": "Faculty",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/04-timetable-week.png",
+    "title": "Timetable \u00b7 Week",
+    "group": "Faculty",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/05-attendance.png",
+    "title": "Attendance",
+    "group": "Faculty",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/06-leave.png",
+    "title": "Leave",
+    "group": "Faculty",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/07-apply-leave.png",
+    "title": "Apply for leave",
+    "group": "Faculty",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/08-profile.png",
+    "title": "Profile",
+    "group": "Faculty",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/09-notifications.png",
+    "title": "Notifications",
+    "group": "Faculty",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/10-hod-home.png",
+    "title": "HOD Home",
+    "group": "HOD",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/11-approvals.png",
+    "title": "Leave approvals",
+    "group": "HOD",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/12-leave-review.png",
+    "title": "Leave review",
+    "group": "HOD",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/13-smart-substitution.png",
+    "title": "Smart substitution",
+    "group": "HOD",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/14-coverage-confirmation.png",
+    "title": "Coverage confirmation",
+    "group": "HOD",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/15-large-type-review.png",
+    "title": "Larger text \u00b7 Review",
+    "group": "Device checks",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/16-tablet-login.png",
+    "title": "iPad \u00b7 Login",
+    "group": "Device checks",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  },
+  {
+    "file": "screens/17-tablet-home.png",
+    "title": "iPad \u00b7 Home",
+    "group": "Device checks",
+    "source": "Native Expo Go / CoreSimulator iOS 26.5"
+  }
+]

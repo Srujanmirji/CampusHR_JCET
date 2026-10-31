@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <title>CampusHR · Faculty V2 designs</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <aside class="preview-nav" aria-label="Design preview screens">
+      <div class="preview-brand">CampusHR <span>V2</span></div>
+      <p>Faculty screen designs</p>
+      <p class="preview-disclosure">
+        Interactive design preview.<br />Sample data. No sign-in or API
+        requests.
+      </p>
+      <nav id="screen-list"></nav>
+      <a href="../DESIGN_SYSTEM.md" class="standard-link"
+        >Approved design standard ↗</a
+      >
+    </aside>
+    <div class="mobile-preview-toolbar">
+      <span>V2 · Faculty preview</span
+      ><button id="screen-menu" type="button" aria-expanded="false">
+        Screens
+      </button>
+    </div>
+    <main class="preview-stage">
+      <div class="device" id="device">
+        <div class="statusbar" aria-hidden="true">
+          <span>10:33</span
+          ><span class="system-status"
+            >●●● Wi-Fi <span class="battery"></span
+          ></span>
+        </div>
+        <div id="app"></div>
+      </div>
+    </main>
+    <aside class="preview-notes" aria-label="Screen design notes">
+      <div class="eyebrow">ACADEMIC CLARITY</div>
+      <h2 id="preview-title"></h2>
+      <p id="preview-description"></p>
+      <div class="preview-note" id="preview-state"></div>
+      <p class="preview-disclosure">
+        Faculty only · 12 requested screens<br />Inter + native-family symbol
+        concepts<br />V2 colors and type unchanged
+      </p>
+      <p class="preview-disclosure">
+        A screen concept is not a claim that SSO, location verification, lunch
+        tracking or support contacts are configured.
+      </p>
+    </aside>
+    <div
+      class="preview-message"
+      id="preview-message"
+      role="status"
+      hidden
+    ></div>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "login",
+    "width": 390,
+    "height": 844,
+    "file": "screenshots/login.png"
+  },
+  {
+    "id": "home",
+    "width": 390,
+    "height": 1232,
+    "file": "screenshots/home.png"
+  },
+  {
+    "id": "today",
+    "width": 390,
+    "height": 957,
+    "file": "screenshots/today.png"
+  },
+  {
+    "id": "week",
+    "width": 390,
+    "height": 1055,
+    "file": "screenshots/week.png"
+  },
+  {
+    "id": "attendance",
+    "width": 390,
+    "height": 1151,
+    "file": "screenshots/attendance.png"
+  },
+  {
+    "id": "leave",
+    "width": 390,
+    "height": 1201,
+    "file": "screenshots/leave.png"
+  },
+  {
+    "id": "apply",
+    "width": 390,
+    "height": 1001,
+    "file": "screenshots/apply.png"
+  },
+  {
+    "id": "detail",
+    "width": 390,
+    "height": 1020,
+    "file": "screenshots/detail.png"
+  },
+  {
+    "id": "notifications",
+    "width": 390,
+    "height": 844,
+    "file": "screenshots/notifications.png"
+  },
+  {
+    "id": "profile",
+    "width": 390,
+    "height": 1380,
+    "file": "screenshots/profile.png"
+  },
+  {
+    "id": "settings",
+    "width": 390,
+    "height": 1446,
+    "file": "screenshots/settings.png"
+  },
+  {
+    "id": "password",
+    "width": 390,
+    "height": 844,
+    "file": "screenshots/password.png"
+  }
+]

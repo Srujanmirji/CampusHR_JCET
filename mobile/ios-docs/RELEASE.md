@@ -2,12 +2,20 @@
 
 This is future release work, not permission to deploy or publish. Start with local development and device QA. Srujan approves distribution after the acceptance gates are met.
 
+## Staging preparation — 25 October 2026
+
+[Staging and signed iPhone handoff](../../deploy/staging/README.md) records the prepared
+Railway config, guarded startup, private volume path, standalone EAS profiles and exact
+account blockers. No hosted staging deployment or signed iPhone installation is complete.
+The checklist below retains acceptance items; earlier statements about missing build profiles
+are superseded by this handoff. Expo ownership and Apple signing identifiers remain pending.
+
 ## Development build — IOS-012
 
 - [ ] Confirm the college/team's Apple and Expo account ownership and who manages signing; keep private credentials out of Git and chat.
-- [ ] Choose and record the iOS bundle identifier, signing team, version/build convention and supported devices/OS versions. The current `app.json` has no iOS bundle identifier.
+- [ ] Choose and record the iOS bundle identifier, signing team, version/build convention and supported devices/OS versions. Staging now requires the approved bundle identifier via `APP_IOS_BUNDLE_IDENTIFIER`; none has been selected yet.
 - [ ] Review required capabilities, permission descriptions, app icons, splash assets and college branding.
-- [ ] Choose local or EAS build workflow, document its commands, and add only the required reviewed configuration. EAS project linkage and build profiles are not present at this baseline.
+- [ ] Choose local or EAS build workflow, document its commands, and add only the required reviewed configuration. Staging EAS profiles and environment-driven project linkage are prepared; an approved account/project is still required.
 - [ ] Create and install a signed development build on a physical iPhone; verify its API environment and session lifecycle.
 - [ ] Verify notification capabilities and remote push in the actual signed build; a local notification preview does not satisfy this step.
 

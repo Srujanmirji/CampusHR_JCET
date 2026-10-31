@@ -1,7 +1,20 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { after } from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'campushr-document-unit-'));
+const testPdf = () => {
+  const file = path.join(temp, `${Math.random()}.pdf`);
+  fs.writeFileSync(file, '%PDF-1.4\n%%EOF');
+  return file;
+};
+after(() => fs.rmSync(temp, { recursive: true, force: true }));
 import { HttpError } from '../src/common/http-error.js';
-import type { DocumentWithRelations, DocumentsRepository } from '../src/modules/documents/documents.repository.js';
+import type {
+  DocumentWithRelations,
+  DocumentsRepository,
+} from '../src/modules/documents/documents.repository.js';
 import { createDocumentsService } from '../src/modules/documents/documents.service.js';
 
 function createMemoryDocumentsRepository(): DocumentsRepository {
@@ -80,7 +93,9 @@ function createMemoryDocumentsRepository(): DocumentsRepository {
 
     async countPending(employeeId) {
       return docs.filter(
-        (d) => d.status === 'PENDING' && (!employeeId || d.employeeId === employeeId),
+        (d) =>
+          d.status === 'PENDING' &&
+          (!employeeId || d.employeeId === employeeId),
       ).length;
     },
   };
@@ -105,7 +120,7 @@ test('uploadDocument creates a pending document for valid files', async () => {
     size: 1024 * 500, // 500KB
     destination: '/uploads',
     filename: 'test.pdf',
-    path: '/uploads/test.pdf',
+    path: testPdf(),
     buffer: Buffer.from(''),
   } as Express.Multer.File;
 
@@ -193,7 +208,7 @@ test('HR Admin can review and verify pending documents', async () => {
     originalname: 'aadhaar.pdf',
     mimetype: 'application/pdf',
     size: 2048,
-    path: '/uploads/aadhaar.pdf',
+    path: testPdf(),
   } as Express.Multer.File;
 
   const uploaded = await service.uploadDocument(
@@ -246,24 +261,98 @@ test('Faculty can only see own documents, HR Admin sees all', async () => {
     originalname: 'doc.pdf',
     mimetype: 'application/pdf',
     size: 100,
-    path: '/tmp/doc.pdf',
+    path: testPdf(),
   } as Express.Multer.File;
 
   await service.uploadDocument(
     faculty1,
-    { category: 'ACADEMIC', documentType: 'Cert', title: 'Doc 1', expiryDate: null },
+    {
+      category: 'ACADEMIC',
+      documentType: 'Cert',
+      title: 'Doc 1',
+      expiryDate: null,
+    },
     file,
   );
   await service.uploadDocument(
     faculty2,
-    { category: 'IDENTITY', documentType: 'PAN', title: 'Doc 2', expiryDate: null },
+    {
+      category: 'IDENTITY',
+      documentType: 'PAN',
+      title: 'Doc 2',
+      expiryDate: null,
+    },
     file,
   );
 
-  const listFaculty1 = await service.listDocuments(faculty1, { page: 1, limit: 10 });
+  const listFaculty1 = await service.listDocuments(faculty1, {
+    page: 1,
+    limit: 10,
+  });
   assert.equal(listFaculty1.data.length, 1);
   assert.equal(listFaculty1.data[0].employeeId, 'emp-1');
 
   const listHr = await service.listDocuments(hrAdmin, { page: 1, limit: 10 });
   assert.equal(listHr.data.length, 2);
+});
+
+test('unlinked own scope cannot list or count another employee documents', async () => {
+  const service = createDocumentsService(createMemoryDocumentsRepository());
+  const access = {
+    userId: 'unlinked',
+    employeeId: null,
+    departmentId: null,
+    scope: 'own' as const,
+  };
+  await assert.rejects(
+    service.listDocuments(access, { page: 1, limit: 20 }),
+    (e: unknown) => e instanceof HttpError && e.status === 403,
+  );
+  await assert.rejects(
+    service.getPendingCount(access),
+    (e: unknown) => e instanceof HttpError && e.status === 403,
+  );
+});
+
+test('spoofed files are removed; uncertain persistence retains bytes to avoid losing a committed document', async () => {
+  const repo = createMemoryDocumentsRepository(),
+    access = {
+      userId: 'u',
+      employeeId: 'emp',
+      departmentId: 1,
+      scope: 'own' as const,
+    };
+  const metadata = {
+    category: 'OTHER' as const,
+    title: 'Test certificate',
+    documentType: 'Certificate',
+    expiryDate: null,
+  };
+  const bad = testPdf();
+  fs.writeFileSync(bad, '<html>unsafe</html>');
+  await assert.rejects(
+    createDocumentsService(repo).uploadDocument(access, metadata, {
+      path: bad,
+      originalname: 'certificate.pdf',
+      mimetype: 'application/pdf',
+      size: 19,
+    } as Express.Multer.File),
+  );
+  assert.equal(fs.existsSync(bad), false);
+  const good = testPdf();
+  await assert.rejects(
+    createDocumentsService({
+      ...repo,
+      create: async () => {
+        throw new Error('Database unavailable');
+      },
+    }).uploadDocument(access, metadata, {
+      path: good,
+      originalname: 'certificate.pdf',
+      mimetype: 'application/pdf',
+      size: 14,
+    } as Express.Multer.File),
+    (e: unknown) => e instanceof HttpError && e.status === 503,
+  );
+  assert.equal(fs.existsSync(good), true);
 });

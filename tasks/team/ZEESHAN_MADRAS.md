@@ -66,3 +66,12 @@ check-in), working hours and late rule, working days and holidays.
 Typecheck, lint, tests, build and formatting pass; endpoints documented in
 `backend/API_ENDPOINTS.md`; tasks ticked in `BACKEND_TASKS.md` /
 `FRONTEND_TASKS.md`; reviewed by Srujan.
+
+
+## IOS-010 API integration
+
+- [x] Session-owned Expo device registration/removal and transactional push outbox.
+- [x] Generic lock-screen payload, retry/receipt handling, invalid-token cleanup and ownership tests.
+- [ ] Configure approved project/provider credentials and verify real signed-iPhone delivery with Pranav (IOS-012 prerequisite).
+
+See [remote push configuration and acceptance](../../mobile/ios-docs/REMOTE_PUSH.md). Push remains disabled by default; no production migration or provider configuration was applied.

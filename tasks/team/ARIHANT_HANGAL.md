@@ -14,14 +14,14 @@ Each API comes from the website team. Until it exists, build the screen on
 sample data in `mobile/lib/sample/`, then switch to the API. Agree the data
 shape with the owner first, so the switch is small.
 
-## 1. Timetable — MB-004 · start now on sample data
+## 1. Timetable — MB-004 · live reads implemented
 
 API owner: Srujan (Timetable).
 
 - [x] Today: classes in order with time, subject, class section and room;
       current class highlighted
 - [x] Week: day-by-day view
-- [ ] Server-assigned substitute duties, dated and marked clearly (IOS-005/008); local demo exists
+- [x] Server-assigned substitute duties on their exact dates, shared with Home (IOS-005); assignment/undo UI remains IOS-008
 - [x] Pull to refresh; works with no classes (holiday, weekend)
 - [x] Switch to the Timetable API when it lands
 
@@ -30,19 +30,28 @@ API owner: Srujan (Timetable).
 API owner: Srujan (Leave).
 
 - [x] Balances by leave type
-- [x] Apply: type, dates (date pickers, minimal typing), half day if allowed,
+- [x] Apply: type, validated date entry with Today/Tomorrow shortcuts, half day if allowed,
       reason
 - [x] My requests with status and the next approver
 - [x] Cancel a pending request (with confirmation)
+- [x] Department-scoped HOD recommendations and rejection notes (IOS-007); [simulator evidence](../../mobile/ios-docs/LEAVE.md)
 
 ## 3. Attendance — MB-005 · after JCET attendance policy
 
 API owner: Zeeshan (Attendance).
 
-- [ ] Today's status (present, late, half day, absent, on leave)
-- [ ] Monthly history and attendance percentage
-- [ ] Check in and out from the app, if JCET chooses self check-in
-- [ ] Request a correction for a day
+- [x] Today's status (present, late, half day, absent, on leave)
+- [x] Own monthly history (IOS-006)
+- [ ] Attendance percentage needs an approved expected-working-days denominator; missing rows are not automatically absences
+- [x] Explicit MOBILE check-in/out where the account has permission; current UTC policy is labelled
+- [x] Request a correction and view own request/review status (IOS-006)
+
+## Substitution — MB-009 / IOS-008
+
+- [x] Server-approved leave/classes, candidate scores and eligibility
+- [x] Confirm assignment, no-substitute arrangements and undo through the API
+- [x] Preserve failed notes and reconcile unknown outcomes
+- [x] Simulator management and separate recipient-account timetable verification; [evidence](../../mobile/ios-docs/SUBSTITUTION.md)
 
 ## For every screen
 

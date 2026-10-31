@@ -18,6 +18,12 @@ import { useScope } from '@/features/auth/hooks/useCan';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { listDepartments } from '@/features/departments/api/departments';
 import {
+  getLeaveClasses,
+  listApprovedLeave,
+  listMyClasses,
+} from '@/features/substitution/api/substitution';
+import { MutualClassSwapCard } from '@/features/substitution/components/MutualClassSwapCard';
+import {
   listEntries,
   listPeriods,
   type Day,
@@ -25,7 +31,10 @@ import {
 } from '../api/timetable';
 import { EntryDialog, type EntryTarget } from '../components/EntryDialog';
 import { RoomsDialog, SubjectsDialog } from '../components/ReferenceDialogs';
-import { TimetableGrid } from '../components/TimetableGrid';
+import {
+  TimetableGrid,
+  type EntrySubstitution,
+} from '../components/TimetableGrid';
 
 const SEMESTERS = [1, 2, 3, 4, 5, 6, 7, 8];
 const SECTIONS = ['A', 'B', 'C', 'D'];
@@ -36,6 +45,7 @@ export default function TimetablePage() {
   const user = session.status === 'signedIn' ? session.user : undefined;
   const readScope = scopeOf('timetable.read');
   const manageScope = scopeOf('timetable.manage');
+  const subScope = scopeOf('substitution.read');
   // Faculty see their own classes across sections; others pick a class.
   const ownView = readScope === 'own';
 
@@ -70,6 +80,43 @@ export default function TimetablePage() {
     queryKey: ['timetable', 'entries', filters],
     queryFn: () => listEntries(filters),
     enabled: ownView || departmentId !== undefined,
+  });
+  const myDuties = useQuery({
+    queryKey: ['substitution', 'mine'],
+    queryFn: listMyClasses,
+    enabled: ownView && subScope !== null,
+  });
+  const deptSubstitutions = useQuery({
+    queryKey: ['substitution', 'timetable-coverage', departmentId],
+    enabled:
+      !ownView &&
+      subScope !== null &&
+      subScope !== 'own' &&
+      departmentId !== undefined,
+    queryFn: async () => {
+      const leaves = await listApprovedLeave();
+      const details = await Promise.all(
+        leaves
+          .filter((item) => item.leave.department.id === departmentId)
+          .map((item) => getLeaveClasses(item.leave.id)),
+      );
+      const map: Record<string, EntrySubstitution[]> = {};
+      for (const detail of details) {
+        for (const cls of detail.classes) {
+          if (!cls.coverage) continue;
+          const list = (map[cls.entry.id] ??= []);
+          list.push({
+            date: cls.date,
+            kind: cls.coverage.kind,
+            label:
+              cls.coverage.kind === 'SUBSTITUTE' && cls.coverage.substitute
+                ? `Sub: ${cls.coverage.substitute.name}`
+                : 'No sub needed',
+          });
+        }
+      }
+      return map;
+    },
   });
 
   function open(day: Day, period: number, entry?: Entry) {
@@ -218,8 +265,14 @@ export default function TimetablePage() {
             entries={entries.data ?? []}
             showClass={ownView}
             canManage={canManage}
+            substitutions={deptSubstitutions.data}
+            coveredDuties={myDuties.data}
             onAdd={(day, period) => open(day, period)}
             onOpen={(entry) => open(entry.day, entry.startPeriod, entry)}
+          />
+          <MutualClassSwapCard
+            canDecide={canManage}
+            currentUserName={user?.email ?? 'Faculty Member'}
           />
         </>
       )}
