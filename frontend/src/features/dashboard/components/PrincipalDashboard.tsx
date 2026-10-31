@@ -5,7 +5,6 @@ import {
   Users,
   GraduationCap,
   CheckCircle2,
-  Clock,
   ArrowRight,
   ArrowUpRight,
   CheckCheck,
@@ -35,6 +34,7 @@ import { PunchCard } from '@/features/attendance/components/PunchCard';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useReportsSummary } from '@/features/reports/api/reports';
 import { useLeaveWaiting } from '@/features/leave/hooks/useLeaveWaiting';
+import { listWorkload } from '@/features/workload/api/workload';
 import { listDepartments } from '@/features/departments/api/departments';
 
 export function PrincipalDashboard() {
@@ -51,134 +51,75 @@ export function PrincipalDashboard() {
   });
   const departments = departmentsQuery.data ?? [];
 
-  // Principal Name fallback
+  const workloadQuery = useQuery({
+    queryKey: ['workload', 'department'],
+    queryFn: () => listWorkload(),
+  });
   const principalDisplayName =
-    user?.email === 'principal@jcethbl.edu.in'
-      ? 'Dr. Suresh Patil'
-      : user?.email
-        ? user.email
-            .split('@')[0]
-            .split('.')
-            .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-            .join(' ')
-        : 'Principal';
-
-  // Fallback computations using live summary if available or institutional benchmarks
-  const totalEmployees =
-    summary?.headcount?.total && summary.headcount.total > 10
-      ? summary.headcount.total
-      : 186;
-  const teachingStaff =
-    summary?.headcount?.teaching && summary.headcount.teaching > 10
-      ? summary.headcount.teaching
-      : 136;
-  const nonTeachingStaff =
-    summary?.headcount?.nonTeaching && summary.headcount.nonTeaching > 10
-      ? summary.headcount.nonTeaching
-      : 50;
-  const doctoratesCount =
-    summary?.headcount?.doctorates && summary.headcount.doctorates > 0
-      ? summary.headcount.doctorates
-      : 38;
-  const doctoratePercentage = Math.round((doctoratesCount / (teachingStaff || 1)) * 100);
-
-  const attendanceRate =
-    summary?.attendance?.todayRate && summary.attendance.todayRate > 0
-      ? summary.attendance.todayRate
-      : 95.5;
-  const presentCount =
-    summary?.attendance?.present && summary.attendance.present > 0
-      ? summary.attendance.present
-      : 176;
-  const onLeaveCount =
-    summary?.attendance?.onLeave && summary.attendance.onLeave > 0
-      ? summary.attendance.onLeave
-      : 8;
-
-  const workloadCompliance =
-    summary?.workload?.normalLoadPercentage && summary.workload.normalLoadPercentage > 0
-      ? summary.workload.normalLoadPercentage
-      : 92.4;
-
-  // Department Health Matrix benchmark items
-  const departmentHealthMatrix = [
-    {
-      code: 'CSE',
-      name: 'Computer Science & Engineering',
-      facultyCount: 26,
-      attendanceRate: 96.2,
-      workloadCompliance: 94.0,
-      phdCount: 8,
-      status: 'Optimal',
-      statusVariant: 'success' as const,
-    },
-    {
-      code: 'ECE',
-      name: 'Electronics & Communication',
-      facultyCount: 24,
-      attendanceRate: 95.0,
-      workloadCompliance: 91.5,
-      phdCount: 7,
-      status: 'Optimal',
-      statusVariant: 'success' as const,
-    },
-    {
-      code: 'ME',
-      name: 'Mechanical Engineering',
-      facultyCount: 22,
-      attendanceRate: 94.8,
-      workloadCompliance: 89.5,
-      phdCount: 6,
-      status: 'Monitoring',
-      statusVariant: 'warning' as const,
-    },
-    {
-      code: 'CE',
-      name: 'Civil Engineering',
-      facultyCount: 20,
-      attendanceRate: 96.5,
-      workloadCompliance: 93.2,
-      phdCount: 5,
-      status: 'Optimal',
-      statusVariant: 'success' as const,
-    },
-    {
-      code: 'AIML',
-      name: 'Artificial Intelligence & ML',
-      facultyCount: 18,
-      attendanceRate: 97.1,
-      workloadCompliance: 95.8,
-      phdCount: 6,
-      status: 'Optimal',
-      statusVariant: 'success' as const,
-    },
-    {
-      code: 'MBA',
-      name: 'Management Studies',
-      facultyCount: 16,
-      attendanceRate: 94.2,
-      workloadCompliance: 90.0,
-      phdCount: 4,
-      status: 'Optimal',
-      statusVariant: 'success' as const,
-    },
-  ];
-
-  // Cadre Breakdown
-  const cadre =
-    summary?.headcount?.cadre?.professors && summary.headcount.cadre.professors > 5
-      ? summary.headcount.cadre
-      : {
-          professors: 18,
-          associateProfessors: 32,
-          assistantProfessors: 86,
-          others: 50,
-        };
+    user?.email?.split('@')[0].replaceAll('.', ' ') ?? 'Principal';
+  const totalEmployees = summary?.headcount.total ?? 0;
+  const teachingStaff = summary?.headcount.teaching ?? 0;
+  const nonTeachingStaff = summary?.headcount.nonTeaching ?? 0;
+  const doctoratesCount = summary?.headcount.doctorates ?? 0;
+  const doctoratePercentage = teachingStaff
+    ? Math.round((doctoratesCount / teachingStaff) * 100)
+    : 0;
+  const attendanceRate = summary?.attendance.todayRate ?? 0;
+  const presentCount = summary?.attendance.present ?? 0;
+  const onLeaveCount = summary?.attendance.onLeave ?? 0;
+  const workloadCompliance = summary?.workload.normalLoadPercentage ?? 0;
+  const departmentHealthMatrix = departments.map((department) => {
+    const faculty = (workloadQuery.data ?? []).filter(
+      (row) =>
+        row.faculty.department.id === department.id && row.status !== null,
+    );
+    return {
+      code: department.code,
+      name: department.name,
+      facultyCount: department.staff.teaching,
+      attendanceRate:
+        summary?.attendance.departmentAverages.find(
+          (row) => row.department === department.code,
+        )?.rate ?? 0,
+      workloadCompliance:
+        workloadQuery.isSuccess && faculty.length
+          ? `${Math.round((faculty.filter((row) => row.status === 'NORMAL').length / faculty.length) * 100)}%`
+          : '—',
+    };
+  });
+  const cadre = summary?.headcount.cadre ?? {
+    professors: 0,
+    associateProfessors: 0,
+    assistantProfessors: 0,
+    others: 0,
+  };
+  if (executiveSummaryQuery.isPending)
+    return <p role="status">Loading campus summary…</p>;
+  if (executiveSummaryQuery.isError)
+    return (
+      <div role="alert">
+        Campus summary unavailable.{' '}
+        <Button onClick={() => void executiveSummaryQuery.refetch()}>
+          Retry
+        </Button>
+      </div>
+    );
 
   return (
     <div className="space-y-6">
+      {(departmentsQuery.isError ||
+        workloadQuery.isError ||
+        leaveWaitingQuery.isError) && (
+        <p role="alert">
+          Some department, workload or approval data could not be loaded.
+          Refresh the page to retry.
+        </p>
+      )}
       {/* 1. Principal Executive Welcome Banner */}
-      <section className="welcome-banner" aria-labelledby="principal-welcome-title">
+      <section
+        className="welcome-banner"
+        aria-labelledby="principal-welcome-title"
+      >
         <div>
           <span className="inline-flex w-fit items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/15 text-white backdrop-blur-sm mb-2 border border-white/20">
             <ShieldCheck className="w-3.5 h-3.5 text-secondary" />
@@ -187,8 +128,8 @@ export function PrincipalDashboard() {
           <h2 id="principal-welcome-title">Welcome, {principalDisplayName}</h2>
           <p>Principal & Academic Head · JCET Hubballi</p>
           <span>
-            Institutional Governance <b>•</b> AY 2025–26 <b>•</b> 6 Departments <b>•</b>{' '}
-            {totalEmployees} Campus Staff <b>•</b> AICTE & VTU Accredited
+            Institutional Governance <b>•</b> {departments.length} Departments{' '}
+            <b>•</b> {totalEmployees} Campus Staff
           </span>
         </div>
         <img
@@ -203,7 +144,10 @@ export function PrincipalDashboard() {
       <PunchCard />
 
       {/* 3. Institutional KPI Metrics Grid */}
-      <section aria-label="Campus Key Performance Indicators" className="metrics-grid">
+      <section
+        aria-label="Campus Key Performance Indicators"
+        className="metrics-grid"
+      >
         <MetricCard
           label="Campus Attendance Today"
           value={`${attendanceRate}%`}
@@ -215,15 +159,15 @@ export function PrincipalDashboard() {
         <MetricCard
           label="Faculty Workload Compliance"
           value={`${workloadCompliance}%`}
-          detail="Compliant within AICTE 14–18h teaching bands"
+          detail="Faculty within their configured workload bands"
           icon={BarChart3}
           index={1}
           href="/workload"
         />
         <MetricCard
-          label="Accredited Programs"
-          value="6 / 6 NBA & AICTE"
-          detail="All engineering & MBA departments accredited"
+          label="Teaching Staff"
+          value={teachingStaff}
+          detail="Active teaching employees"
           icon={Award}
           index={2}
           href="/departments"
@@ -246,8 +190,8 @@ export function PrincipalDashboard() {
         />
         <MetricCard
           label="Academic Departments"
-          value={`${departments.length > 0 ? departments.length : 6} Active`}
-          detail="CSE, ECE, ME, CE, AIML, MBA departments"
+          value={`${departments.length} Active`}
+          detail="Departments registered in CampusHR"
           icon={Building2}
           index={5}
           href="/departments"
@@ -269,12 +213,12 @@ export function PrincipalDashboard() {
                     Department Academic & Attendance Matrix
                   </CardTitle>
                   <CardDescription>
-                    Real-time cross-departmental operations and AICTE compliance
+                    Recorded attendance and configured workload bands
                   </CardDescription>
                 </div>
               </div>
               <Badge variant="outline" className="text-xs">
-                AY 2025–26
+                Current records
               </Badge>
             </div>
           </CardHeader>
@@ -287,15 +231,22 @@ export function PrincipalDashboard() {
                     <th className="py-2.5 px-3 w-20 text-center">Faculty</th>
                     <th className="py-2.5 px-3 w-24 text-center">Attendance</th>
                     <th className="py-2.5 px-3 w-28 text-center">Workload</th>
-                    <th className="py-2.5 px-3 text-right">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
                   {departmentHealthMatrix.map((dept) => (
-                    <tr key={dept.code} className="hover:bg-muted/40 transition-colors">
+                    <tr
+                      key={dept.code}
+                      className="hover:bg-muted/40 transition-colors"
+                    >
                       <td className="py-2.5 px-3 font-medium text-foreground">
-                        <div className="font-semibold text-primary">{dept.code}</div>
-                        <div className="text-xs text-muted-foreground truncate" title={dept.name}>
+                        <div className="font-semibold text-primary">
+                          {dept.code}
+                        </div>
+                        <div
+                          className="text-xs text-muted-foreground truncate"
+                          title={dept.name}
+                        >
                           {dept.name}
                         </div>
                       </td>
@@ -309,23 +260,7 @@ export function PrincipalDashboard() {
                       </td>
                       <td className="py-2.5 px-3 text-center">
                         <span className="font-mono font-medium text-foreground">
-                          {dept.workloadCompliance}%
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                            dept.statusVariant === 'success'
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                          }`}
-                        >
-                          {dept.statusVariant === 'success' ? (
-                            <CheckCircle2 className="w-3 h-3" />
-                          ) : (
-                            <Clock className="w-3 h-3" />
-                          )}
-                          {dept.status}
+                          {dept.workloadCompliance}
                         </span>
                       </td>
                     </tr>
@@ -336,9 +271,14 @@ export function PrincipalDashboard() {
           </CardContent>
           <CardFooter className="mt-auto pt-3 border-t border-border/40 flex items-center justify-between">
             <span className="text-xs text-muted-foreground">
-              6 of 6 departments fully operational
+              {departments.length} registered departments
             </span>
-            <Button variant="ghost" size="sm" asChild className="gap-1.5 text-xs text-primary">
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="gap-1.5 text-xs text-primary"
+            >
               <Link to="/reports">
                 View Detailed Reports
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -360,7 +300,8 @@ export function PrincipalDashboard() {
                     Executive Governance & Sign-Offs
                   </CardTitle>
                   <CardDescription>
-                    Leaves requiring Principal sanction & institutional compliance
+                    Leaves requiring Principal sanction & institutional
+                    compliance
                   </CardDescription>
                 </div>
               </div>
@@ -382,16 +323,26 @@ export function PrincipalDashboard() {
                         <span className="font-semibold text-sm text-foreground truncate">
                           {leave.employee?.name}
                         </span>
-                        <Badge variant="outline" className="text-xs uppercase font-mono">
+                        <Badge
+                          variant="outline"
+                          className="text-xs uppercase font-mono"
+                        >
                           {leave.leaveType?.name ?? 'Leave'}
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {leave.startDate} to {leave.endDate} •{' '}
-                        <span className="font-medium text-foreground">{leave.days} day(s)</span>
+                        <span className="font-medium text-foreground">
+                          {leave.days} day(s)
+                        </span>
                       </p>
                     </div>
-                    <Button variant="outline" size="sm" asChild className="text-xs gap-1 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className="text-xs gap-1 shrink-0"
+                    >
                       <Link to="/leave">Review</Link>
                     </Button>
                   </div>
@@ -404,7 +355,8 @@ export function PrincipalDashboard() {
                   All Executive Leaves Up to Date
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  No pending institutional leave requests currently awaiting Principal review.
+                  No pending institutional leave requests currently awaiting
+                  Principal review.
                 </p>
               </div>
             )}
@@ -414,9 +366,12 @@ export function PrincipalDashboard() {
               <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-3">
                 <BookOpen className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                 <div className="text-xs space-y-0.5">
-                  <p className="font-semibold text-primary">AICTE Faculty-Student Ratio</p>
+                  <p className="font-semibold text-primary">
+                    AICTE Faculty-Student Ratio
+                  </p>
                   <p className="text-muted-foreground">
-                    Engineering programs compliant with 1:15 ratio standard (JCET current: 1:14.2).
+                    Student counts are not recorded here. Faculty-student ratios
+                    require an institutional review.
                   </p>
                 </div>
               </div>
@@ -428,7 +383,8 @@ export function PrincipalDashboard() {
                     Accreditation & Governance Status
                   </p>
                   <p className="text-muted-foreground">
-                    All 6 engineering & management programs meet VTU academic governance guidelines.
+                    Accreditation status requires an institutional review; it is
+                    not calculated from staff records.
                   </p>
                 </div>
               </div>
@@ -438,7 +394,12 @@ export function PrincipalDashboard() {
             <span className="text-xs text-muted-foreground">
               Principal has final sign-off authority
             </span>
-            <Button variant="ghost" size="sm" asChild className="gap-1.5 text-xs text-primary">
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="gap-1.5 text-xs text-primary"
+            >
               <Link to="/leave">
                 Manage All Approvals
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -463,7 +424,8 @@ export function PrincipalDashboard() {
                     Teaching Cadre & Research Distribution
                   </CardTitle>
                   <CardDescription>
-                    Cadre proportion across {teachingStaff} academic teaching staff
+                    Cadre proportion across {teachingStaff} academic teaching
+                    staff
                   </CardDescription>
                 </div>
               </div>
@@ -479,7 +441,7 @@ export function PrincipalDashboard() {
                 <div className="flex justify-between text-xs font-medium mb-1">
                   <span className="text-foreground">Professors</span>
                   <span className="text-muted-foreground font-mono">
-                    {cadre.professors} faculty (100% Ph.D)
+                    {cadre.professors} faculty
                   </span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
@@ -497,7 +459,7 @@ export function PrincipalDashboard() {
                 <div className="flex justify-between text-xs font-medium mb-1">
                   <span className="text-foreground">Associate Professors</span>
                   <span className="text-muted-foreground font-mono">
-                    {cadre.associateProfessors} faculty (50% Ph.D)
+                    {cadre.associateProfessors} faculty
                   </span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
@@ -515,7 +477,7 @@ export function PrincipalDashboard() {
                 <div className="flex justify-between text-xs font-medium mb-1">
                   <span className="text-foreground">Assistant Professors</span>
                   <span className="text-muted-foreground font-mono">
-                    {cadre.assistantProfessors} faculty (12% Ph.D, 45% pursuing)
+                    {cadre.assistantProfessors} faculty
                   </span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
@@ -530,7 +492,9 @@ export function PrincipalDashboard() {
             </div>
 
             <div className="pt-2 p-3 rounded-lg bg-muted/40 border border-border/60 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Non-Teaching Support Cadre:</span>
+              <span className="text-muted-foreground">
+                Non-Teaching Support Cadre:
+              </span>
               <span className="font-semibold text-foreground font-mono">
                 {nonTeachingStaff} staff across campus
               </span>
@@ -538,9 +502,14 @@ export function PrincipalDashboard() {
           </CardContent>
           <CardFooter className="mt-auto pt-3 border-t border-border/40 flex items-center justify-between">
             <span className="text-xs text-muted-foreground">
-              Cadre Ratio: 1 Prof : 2 Assoc : 6 Asst
+              Active employee designation counts
             </span>
-            <Button variant="ghost" size="sm" asChild className="gap-1.5 text-xs text-primary">
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="gap-1.5 text-xs text-primary"
+            >
               <Link to="/employees">
                 View Faculty Directory
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -598,7 +567,10 @@ export function PrincipalDashboard() {
                 <ArrowUpRight data-icon="inline-end" />
               </Button>
 
-              <Button variant="ghost" onClick={() => navigate('/notifications')}>
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/notifications')}
+              >
                 <Send data-icon="inline-start" />
                 <span>Campus-Wide Broadcast</span>
                 <ArrowUpRight data-icon="inline-end" />
@@ -609,7 +581,9 @@ export function PrincipalDashboard() {
             <span className="text-xs text-muted-foreground">
               Institutional executive controls
             </span>
-            <span className="text-xs font-mono text-muted-foreground">JCET E265</span>
+            <span className="text-xs font-mono text-muted-foreground">
+              JCET E265
+            </span>
           </CardFooter>
         </Card>
       </div>

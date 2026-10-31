@@ -1,0 +1,29 @@
+{
+  "verifiedAt": "2026-10-24T11:47:25.425Z",
+  "date": "2026-11-23",
+  "leaveId": "689d3716-d42d-41f4-85ca-a302c34f352c",
+  "assignments": [
+    "693c560e-c067-4970-a4be-fdd0d26100db",
+    "382e6927-66ec-4265-9f16-0faf631d3744"
+  ],
+  "employeeId": "23458c32-261f-4270-95da-b8b9329e71ad",
+  "substituteId": "dc76ba9b-69db-4cf7-ba50-fc88e2ac0e46",
+  "balance": {
+    "leaveType": {
+      "id": 1,
+      "code": "CL",
+      "name": "Casual Leave"
+    },
+    "active": true,
+    "year": 2026,
+    "entitled": 15,
+    "carriedIn": 0,
+    "used": 3,
+    "pending": 0,
+    "remaining": 12
+  },
+  "expectedRoles": [
+    "HOD",
+    "HR Admin"
+  ]
+}

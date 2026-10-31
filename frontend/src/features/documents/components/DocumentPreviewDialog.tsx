@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -5,10 +6,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Download, ExternalLink, FileText, CheckCircle2, XCircle, Clock } from 'lucide-react';
-import { DOCUMENT_CATEGORY_MAP, type DocumentItem } from '../api/documents';
-
+import { useSession } from '@/features/auth/hooks/useSession';
+import { documentBlob, type DocumentItem } from '../api/documents';
 export function DocumentPreviewDialog({
   document,
   open,
@@ -18,123 +17,81 @@ export function DocumentPreviewDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  if (!document) return null;
-
-  const isPdf = document.mimeType === 'application/pdf';
-  const isImage = document.mimeType.startsWith('image/');
-  const fullFileUrl = `${import.meta.env.VITE_API_URL}${document.fileUrl}`;
-
+  const id = document?.id;
+  const session = useSession();
+  const userId = session.status === 'signedIn' ? session.user.id : null;
+  const [retry, setRetry] = useState(0);
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-6">
-        <DialogHeader className="flex flex-row items-center justify-between border-b pb-3 pr-6">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-600" />
-              <DialogTitle className="text-lg font-bold">{document.title}</DialogTitle>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {document.documentType} · {DOCUMENT_CATEGORY_MAP[document.category]} · Uploaded by{' '}
-              <span className="font-medium text-foreground">
-                {document.employee.firstName} {document.employee.lastName} (
-                {document.employee.employeeCode})
-              </span>
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {document.status === 'VERIFIED' && (
-              <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Verified
-              </Badge>
-            )}
-            {document.status === 'PENDING' && (
-              <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-50 gap-1">
-                <Clock className="h-3.5 w-3.5" />
-                Pending Review
-              </Badge>
-            )}
-            {document.status === 'REJECTED' && (
-              <Badge variant="destructive" className="gap-1">
-                <XCircle className="h-3.5 w-3.5" />
-                Rejected
-              </Badge>
-            )}
-
-            <Button
-              size="sm"
-              variant="outline"
-              asChild
-            >
-              <a href={fullFileUrl} target="_blank" rel="noopener noreferrer" download>
-                <Download className="h-4 w-4 mr-1.5" />
-                Download
-              </a>
-            </Button>
-          </div>
+    <Dialog open={open && !!userId} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{document?.title ?? 'Document preview'}</DialogTitle>
         </DialogHeader>
-
-        {/* Rejection / Verification Note Callout */}
-        {document.reviewNote && (
-          <div
-            className={`p-3 rounded-lg text-sm my-2 ${
-              document.status === 'REJECTED'
-                ? 'bg-rose-50 text-rose-800 border border-rose-200'
-                : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-            }`}
-          >
-            <span className="font-semibold">
-              {document.status === 'REJECTED' ? 'HR Rejection Reason: ' : 'HR Note: '}
-            </span>
-            {document.reviewNote}
-          </div>
+        {open && id && userId && (
+          <Preview
+            key={`${userId}:${id}:${retry}`}
+            id={id}
+            title={document?.title ?? 'Document'}
+            onRetry={() => setRetry((value) => value + 1)}
+          />
         )}
-
-        {/* Document Viewer Frame */}
-        <div className="flex-1 w-full min-h-[480px] bg-slate-100 rounded-md overflow-hidden border my-2 flex items-center justify-center">
-          {isPdf ? (
-            <iframe
-              src={fullFileUrl}
-              className="w-full h-full min-h-[480px] border-0"
-              title={document.title}
-            />
-          ) : isImage ? (
-            <div className="max-h-[500px] overflow-auto p-4 flex items-center justify-center">
-              <img
-                src={fullFileUrl}
-                alt={document.title}
-                className="max-w-full max-h-[480px] object-contain rounded shadow"
-              />
-            </div>
-          ) : (
-            <div className="text-center p-8 space-y-3">
-              <FileText className="h-12 w-12 text-slate-400 mx-auto" />
-              <p className="text-sm text-muted-foreground">
-                Preview not directly available in-browser for this format ({document.mimeType}).
-              </p>
-              <Button asChild>
-                <a href={fullFileUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4 mr-1.5" />
-                  Open in New Tab
-                </a>
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* Footer Meta */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-          <span>
-            File: {document.fileName} ({(document.fileSize / (1024 * 1024)).toFixed(2)} MB)
-          </span>
-          {document.expiryDate && (
-            <span className="font-medium text-amber-700">
-              Expires: {new Date(document.expiryDate).toLocaleDateString()}
-            </span>
-          )}
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Preview requires your current document permissions. Close this window
+          to release the preview.
+        </p>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function Preview({
+  id,
+  title,
+  onRetry,
+}: {
+  id: string;
+  title: string;
+  onRetry: () => void;
+}) {
+  const [preview, setPreview] = useState<{ url: string; mime: string } | null>(
+    null,
+  );
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    let active = true,
+      url: string | undefined;
+    void documentBlob(id)
+      .then((blob) => {
+        if (!active) return;
+        url = URL.createObjectURL(blob);
+        setPreview({ url, mime: blob.type });
+      })
+      .catch(() => {
+        if (active) setError(true);
+      });
+    return () => {
+      active = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [id]);
+  return (
+    <>
+      {error ? (
+        <div role="alert">
+          Document could not be loaded.{' '}
+          <Button onClick={() => onRetry()}>Retry preview</Button>
+        </div>
+      ) : !preview ? (
+        <p role="status">Loading protected document…</p>
+      ) : preview.mime === 'application/pdf' ? (
+        <iframe title={title} src={preview.url} className="w-full min-h-96" />
+      ) : (
+        <img
+          src={preview.url}
+          alt={title}
+          className="w-full max-h-96 object-contain"
+        />
+      )}
+    </>
   );
 }

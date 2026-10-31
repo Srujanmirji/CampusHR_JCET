@@ -1,0 +1,28 @@
+{
+  "cli": {
+    "version": ">= 25.3.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "staging": {
+      "distribution": "internal",
+      "developmentClient": false,
+      "environment": "preview",
+      "autoIncrement": true,
+      "env": {
+        "APP_VARIANT": "staging"
+      },
+      "ios": {
+        "buildConfiguration": "Release",
+        "simulator": false
+      }
+    },
+    "staging-simulator": {
+      "extends": "staging",
+      "autoIncrement": false,
+      "ios": {
+        "simulator": true
+      }
+    }
+  }
+}

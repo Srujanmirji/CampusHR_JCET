@@ -1,3 +1,12 @@
+import { countLeaveDays } from '../leave/leave.rules.js';
+import {
+  inHalf,
+  isoDate,
+  leaveDates,
+  toDate,
+  weekdayOf,
+} from '../substitution/substitution.rules.js';
+import { weeklyHours } from '../workload/workload.calc.js';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 
 export interface ReportsRepository {
@@ -26,7 +35,13 @@ export interface ReportsRepository {
     leave: {
       monthlyLeaveDays: number;
       activeLeavesToday: number;
-      monthlyTrends: { month: string; CL: number; ML: number; EL: number; other: number }[];
+      monthlyTrends: {
+        month: string;
+        CL: number;
+        ML: number;
+        EL: number;
+        other: number;
+      }[];
     };
     continuity: {
       affectedClasses: number;
@@ -84,9 +99,7 @@ export interface ReportsRepository {
     }[];
   }>;
 
-  getWorkloadReport(params: {
-    departmentId?: number;
-  }): Promise<{
+  getWorkloadReport(params: { departmentId?: number }): Promise<{
     summary: { normal: number; overload: number; underload: number };
     records: {
       facultyId: string;
@@ -97,9 +110,9 @@ export interface ReportsRepository {
       theoryHours: number;
       labHours: number;
       totalHours: number;
-      minThreshold: number;
-      maxThreshold: number;
-      status: 'NORMAL' | 'OVERLOAD' | 'UNDERLOAD';
+      minThreshold: number | null;
+      maxThreshold: number | null;
+      status: 'NORMAL' | 'OVERLOAD' | 'UNDERLOAD' | 'UNCONFIGURED';
     }[];
   }>;
 
@@ -128,7 +141,9 @@ export interface ReportsRepository {
   }>;
 }
 
-export function createReportsRepository(prisma: PrismaClient): ReportsRepository {
+export function createReportsRepository(
+  prisma: PrismaClient,
+): ReportsRepository {
   return {
     async getExecutiveSummary(departmentId) {
       const empWhere = {
@@ -161,7 +176,12 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
         }
 
         const qual = (emp.qualification || '').toUpperCase();
-        if (qual.includes('PH.D') || qual.includes('PHD') || qual.includes('DOCTOR')) {
+        if (
+          emp.designation.category === 'TEACHING' &&
+          (qual.includes('PH.D') ||
+            qual.includes('PHD') ||
+            qual === 'DOCTORATE')
+        ) {
           doctorates++;
         }
 
@@ -184,7 +204,10 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
       const attendanceToday = await prisma.attendance.findMany({
         where: {
           date: todayStart,
-          ...(departmentId ? { employee: { departmentId } } : {}),
+          employee: {
+            status: 'ACTIVE',
+            ...(departmentId ? { departmentId } : {}),
+          },
         },
         include: { employee: true },
       });
@@ -193,6 +216,7 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
       let absentCount = 0;
       let lateCount = 0;
       let onLeaveCount = 0;
+      let halfDayCount = 0;
 
       for (const att of attendanceToday) {
         if (att.status === 'PRESENT') presentCount++;
@@ -201,16 +225,29 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
           lateCount++;
         } else if (att.status === 'ABSENT') absentCount++;
         else if (att.status === 'ON_LEAVE') onLeaveCount++;
+        else if (att.status === 'HALF_DAY') halfDayCount++;
       }
 
       const totalToday = attendanceToday.length;
-      const todayRate = totalToday > 0 ? Math.round((presentCount / totalToday) * 1000) / 10 : 94.2;
+      const todayRate =
+        totalToday > 0
+          ? Math.round(
+              ((presentCount + halfDayCount * 0.5) / totalToday) * 1000,
+            ) / 10
+          : 0;
 
       // Department attendance averages
-      const deptAttendanceMap = new Map<number, { present: number; total: number; name: string }>();
+      const deptAttendanceMap = new Map<
+        number,
+        { present: number; total: number; name: string }
+      >();
       for (const dept of departments) {
         if (!departmentId || dept.id === departmentId) {
-          deptAttendanceMap.set(dept.id, { present: 0, total: 0, name: dept.code });
+          deptAttendanceMap.set(dept.id, {
+            present: 0,
+            total: 0,
+            name: dept.code,
+          });
         }
       }
 
@@ -220,31 +257,68 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
           item.total++;
           if (att.status === 'PRESENT' || att.status === 'LATE') {
             item.present++;
-          }
+          } else if (att.status === 'HALF_DAY') item.present += 0.5;
         }
       }
 
-      const departmentAverages = Array.from(deptAttendanceMap.values()).map((d) => ({
-        department: d.name,
-        rate: d.total > 0 ? Math.round((d.present / d.total) * 1000) / 10 : 92.5,
-      }));
+      const departmentAverages = Array.from(deptAttendanceMap.values()).map(
+        (d) => ({
+          department: d.name,
+          rate: d.total > 0 ? Math.round((d.present / d.total) * 1000) / 10 : 0,
+        }),
+      );
 
       // Monthly leave metrics
       const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const firstDayOfMonth = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+      );
+      const nextMonth = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+      );
+      const trendStart = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 3, 1),
+      );
       const monthlyLeaves = await prisma.leaveRequest.findMany({
         where: {
           status: 'APPROVED',
-          startDate: { gte: firstDayOfMonth },
+          startDate: { lt: nextMonth },
+          endDate: { gte: trendStart },
           ...(departmentId ? { departmentId } : {}),
         },
         include: { leaveType: true },
       });
-
-      let monthlyLeaveDays = 0;
-      for (const l of monthlyLeaves) {
-        monthlyLeaveDays += Number(l.days) || 1;
-      }
+      const monthlyTrends = Array.from({ length: 4 }, (_, index) => {
+        const start = new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 3 + index, 1),
+        );
+        const end = new Date(
+          Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0),
+        );
+        const totals = { CL: 0, ML: 0, EL: 0, other: 0 };
+        for (const leave of monthlyLeaves) {
+          const from = new Date(
+            Math.max(start.getTime(), leave.startDate.getTime()),
+          );
+          const to = new Date(Math.min(end.getTime(), leave.endDate.getTime()));
+          if (from > to) continue;
+          const code = leave.leaveType.code.toUpperCase();
+          const key =
+            code === 'CL' || code === 'ML' || code === 'EL' ? code : 'other';
+          totals[key] += countLeaveDays(from, to, leave.halfDay !== null);
+        }
+        return {
+          month: start.toLocaleDateString('en-GB', {
+            month: 'short',
+            year: 'numeric',
+            timeZone: 'UTC',
+          }),
+          ...totals,
+        };
+      });
+      const current = monthlyTrends[3]!;
+      const monthlyLeaveDays =
+        current.CL + current.ML + current.EL + current.other;
 
       const activeLeavesToday = await prisma.leaveRequest.count({
         where: {
@@ -255,28 +329,23 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
         },
       });
 
-      // Monthly Trends (Mock/Derived for last 4 months)
-      const months = ['Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026'];
-      const monthlyTrends = months.map((m, idx) => ({
-        month: m,
-        CL: idx === 3 ? Math.max(monthlyLeaveDays - 12, 14) : 18 + idx * 2,
-        ML: 6 + idx,
-        EL: 4 + (idx % 2),
-        other: 2,
-      }));
-
-      // Academic continuity
-      const substitutions = await prisma.substitution.findMany({
-        where: {
-          date: { gte: firstDayOfMonth },
-          ...(departmentId ? { timetableEntry: { departmentId } } : {}),
-        },
-      });
-
-      const affectedClasses = Math.max(substitutions.length, 18);
-      const classesCovered = substitutions.filter((s) => s.substituteId !== null || s.kind === 'NOT_NEEDED').length || 17;
-      const coverageRate = affectedClasses > 0 ? Math.round((classesCovered / affectedClasses) * 100) : 94;
-      const uncoveredClasses = Math.max(affectedClasses - classesCovered, 1);
+      const [continuity, workload] = await Promise.all([
+        this.getContinuityReport({
+          from: isoDate(firstDayOfMonth),
+          to: isoDate(new Date(nextMonth.getTime() - 86400000)),
+          departmentId,
+        }),
+        this.getWorkloadReport({ departmentId }),
+      ]);
+      const {
+        totalImpacted: affectedClasses,
+        covered: classesCovered,
+        uncovered: uncoveredClasses,
+        coverageRate,
+      } = continuity.summary;
+      const totalAudited = workload.records.filter(
+        (row) => row.status !== 'UNCONFIGURED',
+      ).length;
 
       return {
         headcount: {
@@ -293,20 +362,15 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
         },
         attendance: {
           todayRate,
-          present: presentCount || Math.round(total * 0.92),
-          absent: absentCount || Math.round(total * 0.05),
-          late: lateCount || Math.round(total * 0.03),
-          onLeave: onLeaveCount || activeLeavesToday,
-          totalToday: totalToday || total,
-          departmentAverages: departmentAverages.length ? departmentAverages : [
-            { department: 'CSE', rate: 95.2 },
-            { department: 'ECE', rate: 93.8 },
-            { department: 'MECH', rate: 91.5 },
-            { department: 'CIVIL', rate: 94.0 },
-          ],
+          present: presentCount,
+          absent: absentCount,
+          late: lateCount,
+          onLeave: onLeaveCount,
+          totalToday,
+          departmentAverages,
         },
         leave: {
-          monthlyLeaveDays: monthlyLeaveDays || 38,
+          monthlyLeaveDays,
           activeLeavesToday,
           monthlyTrends,
         },
@@ -317,8 +381,10 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
           uncoveredClasses,
         },
         workload: {
-          normalLoadPercentage: 81.8,
-          totalAudited: teaching || 45,
+          normalLoadPercentage: totalAudited
+            ? Math.round((workload.summary.normal / totalAudited) * 1000) / 10
+            : 0,
+          totalAudited,
         },
       };
     },
@@ -337,7 +403,9 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
           department: true,
           designation: true,
           attendance: {
-            where: Object.keys(dateFilter).length ? { date: dateFilter } : undefined,
+            where: Object.keys(dateFilter).length
+              ? { date: dateFilter }
+              : undefined,
           },
         },
         orderBy: [{ department: { name: 'asc' } }, { employeeCode: 'asc' }],
@@ -362,9 +430,10 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
         const totalRecorded = emp.attendance.length;
         // Count half day as 0.5, present and late as 1.0
         const effectivePresent = present + late + halfDay * 0.5;
-        const attendanceRate = totalRecorded > 0
-          ? Math.round((effectivePresent / totalRecorded) * 1000) / 10
-          : 100;
+        const attendanceRate =
+          totalRecorded > 0
+            ? Math.round((effectivePresent / totalRecorded) * 1000) / 10
+            : 0;
 
         totalRateSum += attendanceRate;
 
@@ -384,7 +453,9 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
         };
       });
 
-      const averageRate = records.length ? Math.round((totalRateSum / records.length) * 10) / 10 : 0;
+      const averageRate = records.length
+        ? Math.round((totalRateSum / records.length) * 10) / 10
+        : 0;
 
       return {
         summary: {
@@ -412,7 +483,16 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
             leaveRequests: {
               where: {
                 status: 'APPROVED',
-                ...(Object.keys(dateFilter).length ? { startDate: dateFilter } : {}),
+                ...(Object.keys(dateFilter).length
+                  ? {
+                      ...(dateFilter.lte
+                        ? { startDate: { lte: dateFilter.lte } }
+                        : {}),
+                      ...(dateFilter.gte
+                        ? { endDate: { gte: dateFilter.gte } }
+                        : {}),
+                    }
+                  : {}),
               },
               include: { leaveType: true },
             },
@@ -438,7 +518,19 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
         let empTotalDays = 0;
 
         for (const req of emp.leaveRequests) {
-          const days = Number(req.days) || 1;
+          const first = new Date(
+            Math.max(
+              req.startDate.getTime(),
+              dateFilter.gte?.getTime() ?? -Infinity,
+            ),
+          );
+          const last = new Date(
+            Math.min(
+              req.endDate.getTime(),
+              dateFilter.lte?.getTime() ?? Infinity,
+            ),
+          );
+          const days = countLeaveDays(first, last, req.halfDay !== null);
           empTotalDays += days;
           totalDays += days;
           totalRequests++;
@@ -502,30 +594,27 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
       let underload = 0;
 
       const records = faculty.map((emp) => {
-        let theoryHours = 0;
-        let labHours = 0;
-
-        for (const entry of emp.timetable) {
-          if (entry.subject.kind === 'LAB') {
-            labHours += 2; // Lab sessions are typically 2 periods/hours
+        const { theoryHours, labHours, totalHours } = weeklyHours(
+          emp.timetable.map((entry) => ({
+            ...entry,
+            kind: entry.subject.kind,
+          })),
+        );
+        const minThreshold = emp.designation.workload?.minHours ?? null;
+        const maxThreshold = emp.designation.workload?.maxHours ?? null;
+        let status: 'NORMAL' | 'OVERLOAD' | 'UNDERLOAD' | 'UNCONFIGURED' =
+          'UNCONFIGURED';
+        if (minThreshold !== null && maxThreshold !== null) {
+          if (totalHours > maxThreshold) {
+            status = 'OVERLOAD';
+            overload++;
+          } else if (totalHours < minThreshold) {
+            status = 'UNDERLOAD';
+            underload++;
           } else {
-            theoryHours += 1;
+            status = 'NORMAL';
+            normal++;
           }
-        }
-
-        const totalHours = theoryHours + labHours;
-        const minThreshold = emp.designation.workload?.minHours ?? 14;
-        const maxThreshold = emp.designation.workload?.maxHours ?? 18;
-
-        let status: 'NORMAL' | 'OVERLOAD' | 'UNDERLOAD' = 'NORMAL';
-        if (totalHours > maxThreshold) {
-          status = 'OVERLOAD';
-          overload++;
-        } else if (totalHours < minThreshold && totalHours > 0) {
-          status = 'UNDERLOAD';
-          underload++;
-        } else {
-          normal++;
         }
 
         return {
@@ -549,58 +638,91 @@ export function createReportsRepository(prisma: PrismaClient): ReportsRepository
       };
     },
 
+    // shortcut: history uses the current timetable; snapshot classes when edited schedules must be retained.
     async getContinuityReport({ from, to, departmentId }) {
-      const dateFilter: { gte?: Date; lte?: Date } = {};
-      if (from) dateFilter.gte = new Date(`${from}T00:00:00.000Z`);
-      if (to) dateFilter.lte = new Date(`${to}T23:59:59.999Z`);
-
-      const substitutions = await prisma.substitution.findMany({
+      const start = from ? toDate(from) : undefined;
+      const end = to ? toDate(to) : undefined;
+      const leaves = await prisma.leaveRequest.findMany({
         where: {
-          ...(Object.keys(dateFilter).length ? { date: dateFilter } : {}),
-          ...(departmentId ? { timetableEntry: { departmentId } } : {}),
+          status: 'APPROVED',
+          ...(end ? { startDate: { lte: end } } : {}),
+          ...(start ? { endDate: { gte: start } } : {}),
+          employee: {
+            timetable: { some: departmentId ? { departmentId } : {} },
+          },
         },
         include: {
-          substitute: true,
-          leaveRequest: { include: { employee: { include: { department: true } } } },
-          timetableEntry: { include: { subject: true } },
+          employee: {
+            include: {
+              timetable: {
+                where: departmentId ? { departmentId } : {},
+                include: { subject: true, department: true },
+              },
+            },
+          },
+          substitutions: { include: { substitute: true } },
         },
-        orderBy: { date: 'desc' },
       });
-
-      let covered = 0;
-      let uncovered = 0;
-
-      const records = substitutions.map((sub) => {
-        const isCovered = sub.substituteId !== null || sub.kind === 'NOT_NEEDED';
-        if (isCovered) covered++;
-        else uncovered++;
-
-        const pStr = sub.timetableEntry.startPeriod === sub.timetableEntry.endPeriod
-          ? `Period ${sub.timetableEntry.startPeriod}`
-          : `Periods ${sub.timetableEntry.startPeriod}-${sub.timetableEntry.endPeriod}`;
-
-        return {
-          id: sub.id,
-          date: sub.date.toISOString().slice(0, 10),
-          originalFaculty: `${sub.leaveRequest.employee.firstName} ${sub.leaveRequest.employee.lastName}`.trim(),
-          department: sub.leaveRequest.employee.department.code,
-          subject: sub.timetableEntry.subject.name,
-          period: pStr,
-          kind: sub.kind,
-          substituteFaculty: sub.substitute ? `${sub.substitute.firstName} ${sub.substitute.lastName}`.trim() : null,
-          status: (isCovered ? 'COVERED' : 'UNCOVERED') as 'COVERED' | 'UNCOVERED',
-        };
-      });
-
+      const periods = await prisma.period.findMany();
+      const starts = new Map(
+        periods.map((period) => [period.number, period.startTime]),
+      );
+      const records = leaves
+        .flatMap((leave) => {
+          const first =
+            start && start > leave.startDate ? start : leave.startDate;
+          const last = end && end < leave.endDate ? end : leave.endDate;
+          return leaveDates(first, last).flatMap((date) =>
+            leave.employee.timetable
+              .filter(
+                (entry) =>
+                  entry.day === weekdayOf(toDate(date)) &&
+                  inHalf(leave.halfDay, entry, starts),
+              )
+              .map((entry) => {
+                const sub = leave.substitutions.find(
+                  (row) =>
+                    row.timetableEntryId === entry.id &&
+                    isoDate(row.date) === date,
+                );
+                const covered =
+                  !!sub &&
+                  (sub.substituteId !== null || sub.kind === 'NOT_NEEDED');
+                return {
+                  id: `${leave.id}:${entry.id}:${date}`,
+                  date,
+                  originalFaculty:
+                    `${leave.employee.firstName} ${leave.employee.lastName}`.trim(),
+                  department: entry.department.code,
+                  subject: entry.subject.name,
+                  period:
+                    entry.startPeriod === entry.endPeriod
+                      ? `Period ${entry.startPeriod}`
+                      : `Periods ${entry.startPeriod}-${entry.endPeriod}`,
+                  kind: sub?.kind ?? 'UNASSIGNED',
+                  substituteFaculty: sub?.substitute
+                    ? `${sub.substitute.firstName} ${sub.substitute.lastName}`.trim()
+                    : null,
+                  status: covered
+                    ? ('COVERED' as const)
+                    : ('UNCOVERED' as const),
+                };
+              }),
+          );
+        })
+        .sort(
+          (a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id),
+        );
       const totalImpacted = records.length;
-      const coverageRate = totalImpacted > 0 ? Math.round((covered / totalImpacted) * 100) : 100;
-
+      const covered = records.filter((row) => row.status === 'COVERED').length;
       return {
         summary: {
           totalImpacted,
           covered,
-          uncovered,
-          coverageRate,
+          uncovered: totalImpacted - covered,
+          coverageRate: totalImpacted
+            ? Math.round((covered / totalImpacted) * 100)
+            : 0,
         },
         records,
       };

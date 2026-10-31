@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { API_BASE_URL } from './api-config';
+import { apiFetch } from './session';
 
 export type DayOfWeek = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT';
 
@@ -38,6 +38,7 @@ export interface TimetableEntryDto {
   day: DayOfWeek;
   startPeriod: number;
   endPeriod: number;
+  dutyDate?: string;
   isSubstitute?: boolean;
   substituteNote?: string;
 }
@@ -464,7 +465,7 @@ const periodSchema = z.object({
   endTime: z.string().regex(/^\d{2}:\d{2}$/),
 });
 const namedSchema = z.object({ id: z.number(), name: z.string() });
-const entrySchema = z.object({
+export const entrySchema = z.object({
   id: z.string(),
   department: namedSchema.extend({ code: z.string() }),
   semester: z.number(),
@@ -488,9 +489,7 @@ const entrySchema = z.object({
 export async function getPeriods(token: string | null): Promise<PeriodDto[]> {
   if (token?.startsWith('demo-')) return JCET_PERIODS;
   if (!token) throw new Error('Sign in to load your timetable.');
-  const response = await fetch(`${API_BASE_URL}/timetable/periods`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  });
+  const response = await apiFetch('/timetable/periods');
   if (!response.ok)
     throw new Error('Unable to load period timings. Refresh or sign in again.');
   return z.object({ data: z.array(periodSchema) }).parse(await response.json())
@@ -508,15 +507,7 @@ export async function getTimetableEntries(
   } else {
     const params = new URLSearchParams();
     if (options?.facultyId) params.set('facultyId', options.facultyId);
-    const response = await fetch(
-      `${API_BASE_URL}/timetable/entries?${params}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      },
-    );
+    const response = await apiFetch(`/timetable/entries?${params}`);
     if (!response.ok)
       throw new Error(
         'Unable to load your timetable. Refresh or sign in again.',

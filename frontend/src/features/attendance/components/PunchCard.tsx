@@ -15,9 +15,15 @@ export function PunchCard() {
   const queryClient = useQueryClient();
   const [correctionOpen, setCorrectionOpen] = useState(false);
 
-  const { data: today, isLoading } = useQuery({
+  const {
+    data: today,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ['attendance', 'today'],
     queryFn: getTodayAttendance,
+    enabled: canCheckIn,
   });
 
   const punchMutation = useMutation({
@@ -31,7 +37,9 @@ export function PunchCard() {
       }
     },
     onError: (err: unknown) => {
-      toast.error(err instanceof Error ? err.message : 'Failed to record punch.');
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to record punch.',
+      );
     },
   });
 
@@ -40,11 +48,20 @@ export function PunchCard() {
 
   const formatTime = (iso?: string | null) => {
     if (!iso) return '—';
-    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   return (
     <>
+      {isError && (
+        <div role="alert">
+          Today's attendance could not be loaded.{' '}
+          <Button onClick={() => void refetch()}>Retry</Button>
+        </div>
+      )}
       <Card className="border-border/60 bg-gradient-to-r from-card via-card to-primary/5 shadow-sm">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
@@ -53,7 +70,9 @@ export function PunchCard() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-semibold text-foreground">Today's Attendance</h3>
+                <h3 className="text-base font-semibold text-foreground">
+                  Today's Attendance
+                </h3>
                 {today && (
                   <StatusBadge
                     status={
@@ -80,7 +99,11 @@ export function PunchCard() {
 
           {!canCheckIn ? (
             <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground border border-border/50">
-              <span className="font-semibold text-foreground">Admin Account:</span> Self-punch is for faculty & staff. Log in as <code className="font-mono text-primary">zeeshan.faculty@jcethbl.edu.in</code> to test punch-in.
+              <span className="font-semibold text-foreground">
+                Admin Account:
+              </span>{' '}
+              Your role does not allow self-punch attendance. Contact HR if your
+              access needs updating.
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-3">
@@ -98,8 +121,12 @@ export function PunchCard() {
                 <Button
                   size="sm"
                   onClick={() => punchMutation.mutate()}
-                  disabled={punchMutation.isPending || isLoading}
-                  className={isCheckedIn ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-primary'}
+                  disabled={punchMutation.isPending || isLoading || isError}
+                  className={
+                    isCheckedIn
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                      : 'bg-primary'
+                  }
                 >
                   {isCheckedIn ? (
                     <>

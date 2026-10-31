@@ -53,7 +53,11 @@ export function CorrectionsQueueDrawer({
       );
     },
     onError: (err: unknown) => {
-      toast.error(err instanceof Error ? err.message : 'Failed to review correction request.');
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Failed to review correction request.',
+      );
     },
   });
 
@@ -66,7 +70,10 @@ export function CorrectionsQueueDrawer({
 
   const formatTime = (iso?: string | null) => {
     if (!iso) return '—';
-    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   return (
@@ -76,13 +83,17 @@ export function CorrectionsQueueDrawer({
           <SheetTitle className="flex items-center gap-2">
             <span>Attendance Corrections Queue</span>
             {pendingItems.length > 0 && (
-              <Badge variant="secondary" className="bg-amber-500/15 text-amber-600">
+              <Badge
+                variant="secondary"
+                className="bg-amber-500/15 text-amber-600"
+              >
                 {pendingItems.length} Pending
               </Badge>
             )}
           </SheetTitle>
           <SheetDescription>
-            Review and decide missed-punch correction requests submitted by faculty and staff.
+            Review and decide missed-punch correction requests submitted by
+            faculty and staff.
           </SheetDescription>
         </SheetHeader>
 
@@ -97,7 +108,8 @@ export function CorrectionsQueueDrawer({
             </div>
             <h4 className="font-semibold text-foreground">All Caught Up!</h4>
             <p className="text-sm text-muted-foreground max-w-[280px] mt-1">
-              There are no pending attendance correction requests waiting for your approval.
+              There are no pending attendance correction requests waiting for
+              your approval.
             </p>
           </div>
         ) : (
@@ -129,12 +141,16 @@ export function CorrectionsQueueDrawer({
                 <div className="grid grid-cols-2 gap-2 text-xs bg-muted/30 p-2.5 rounded-lg border border-border/40">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5 text-primary" />
-                    <span>Date: <b>{new Date(item.date).toISOString().split('T')[0]}</b></span>
+                    <span>
+                      Date:{' '}
+                      <b>{new Date(item.date).toISOString().split('T')[0]}</b>
+                    </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Clock className="h-3.5 w-3.5 text-primary" />
                     <span>
-                      {formatTime(item.requestedCheckIn)} – {formatTime(item.requestedCheckOut)}
+                      {formatTime(item.requestedCheckIn)} –{' '}
+                      {formatTime(item.requestedCheckOut)}
                     </span>
                   </div>
                 </div>
@@ -153,7 +169,10 @@ export function CorrectionsQueueDrawer({
                     placeholder="Decision note (optional)..."
                     value={reviewNotes[item.id] || ''}
                     onChange={(e) =>
-                      setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))
+                      setReviewNotes((prev) => ({
+                        ...prev,
+                        [item.id]: e.target.value,
+                      }))
                     }
                     className="h-8 text-xs mb-3"
                   />

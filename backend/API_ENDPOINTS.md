@@ -33,6 +33,21 @@ Access tokens are HS256 JWTs valid for 15 minutes. `user` includes
 `permissions`, the granted keys (e.g. `leave.approve.department`), so clients can
 hide what the user cannot do.
 
+## Native authentication
+
+Native clients use `/api/v1/auth/native` and send JSON with `credentials: omit`, without `Origin` or `Cookie` headers. These routes reject either header with 403 `NATIVE_CLIENT_REQUIRED`; this prevents accidental use of browser credentials, not proof that a caller is a trusted device. Native auth routes set `Cache-Control: no-store` and emit no `Set-Cookie`.
+
+- `POST /auth/native/login` `{ identifier, password, remember? }` → `{ accessToken, expiresIn, user, refreshToken }`. Same user/permission shape, 15-minute access token and failed-login limits as browser login. The refresh token is an opaque 43-character base64url credential, stored hashed server-side, with the existing seven-day session lifetime.
+- `POST /auth/native/refresh` `{ refreshToken }` → the same body with a replacement refresh token. Save the replacement securely before treating renewal as complete. Invalid/expired/revoked credentials return 401 `SESSION_EXPIRED`; a recently rotated token returns 409 `REFRESH_IN_PROGRESS`. Reuse after the existing grace period ends all sessions for that user.
+- `POST /auth/native/logout` `{ refreshToken }` → 204, also when that well-formed token was already ended. Revokes the presented server session. A Bearer access token alone does not identify the session to revoke.
+- `POST /auth/native/password` (Bearer access token) `{ currentPassword, newPassword, refreshToken }` → 204. Same password validation, audit and wrong-password limits as `/auth/password`; preserves the matching session of the authenticated user and ends their other sessions. A token belonging to another user never preserves or changes that other user's session.
+
+Native refresh/logout bodies are strict; missing/malformed credentials or extra fields return 400 `VALIDATION_ERROR`. Native password bodies are also strict. Tokens must never be placed in URLs, logs or analytics. Login and wrong-current-password rate-limit budgets are shared between browser and native routes; switching routes cannot reset them.
+
+Browser routes retain their HttpOnly, SameSite=Strict cookies and origin checks; they never return refresh tokens in JSON or read them from request bodies. The native routes reuse the existing service and session table; no migration or second token store is required. Already issued access tokens can remain valid until their normal expiry after logout; future refresh is revoked.
+
+Client persistence/retry rules and native verification evidence: [iOS native session contract](../mobile/ios-docs/NATIVE_SESSION.md).
+
 ## Logins
 
 Implemented. All need `user.manage` (Super Admin, HR Admin). A login signs in
@@ -108,10 +123,10 @@ Implemented.
 
 ## Attendance
 
-Implemented. Role-scoped (Faculty/Staff see own, HOD sees department, HR/Super Admin see all).
+Implemented. Role-scoped (Faculty/Staff see own, HOD sees department, HR/Super Admin see all). Attendance dates and policy calculations currently use UTC. Mobile displays this explicitly; there is no new timezone policy in IOS-006. Missing employee/department scope returns empty lists, never broader access.
 
-- `POST /attendance/punch` (`attendance.check_in`) `{ source?: WEB|MOBILE|BIOMETRIC|MANUAL, notes? }` →
-  records Check-in (first punch of the day, marked LATE if after work start + grace period) or Check-out (subsequent punch; marked HALF_DAY if worked hours < threshold).
+- `POST /attendance/punch` (`attendance.check_in`) `{ source?: WEB|MOBILE|BIOMETRIC|MANUAL, notes?, action?: CHECK_IN|CHECK_OUT, date?: YYYY-MM-DD }` →
+  records Check-in (first punch of the day, marked LATE if after work start + grace period) or Check-out (subsequent punch; marked HALF_DAY if worked hours < threshold). Mobile sends an explicit action and UTC attendance date. Atomic conditional writes refuse repeated/concurrent explicit actions with 409 `PUNCH_CHANGED`; a stale date is 409 `DATE_CHANGED`. Without `action`, existing browser toggle behavior is retained. After a lost response, read today’s state before choosing another explicit action; do not blindly replay a toggle.
 - `GET /attendance/today` (`attendance.read`) → today's attendance record for the caller or `null`.
 - `GET /attendance?date=&startDate=&endDate=&departmentId=&employeeId=&status=&page=&limit=` (`attendance.read`) →
   paged attendance records with employee and department details, scoped to caller.
@@ -119,13 +134,12 @@ Implemented. Role-scoped (Faculty/Staff see own, HOD sees department, HR/Super A
   201; manual attendance entry by HR Admin or Super Admin.
 - `POST /attendance/corrections` (`attendance_correction.request`) `{ date, requestedCheckIn?, requestedCheckOut?, requestedStatus, reason }` →
   201; requests punch correction. Notifies the department HOD.
-- `GET /attendance/corrections?status=&page=&limit=` (`attendance.read`) →
-  paged correction requests, filtered by status and scoped by role.
+- `GET /attendance/corrections?employeeId=&status=&page=&limit=` (`attendance.read`) →
+  paged correction requests, filtered by optional employee/status and scoped by role. Own scope always forces the caller’s employee; department scope combines the employee filter with department restrictions. UUID/status/page/limit are validated (page ≥ 1; limit 1–200).
 - `PATCH /attendance/corrections/:id` (`attendance_correction.approve`) `{ status: APPROVED|REJECTED, reviewNote? }` →
   approves or rejects a correction request (HOD for their department, HR for all). If approved, automatically updates the daily attendance record. Notifies the employee.
 - `GET /attendance/settings` (`attendance.read`) → `{ workDayStart, workDayEnd, gracePeriodMinutes, halfDayHours, fullDayHours }`.
 - `PUT /attendance/settings` (`settings.manage`) → updates attendance policy settings.
-
 
 ## Leave
 
@@ -260,10 +274,11 @@ notification when assigned.
 ## Documents
 
 Implemented (`document.upload`, `document.read`, `document.verify`). Supports PDF, JPEG, PNG, WEBP files up to 10MB.
-Physical files are served statically from `/uploads/documents/<filename>`.
+File content requires `GET`/`HEAD /documents/:id/content`; the former public `/uploads/documents/<filename>` path returns 404. Stored `fileUrl` is an internal locator, not a public download URL.
 
 - `POST /documents` (`document.upload`, multipart/form-data)
   - Fields: `category` (IDENTITY | ACADEMIC | EMPLOYMENT | CERTIFICATION | OTHER), `documentType` (e.g. 'Aadhaar Card', 'Ph.D. Degree'), `title`, `expiryDate?` (YYYY-MM-DD), `file`
+  - Validates real PDF/JPEG/PNG/WEBP signatures and matching extensions, canonicalizes MIME, validates the calendar expiry date, and removes rejected upload copies; uncertain database outcomes retain private bytes until reconciliation.
   - Uploads document, sets status to `PENDING`, and triggers in-app notification to HR Admin.
   - Returns: 201 `{ data: Document }`
 - `GET /documents?category=&status=&search=&page=&limit=` (`document.read`)
@@ -272,6 +287,8 @@ Physical files are served statically from `/uploads/documents/<filename>`.
   - Returns: `{ data: Document[], total, page, totalPages }`
 - `GET /documents/pending-count` (`document.read`) → `{ data: { count } }`
 - `GET /documents/:id` (`document.read`) → `{ data: Document }`
+- `GET`/`HEAD /documents/:id/content` (`document.read`): same record/owner scope as details; canonical file bytes/headers, inline disposition, `nosniff`, `private, no-store`. No public redirect. Missing/unsafe stored paths are refused.
+- Own-scope list/count requests without an employee link return 403.
 - `PUT /documents/:id/verify` (`document.verify`, HR Admin / Super Admin)
   - Body: `{ status: 'VERIFIED' | 'REJECTED', reviewNote?: string }`
   - Updates verification status and dispatches in-app notification to the employee.
@@ -322,8 +339,44 @@ Implemented. Protected by `report.read`. Scoped: Super Admin / HR Admin / Princi
   - Departmental leave quota distribution: Requests count, approved days, and CL/ML/EL breakdown.
   - When `format=csv`, returns a direct downloadable CSV file.
 - `GET /reports/workload?departmentId=&format=json|csv` (`report.read`)
-  - Weekly faculty workload audit: Theory hours, Lab hours, Total teaching hours, Min/Max AICTE thresholds, and status (`NORMAL` | `OVERLOAD` | `UNDERLOAD`).
+  - Weekly faculty workload audit: Theory hours, Lab hours, Total teaching hours, Min/Max AICTE thresholds, and status (`NORMAL` | `OVERLOAD` | `UNDERLOAD` | `UNCONFIGURED`). Unconfigured bands have null min/max thresholds.
   - When `format=csv`, returns a direct downloadable CSV file.
 - `GET /reports/continuity?from=&to=&departmentId=&format=json|csv` (`report.read`)
   - Syllabus and academic continuity audit: Impacted classes due to leaves, substitute faculty assignments, and coverage status (`COVERED` | `UNCOVERED`).
   - When `format=csv`, returns a direct downloadable CSV file.
+
+Report dates must be real ISO dates, with `from <= to`. CSV downloads use the
+same Bearer authentication and department scoping as JSON; text cells that
+could be interpreted as spreadsheet formulas are escaped. Empty summaries
+return zero counts, without sample values. Continuity counts approved-leave
+classes whether or not a substitution has been assigned. Historical class
+coverage is derived from the current timetable. Leave totals clip overlapping
+requests to the selected dates (Sundays excluded).
+
+## Remote push — IOS-010
+
+Disabled by default. See `mobile/ios-docs/REMOTE_PUSH.md` for approved-project,
+signing and physical-device acceptance requirements. No public send/test endpoint.
+
+- `GET /notifications/:id` (`notification.read`) → `{ data: Notification }` for
+  the current user only; another user's ID is 404.
+- `GET /notifications/push` (`notification.read`) →
+  `{ data: { enabled, projectId: string | null } }` (the project UUID is public).
+- `POST /notifications/push/devices` (`notification.read`) with strict
+  `{ token, platform: "ios" | "android", projectId, refreshToken }` → 204.
+  Requires a valid Expo token, configured project match and the caller's current,
+  unrevoked refresh credential. User/session ownership comes from authentication,
+  never from a supplied user ID. Returns 503 while disabled, 400 for invalid input
+  or project mismatch, 401 for invalid/foreign refresh credentials, and 409 for
+  more than ten devices. One token per session; token/account changes replace the
+  previous association and remove old queued messages for that device.
+- `DELETE /notifications/push/devices` (Bearer authentication) with strict
+  `{ refreshToken }` → 204 idempotently removes only that user's matching session
+  registration. Permission loss does not prevent unregistering. Neither route
+  returns device tokens or refresh credentials.
+
+Refresh rotation preserves registrations/outbox entries for the replacement
+session. Confirmed logout and password-change revocation remove the relevant
+registrations. Expired sessions and inactive accounts are pruned by the enabled
+worker. Notification creation queues private generic payloads transactionally;
+worker/provider errors do not roll back leave/substitution operations.

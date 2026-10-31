@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { motionTiming } from '@/lib/motion';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
@@ -20,27 +21,41 @@ export function MetricCard({
   href?: string;
 }) {
   const navigate = useNavigate();
+  const reducedMotion = useReducedMotion();
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      initial={reducedMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{
-        duration: motionTiming.duration,
-        delay: index * motionTiming.stagger,
+        duration: reducedMotion ? 0 : motionTiming.duration,
+        delay: reducedMotion ? 0 : index * motionTiming.stagger,
       }}
     >
       <Card
-        className={`metric-card h-full ${
-          href ? 'cursor-pointer transition-transform hover:scale-[1.01]' : ''
-        }`}
+        data-accent={index % 6}
+        className={cn(
+          'metric-card h-full',
+          href && 'cursor-pointer transition-transform hover:scale-[1.01]',
+        )}
+        role={href ? 'link' : undefined}
+        tabIndex={href ? 0 : undefined}
+        onKeyDown={
+          href
+            ? (event) => {
+                if (event.key === 'Enter') navigate(href);
+              }
+            : undefined
+        }
         onClick={href ? () => navigate(href) : undefined}
       >
         <CardHeader>
           <CardTitle>
             <h2 className="metric-label">{label}</h2>
           </CardTitle>
-          <Icon className="metric-icon" aria-hidden="true" />
+          <span className="metric-icon-badge" aria-hidden="true">
+            <Icon className="metric-icon" aria-hidden="true" />
+          </span>
         </CardHeader>
         <CardContent>
           <p className="metric-value">{value}</p>

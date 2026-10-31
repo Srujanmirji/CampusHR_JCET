@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-23",
+  "status": "passed",
+  "checks": [
+    "hod: 8 screens at 375/430/1280, 48px targets, keyboard focus; @2x exports",
+    "ios: 12 screens at 375/430/1280, 48px targets, keyboard focus; @2x exports",
+    "android: 12 screens at 375/430/1280, 48px targets, keyboard focus; @2x exports",
+    "HOD filters, recommendation boundary, rejection validation/trap/Escape, disabled faculty, assignment/confirmation/next-class flow",
+    "Long faculty/department labels and 200% CSS text stress at 375px; not native font-scaling certification",
+    "Frozen canonical + faculty files unchanged (37 SHA-256 checks); no API writes, external requests or browser exceptions"
+  ],
+  "notChecked": [
+    "Native iOS/Android runtime",
+    "VoiceOver/TalkBack",
+    "Real device haptics",
+    "Native Dynamic Type/font scaling",
+    "Native IME/back/safe-area behavior",
+    "Dark theme (not designed)"
+  ]
+}

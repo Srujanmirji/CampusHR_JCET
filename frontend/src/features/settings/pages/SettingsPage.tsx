@@ -13,11 +13,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { initialSettings } from '@/data/mock/settings';
-import { Building2, Clock, Bell, Save } from 'lucide-react';
+import { Building2, Clock, Bell, Save, Sun, Moon } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState(initialSettings);
+  const [appearance, setAppearance] = useState<'light' | 'dark'>(() =>
+    document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+  );
+
+  function applyAppearance(next: 'light' | 'dark') {
+    setAppearance(next);
+    document.documentElement.classList.toggle('dark', next === 'dark');
+    const meta = document.querySelector<HTMLMetaElement>(
+      'meta[name="color-scheme"]',
+    );
+    if (meta) meta.content = next;
+    try {
+      localStorage.setItem('campushr-color-scheme', next);
+    } catch {
+      // Ignore storage blocks
+    }
+  }
 
   function handleSaveSettings(e: React.FormEvent) {
     e.preventDefault();
@@ -32,6 +49,42 @@ export default function SettingsPage() {
       />
 
       <form onSubmit={handleSaveSettings} className="space-y-6">
+        {/* Section 0: Apple Appearance Mode */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              {appearance === 'dark' ? (
+                <Moon className="h-4 w-4 text-primary" />
+              ) : (
+                <Sun className="h-4 w-4 text-primary" />
+              )}
+              <CardTitle className="text-base">Appearance</CardTitle>
+            </div>
+            <CardDescription className="text-xs">
+              Switch between Apple Light and Dark appearance modes for this
+              browser.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-3">
+            <Button
+              type="button"
+              variant={appearance === 'light' ? 'default' : 'outline'}
+              onClick={() => applyAppearance('light')}
+            >
+              <Sun className="h-4 w-4" />
+              Light Appearance
+            </Button>
+            <Button
+              type="button"
+              variant={appearance === 'dark' ? 'default' : 'outline'}
+              onClick={() => applyAppearance('dark')}
+            >
+              <Moon className="h-4 w-4" />
+              Dark Appearance
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* Section 1: General Campus Configuration */}
         <Card>
           <CardHeader>

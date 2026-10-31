@@ -46,7 +46,11 @@ const SUGGESTED_TYPES: Record<DocumentCategoryKey, string[]> = {
     'Conference / Workshop Certificate',
     'Published Research Paper (Scopus / IEEE)',
   ],
-  OTHER: ['Medical Fitness Certificate', 'Bank Passbook Copy', 'Other Institutional Document'],
+  OTHER: [
+    'Medical Fitness Certificate',
+    'Bank Passbook Copy',
+    'Other Institutional Document',
+  ],
 };
 
 export function DocumentUploadDialog({
@@ -57,7 +61,9 @@ export function DocumentUploadDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [category, setCategory] = useState<DocumentCategoryKey>('ACADEMIC');
-  const [documentType, setDocumentType] = useState('Ph.D. Convocation / Degree');
+  const [documentType, setDocumentType] = useState(
+    'Ph.D. Convocation / Degree',
+  );
   const [title, setTitle] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -82,7 +88,12 @@ export function DocumentUploadDialog({
       return;
     }
 
-    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    const allowed = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+    ];
     if (!allowed.includes(selected.type)) {
       toast.error('Only PDF, JPEG, PNG, and WEBP formats are accepted.');
       return;
@@ -91,7 +102,9 @@ export function DocumentUploadDialog({
     setFile(selected);
     if (!title) {
       // Auto-populate title from filename without extension
-      const cleanName = selected.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+      const cleanName = selected.name
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[_-]/g, ' ');
       setTitle(cleanName);
     }
   };
@@ -118,14 +131,20 @@ export function DocumentUploadDialog({
 
     uploadMutation.mutate(formData, {
       onSuccess: () => {
-        toast.success('Document uploaded successfully and queued for HR verification.');
+        toast.success(
+          'Document uploaded successfully and queued for HR verification.',
+        );
         onOpenChange(false);
         setFile(null);
         setTitle('');
         setExpiryDate('');
       },
       onError: (err: unknown) => {
-        toast.error(err instanceof Error ? err.message : 'Upload failed. Please try again.');
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : 'Upload failed. Please try again.',
+        );
       },
     });
   };
@@ -139,7 +158,8 @@ export function DocumentUploadDialog({
             Upload Document for Verification
           </DialogTitle>
           <DialogDescription>
-            Upload your institutional degrees, experience letters, or certifications. HR will verify your submission.
+            Upload your institutional degrees, experience letters, or
+            certifications. HR will verify your submission.
           </DialogDescription>
         </DialogHeader>
 
@@ -149,7 +169,9 @@ export function DocumentUploadDialog({
             <Label htmlFor="category">Document Category</Label>
             <Select
               value={category}
-              onValueChange={(val) => handleCategoryChange(val as DocumentCategoryKey)}
+              onValueChange={(val) =>
+                handleCategoryChange(val as DocumentCategoryKey)
+              }
             >
               <SelectTrigger id="category">
                 <SelectValue placeholder="Select Category" />
@@ -203,7 +225,8 @@ export function DocumentUploadDialog({
               onChange={(e) => setExpiryDate(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Required for time-bound proofs like contracts, passport, or medical certificates.
+              Required for time-bound proofs like contracts, passport, or
+              medical certificates.
             </p>
           </div>
 
@@ -232,7 +255,9 @@ export function DocumentUploadDialog({
               ) : (
                 <div className="space-y-1 text-sm text-muted-foreground">
                   <Upload className="h-6 w-6 mx-auto text-muted-foreground" />
-                  <p className="font-medium text-foreground">Click to browse or drag file here</p>
+                  <p className="font-medium text-foreground">
+                    Click to browse or drag file here
+                  </p>
                   <p className="text-xs">Supports PDF, PNG, JPG up to 10MB</p>
                 </div>
               )}

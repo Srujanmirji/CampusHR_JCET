@@ -42,8 +42,10 @@ export function createNotificationService(
     async (...args: A) => {
       try {
         await run(...args);
-      } catch (error) {
-        console.error('Notification failed', error);
+      } catch {
+        console.error(
+          'Notification could not be recorded; the business operation remains saved.',
+        );
       }
     };
 
@@ -79,6 +81,12 @@ export function createNotificationService(
       };
     },
 
+    async find(access: Access, id: string) {
+      const row = await repo.find(access.userId, id);
+      if (!row)
+        throw new HttpError(404, 'NOT_FOUND', 'Notification not found.');
+      return row;
+    },
     unread(access: Access) {
       return repo.unread(access.userId);
     },

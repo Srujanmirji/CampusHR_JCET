@@ -39,7 +39,7 @@ export interface AuthRepository {
   ): Promise<(AuthUser & { passwordHash: string }) | null>;
   findUserById(id: string): Promise<AuthUser | null>;
   recordLogin(userId: string, at: Date): Promise<void>;
-  createSession(session: NewSession): Promise<void>;
+  createSession(session: NewSession, replacesSessionId?: string): Promise<void>;
   findSessionByHash(tokenHash: string): Promise<AuthSession | null>;
   /** Revokes one session on rotation; false if it was already revoked. */
   revokeSession(id: string, at: Date): Promise<boolean>;
@@ -121,8 +121,15 @@ export function createPrismaAuthRepository(
         data: { lastLoginAt: at },
       });
     },
-    async createSession(session) {
-      await prisma.refreshSession.create({ data: session });
+    async createSession(session, replacesSessionId) {
+      await prisma.$transaction(async (tx) => {
+        const created = await tx.refreshSession.create({ data: session });
+        if (replacesSessionId)
+          await tx.pushDevice.updateMany({
+            where: { sessionId: replacesSessionId, userId: session.userId },
+            data: { sessionId: created.id },
+          });
+      });
     },
     findSessionByHash(tokenHash) {
       return prisma.refreshSession.findUnique({
@@ -145,16 +152,22 @@ export function createPrismaAuthRepository(
       return count === 1;
     },
     async endSession(id, at) {
-      await prisma.refreshSession.update({
-        where: { id },
-        data: { revokedAt: at, expiresAt: at },
-      });
+      await prisma.$transaction([
+        prisma.refreshSession.update({
+          where: { id },
+          data: { revokedAt: at, expiresAt: at },
+        }),
+        prisma.pushDevice.deleteMany({ where: { sessionId: id } }),
+      ]);
     },
     async revokeAllSessions(userId, at) {
-      await prisma.refreshSession.updateMany({
-        where: { userId, expiresAt: { gt: at } },
-        data: { revokedAt: at, expiresAt: at },
-      });
+      await prisma.$transaction([
+        prisma.refreshSession.updateMany({
+          where: { userId, expiresAt: { gt: at } },
+          data: { revokedAt: at, expiresAt: at },
+        }),
+        prisma.pushDevice.deleteMany({ where: { userId } }),
+      ]);
     },
     async findPasswordHash(userId) {
       if (!z.uuid().safeParse(userId).success) return null;
@@ -174,6 +187,12 @@ export function createPrismaAuthRepository(
             ...(keepSessionId ? { NOT: { id: keepSessionId } } : {}),
           },
           data: { revokedAt: at, expiresAt: at },
+        });
+        await tx.pushDevice.deleteMany({
+          where: {
+            userId,
+            ...(keepSessionId ? { NOT: { sessionId: keepSessionId } } : {}),
+          },
         });
         await writeAudit(tx, {
           actorUserId: userId,

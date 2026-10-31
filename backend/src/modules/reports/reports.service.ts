@@ -4,33 +4,58 @@ import type { ReportsRepository } from './reports.repository.js';
 import type { ReportQuery } from './reports.schema.js';
 
 export interface ReportsService {
-  getExecutiveSummary(access: Access): Promise<Awaited<ReturnType<ReportsRepository['getExecutiveSummary']>>>;
+  getExecutiveSummary(
+    access: Access,
+  ): Promise<Awaited<ReturnType<ReportsRepository['getExecutiveSummary']>>>;
   getAttendanceReport(
     access: Access,
     query: ReportQuery,
-  ): Promise<{ data: Awaited<ReturnType<ReportsRepository['getAttendanceReport']>>; csv?: string }>;
+  ): Promise<{
+    data: Awaited<ReturnType<ReportsRepository['getAttendanceReport']>>;
+    csv?: string;
+  }>;
   getLeaveReport(
     access: Access,
     query: ReportQuery,
-  ): Promise<{ data: Awaited<ReturnType<ReportsRepository['getLeaveReport']>>; csv?: string }>;
+  ): Promise<{
+    data: Awaited<ReturnType<ReportsRepository['getLeaveReport']>>;
+    csv?: string;
+  }>;
   getWorkloadReport(
     access: Access,
     query: ReportQuery,
-  ): Promise<{ data: Awaited<ReturnType<ReportsRepository['getWorkloadReport']>>; csv?: string }>;
+  ): Promise<{
+    data: Awaited<ReturnType<ReportsRepository['getWorkloadReport']>>;
+    csv?: string;
+  }>;
   getContinuityReport(
     access: Access,
     query: ReportQuery,
-  ): Promise<{ data: Awaited<ReturnType<ReportsRepository['getContinuityReport']>>; csv?: string }>;
+  ): Promise<{
+    data: Awaited<ReturnType<ReportsRepository['getContinuityReport']>>;
+    csv?: string;
+  }>;
 }
 
-function resolveScopeDepartment(access: Access, requestedDeptId?: number): number | undefined {
+function resolveScopeDepartment(
+  access: Access,
+  requestedDeptId?: number,
+): number | undefined {
   if (access.scope === 'own') {
-    throw new HttpError(403, 'FORBIDDEN', 'Access denied. You do not have permission to view reports.');
+    throw new HttpError(
+      403,
+      'FORBIDDEN',
+      'Access denied. You do not have permission to view reports.',
+    );
   }
 
   if (access.scope === 'department') {
     if (!access.departmentId) {
-      throw new HttpError(403, 'FORBIDDEN', 'User is not assigned to a department.');
+      throw new HttpError(
+        403,
+        'FORBIDDEN',
+        'User is not assigned to a department.',
+      );
     }
     return access.departmentId;
   }
@@ -38,11 +63,18 @@ function resolveScopeDepartment(access: Access, requestedDeptId?: number): numbe
   return requestedDeptId;
 }
 
-function toCsv(headers: string[], rows: (string | number | null | undefined)[][]): string {
+function toCsv(
+  headers: string[],
+  rows: (string | number | null | undefined)[][],
+): string {
   const escapeCell = (val: string | number | null | undefined): string => {
     if (val === null || val === undefined) return '';
-    const str = String(val);
-    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    // Spreadsheet exports must treat user-supplied names as text, never formulas.
+    const str =
+      typeof val === 'string' && /^[\s]*[=+\-@\t\r\n]/.test(val)
+        ? `'${val}`
+        : String(val);
+    if (/[,"\r\n]/.test(str)) {
       return `"${str.replace(/"/g, '""')}"`;
     }
     return str;

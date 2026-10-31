@@ -44,11 +44,15 @@ app/
 
 ## Current integration limits
 
-Daily and weekly timetable screens load authenticated API data. Failed requests show an error; sample classes are restricted to explicit demo sessions.
+Today and dated week views load the signed-in employee’s regular classes plus exact-date server substitution duties. Refresh, foreground return and a minute clock keep coverage/date/status current. Missing employee links or teaching permissions prevent requests. The Timetable screen requires a real account; failed live requests never become sample classes. See [dated timetable evidence](ios-docs/TIMETABLE.md).
 
-Smart substitution on mobile is a local demo, available only in demo sessions. Real accounts must use the web substitution page; local assignments are never merged into their schedules. Native push delivery, secure session persistence, and the remaining mobile modules are still unfinished.
+Leave → Class coverage now uses server-approved leave, affected classes, candidate scores and eligibility. Authorized managers can confirm assignment, document no substitute needed and undo coverage. Recipient duties refresh from the server; the old local assignment store/modal are removed. See [substitution verification](ios-docs/SUBSTITUTION.md). Native session persistence and restart restoration are implemented; see [session evidence](ios-docs/NATIVE_SESSION.md). Attendance now loads own records/history and supports permitted explicit punches and correction requests. Its UTC policy and write-recovery limits are described in [attendance verification](ios-docs/ATTENDANCE.md). Native push implementation is ready; approved signing and actual iPhone delivery acceptance remain pending, alongside the remaining mobile modules.
 
-Run `npm run test --workspace @campushr/mobile` for timetable API regression checks.
+Home summaries use authenticated APIs for own regular classes, attendance, casual leave, workload and latest notifications. Accounts without an employee link never request personal employee summaries. Home has no demo-data fallback; see [Home verification and limits](ios-docs/HOME.md).
+
+Run `npm run test --workspace @campushr/mobile` for session, schedule, attendance, leave, coverage, notification API and live-lifecycle regression checks.
+
+The protected notification inbox now provides own pagination, confirmed read/read-all, a shared Home unread count and current-token Socket.IO refresh. Safe links open permitted native screens. No employee link is needed for notifications. See [in-app notification verification](ios-docs/NOTIFICATIONS.md); see [IOS-010 remote push implementation and device gate](ios-docs/REMOTE_PUSH.md).
 
 ## iOS delivery
 

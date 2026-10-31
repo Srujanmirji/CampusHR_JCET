@@ -1,0 +1,202 @@
+[
+  {
+    "id": "login",
+    "name": "Login",
+    "purpose": "Access the institutional account",
+    "primaryAction": "Sign in",
+    "secondaryActions": "Remember me; password visibility; Forgot password; Institutional SSO",
+    "components": "Identity header, labeled login/password fields, checkbox, buttons, help sheet",
+    "states": "Invalid credentials; account inactive; busy; SSO unavailable; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Home; Password Help; institution SSO if configured"
+  },
+  {
+    "id": "home",
+    "name": "Faculty Home",
+    "purpose": "Orient faculty around the next class",
+    "primaryAction": "Open next class",
+    "secondaryActions": "Bell; profile; schedule; root tabs",
+    "components": "Greeting/date, next-class hero, editorial summary, timeline, tab bar",
+    "states": "No next class; no classes; partial summaries; refresh; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Timetable; Notifications; Profile"
+  },
+  {
+    "id": "today",
+    "name": "Timetable Today",
+    "purpose": "Read dated teaching and substitution duties",
+    "primaryAction": "Select Today or Week",
+    "secondaryActions": "Open class; root tabs",
+    "components": "Navigation, segmented control, schedule rows, academic rail",
+    "states": "No classes; changed class; substitution; fetch failure; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Timetable Week; class context"
+  },
+  {
+    "id": "week",
+    "name": "Timetable Week",
+    "purpose": "Read one day at a time on phone",
+    "primaryAction": "Choose day",
+    "secondaryActions": "Return Today; open class",
+    "components": "Day selector, selected date, mobile schedule list",
+    "states": "Weekend empty; selected-day load/error; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Timetable Today; selected day"
+  },
+  {
+    "id": "attendance",
+    "name": "Attendance",
+    "purpose": "Record daily attendance and review history",
+    "primaryAction": "Check In or Check Out according to server state",
+    "secondaryActions": "Review month and recent activity",
+    "components": "Status summary, contextual action, monthly distribution, activity rows",
+    "states": "Not checked in; checked in; checked out; permission denied; write uncertainty; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Same screen after confirmed punch; root tabs"
+  },
+  {
+    "id": "leave",
+    "name": "Leave Management",
+    "purpose": "Read balances and personal requests",
+    "primaryAction": "Apply for Leave",
+    "secondaryActions": "Filter requests; open request",
+    "components": "Balance rows, primary button, filter control, native list",
+    "states": "No requests; balances unavailable; pending/approved/rejected; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Apply Leave; Leave Detail"
+  },
+  {
+    "id": "apply",
+    "name": "Apply Leave",
+    "purpose": "Submit a dated leave request with impact context",
+    "primaryAction": "Submit Request",
+    "secondaryActions": "Choose type/dates; half-day; attachment; cancel",
+    "components": "Full-screen form, date selector, toggle, reason, attachment row, impact group",
+    "states": "Invalid dates; insufficient balance; pending; upload error; preserved draft; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Leave Detail on confirmed creation; Leave on cancel"
+  },
+  {
+    "id": "detail",
+    "name": "Leave Detail",
+    "purpose": "Understand request progress and class coverage",
+    "primaryAction": "Read status and timeline",
+    "secondaryActions": "Back to requests",
+    "components": "Status, reason, approval timeline, impact and coverage rows",
+    "states": "Pending recommendation; awaiting final approval; approved; rejected; changed coverage; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Leave Management"
+  },
+  {
+    "id": "notifications",
+    "name": "Notifications",
+    "purpose": "Read actionable academic updates",
+    "primaryAction": "Open notification destination",
+    "secondaryActions": "Filter; mark all read; back",
+    "components": "Category tabs, subtle unread row, semantic icon, timestamp",
+    "states": "All read; empty category; broken destination; read update failure; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Leave Detail; Timetable; substitution context; previous screen"
+  },
+  {
+    "id": "profile",
+    "name": "Faculty Profile",
+    "purpose": "Access faculty record and preferences",
+    "primaryAction": "Choose profile section",
+    "secondaryActions": "Settings; support; sign out",
+    "components": "Editorial avatar header, compact stats, grouped profile rows",
+    "states": "Unavailable field; partial stats; expired session; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Existing profile sections; Settings; Password Help; Login on sign out"
+  },
+  {
+    "id": "settings",
+    "name": "Settings",
+    "purpose": "Adjust existing preferences and obtain support",
+    "primaryAction": "Choose setting",
+    "secondaryActions": "Back; account/security/support links",
+    "components": "Grouped rows, toggles, accessibility rows",
+    "states": "Device-managed preference; permission denied; unsupported setting; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Profile; Password Help; platform settings when supported"
+  },
+  {
+    "id": "password",
+    "name": "Password Help",
+    "purpose": "Explain centrally managed account assistance",
+    "primaryAction": "Done",
+    "secondaryActions": "HR Desk; Email Support",
+    "components": "Native content-sized sheet, text, support rows, close",
+    "states": "Support contacts unconfigured; external action confirmation; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Restore the invoking screen and focus"
+  },
+  {
+    "id": "hod-home",
+    "name": "HOD Home",
+    "purpose": "Prioritize department decisions",
+    "primaryAction": "Review pending approvals",
+    "secondaryActions": "Coverage; workload; bell; role tabs",
+    "components": "Greeting, two decision rows, compact presence/alerts, continuity progress",
+    "states": "No pending work; partial counts; stale departmental data; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Approvals; Academic Impact; Workload; Notifications"
+  },
+  {
+    "id": "hod-approvals",
+    "name": "Approvals",
+    "purpose": "Review department leave queue",
+    "primaryAction": "Review request",
+    "secondaryActions": "Pending/Approved/Rejected; role tabs",
+    "components": "Status segment, applicant/request list rows",
+    "states": "No requests in selected status; permissions changed; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Leave Review; HOD roots"
+  },
+  {
+    "id": "hod-review",
+    "name": "Leave Review",
+    "purpose": "Make a decision with balance/history/academic context",
+    "primaryAction": "Recommend approval (requested design fixture says Approve & Find Cover with authority qualifier)",
+    "secondaryActions": "Reject with reason; inspect impact; back",
+    "components": "Applicant, leave detail, history, balance, schedule, sticky decisions, confirmation sheet",
+    "states": "Pending; recommendation saved; final approval pending; rejection reason invalid; conflict; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Approvals; Academic Impact; cover only after final approval"
+  },
+  {
+    "id": "hod-impact",
+    "name": "Academic Impact",
+    "purpose": "Inspect each class affected by approved or pending leave",
+    "primaryAction": "Find cover when authorized",
+    "secondaryActions": "Back to review",
+    "components": "Schedule rows, coverage labels, readiness explanation",
+    "states": "Pending final approval; uncovered; partly covered; fully covered; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Smart Coverage on approved fixture; Leave Review"
+  },
+  {
+    "id": "hod-coverage",
+    "name": "Smart Coverage",
+    "purpose": "Choose available, suitable covering faculty",
+    "primaryAction": "Assign available faculty",
+    "secondaryActions": "Back; inspect recommendation reasons",
+    "components": "Class context, recommendation rows, availability/status, factual match text",
+    "states": "Unavailable disabled; capacity changed; no candidates; fetch error; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Assignment Confirmation; Academic Impact"
+  },
+  {
+    "id": "hod-confirm",
+    "name": "Assignment Confirmation",
+    "purpose": "Protect against assigning the wrong class or person",
+    "primaryAction": "Confirm assignment",
+    "secondaryActions": "Cancel/back",
+    "components": "Faculty context, class/time/location, notification expectation, sticky action",
+    "states": "Busy; availability conflict; workload conflict; lost response; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Coverage Success after saved result; Smart Coverage on cancel"
+  },
+  {
+    "id": "hod-success",
+    "name": "Coverage Success",
+    "purpose": "Confirm saved coverage and expose remaining work",
+    "primaryAction": "Continue to next class",
+    "secondaryActions": "View academic impact",
+    "components": "Success symbol, assigned class context, delivery status, coverage progress",
+    "states": "Assignment saved; notification pending/sent; no remaining classes; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "Smart Coverage for next uncovered class; Academic Impact"
+  },
+  {
+    "id": "hod-workload",
+    "name": "HOD Workload View",
+    "purpose": "Review factual departmental hours and capacity",
+    "primaryAction": "Review capacity alerts",
+    "secondaryActions": "Role root tabs",
+    "components": "Department heading, compact alert summary, faculty workload rows",
+    "states": "No capacity alerts; missing hours; partial/stale data; initial loading; recoverable error; offline/cached context",
+    "navigationDestination": "HOD root destinations; no new faculty-management feature"
+  }
+]

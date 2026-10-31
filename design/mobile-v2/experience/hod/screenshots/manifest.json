@@ -1,0 +1,42 @@
+[
+  {
+    "id": "hod-home",
+    "width": 390,
+    "height": 1079
+  },
+  {
+    "id": "hod-approvals",
+    "width": 390,
+    "height": 844
+  },
+  {
+    "id": "hod-review",
+    "width": 390,
+    "height": 1181
+  },
+  {
+    "id": "hod-impact",
+    "width": 390,
+    "height": 844
+  },
+  {
+    "id": "hod-coverage",
+    "width": 390,
+    "height": 1267
+  },
+  {
+    "id": "hod-confirm",
+    "width": 390,
+    "height": 844
+  },
+  {
+    "id": "hod-success",
+    "width": 390,
+    "height": 844
+  },
+  {
+    "id": "hod-workload",
+    "width": 390,
+    "height": 865
+  }
+]

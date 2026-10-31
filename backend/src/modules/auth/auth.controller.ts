@@ -1,7 +1,13 @@
 import type { CookieOptions, Request, RequestHandler, Response } from 'express';
 import { HttpError } from '../../common/http-error.js';
+import { parse } from '../../common/validate.js';
 import { createFailureLimiter } from '../../middleware/rate-limit.js';
-import { changePasswordSchema, loginSchema } from './auth.schema.js';
+import {
+  changePasswordSchema,
+  loginSchema,
+  nativeSessionSchema,
+  nativeChangePasswordSchema,
+} from './auth.schema.js';
 import {
   REFRESH_TOKEN_TTL_MS,
   type AuthResult,
@@ -63,129 +69,147 @@ export function createAuthController(
     }
   }
 
-  function send(
-    res: Response,
-    { refreshToken, persistent, ...body }: AuthResult,
-  ) {
-    res
-      .cookie(REFRESH_COOKIE, refreshToken, {
-        ...cookieOptions,
-        // Without maxAge the browser drops the cookie when it closes.
-        ...(persistent ? { maxAge: REFRESH_TOKEN_TTL_MS } : {}),
-      })
-      .set('Cache-Control', 'no-store')
-      .json(body);
+  // Both transports share failed-login and password-attempt budgets.
+  const perUser = createFailureLimiter(5, LIMIT_WINDOW_MS);
+
+  function handlers(native: boolean) {
+    const sessionToken = (req: Request) =>
+      native
+        ? parse(nativeSessionSchema, req.body).refreshToken
+        : readCookie(req, REFRESH_COOKIE);
+
+    function send(
+      res: Response,
+      { refreshToken, persistent, ...body }: AuthResult,
+    ) {
+      if (native) {
+        res.set('Cache-Control', 'no-store').json({ ...body, refreshToken });
+        return;
+      }
+      res
+        .cookie(REFRESH_COOKIE, refreshToken, {
+          ...cookieOptions,
+          // Without maxAge the browser drops the cookie when it closes.
+          ...(persistent ? { maxAge: REFRESH_TOKEN_TTL_MS } : {}),
+        })
+        .set('Cache-Control', 'no-store')
+        .json(body);
+    }
+
+    const login: RequestHandler = async (req, res) => {
+      const parsed = loginSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new HttpError(
+          400,
+          'VALIDATION_ERROR',
+          'Enter your employee ID or email, and your password.',
+        );
+      }
+      const { identifier, password, remember } = parsed.data;
+      const ip = req.ip ?? 'unknown';
+      const accountKey = `${ip}|${identifier}`;
+      if (perAccount.isBlocked(accountKey) || perIp.isBlocked(ip)) {
+        res.set('Retry-After', String(LIMIT_WINDOW_MS / 1000));
+        throw new HttpError(
+          429,
+          'TOO_MANY_ATTEMPTS',
+          'Too many sign-in attempts. Try again in 15 minutes.',
+        );
+      }
+      // Count before the slow password check so parallel guesses are limited too.
+      perAccount.hit(accountKey);
+      perIp.hit(ip);
+      try {
+        const result = await auth.login(
+          identifier,
+          password,
+          clientMeta(req),
+          remember,
+        );
+        perAccount.reset(accountKey);
+        perIp.forgive(ip);
+        send(res, result);
+      } catch (error) {
+        if (!(
+          error instanceof HttpError && error.code === 'INVALID_CREDENTIALS'
+        )) {
+          perAccount.forgive(accountKey);
+          perIp.forgive(ip);
+        }
+        throw error;
+      }
+    };
+
+    const refresh: RequestHandler = async (req, res) => {
+      if (!native) assertWebOrigin(req);
+      try {
+        send(res, await auth.refresh(sessionToken(req), clientMeta(req)));
+      } catch (error) {
+        // A concurrent refresh already set a newer cookie; keep it.
+        if (
+          !native &&
+          !(error instanceof HttpError && error.code === 'REFRESH_IN_PROGRESS')
+        ) {
+          res.clearCookie(REFRESH_COOKIE, cookieOptions);
+        }
+        throw error;
+      }
+    };
+
+    const logout: RequestHandler = async (req, res) => {
+      if (!native) assertWebOrigin(req);
+      await auth.logout(sessionToken(req));
+      if (!native) res.clearCookie(REFRESH_COOKIE, cookieOptions);
+      res.status(204).end();
+    };
+
+    const changePassword: RequestHandler = async (req, res) => {
+      const userId: string = res.locals.auth.userId;
+      const parsed = (
+        native ? nativeChangePasswordSchema : changePasswordSchema
+      ).safeParse(req.body);
+      if (!parsed.success) {
+        throw new HttpError(
+          400,
+          'VALIDATION_ERROR',
+          parsed.error.issues[0]?.message ?? 'Check the passwords.',
+        );
+      }
+      if (perUser.isBlocked(userId)) {
+        res.set('Retry-After', String(LIMIT_WINDOW_MS / 1000));
+        throw new HttpError(
+          429,
+          'TOO_MANY_ATTEMPTS',
+          'Too many attempts. Try again in 15 minutes.',
+        );
+      }
+      perUser.hit(userId);
+      try {
+        await auth.changePassword(
+          userId,
+          parsed.data.currentPassword,
+          parsed.data.newPassword,
+          'refreshToken' in parsed.data &&
+            typeof parsed.data.refreshToken === 'string'
+            ? parsed.data.refreshToken
+            : readCookie(req, REFRESH_COOKIE),
+        );
+        perUser.reset(userId);
+        res.status(204).end();
+      } catch (error) {
+        if (!(error instanceof HttpError && error.code === 'WRONG_PASSWORD')) {
+          perUser.forgive(userId);
+        }
+        throw error;
+      }
+    };
+
+    const me: RequestHandler = async (_req, res) => {
+      res.json({ user: await auth.me(res.locals.auth.userId) });
+    };
+
+    return { login, refresh, logout, changePassword, me };
   }
 
-  const login: RequestHandler = async (req, res) => {
-    const parsed = loginSchema.safeParse(req.body);
-    if (!parsed.success) {
-      throw new HttpError(
-        400,
-        'VALIDATION_ERROR',
-        'Enter your employee ID or email, and your password.',
-      );
-    }
-    const { identifier, password, remember } = parsed.data;
-    const ip = req.ip ?? 'unknown';
-    const accountKey = `${ip}|${identifier}`;
-    if (perAccount.isBlocked(accountKey) || perIp.isBlocked(ip)) {
-      res.set('Retry-After', String(LIMIT_WINDOW_MS / 1000));
-      throw new HttpError(
-        429,
-        'TOO_MANY_ATTEMPTS',
-        'Too many sign-in attempts. Try again in 15 minutes.',
-      );
-    }
-    // Count before the slow password check so parallel guesses are limited too.
-    perAccount.hit(accountKey);
-    perIp.hit(ip);
-    try {
-      const result = await auth.login(
-        identifier,
-        password,
-        clientMeta(req),
-        remember,
-      );
-      perAccount.reset(accountKey);
-      perIp.forgive(ip);
-      send(res, result);
-    } catch (error) {
-      if (!(
-        error instanceof HttpError && error.code === 'INVALID_CREDENTIALS'
-      )) {
-        perAccount.forgive(accountKey);
-        perIp.forgive(ip);
-      }
-      throw error;
-    }
-  };
-
-  const refresh: RequestHandler = async (req, res) => {
-    assertWebOrigin(req);
-    try {
-      send(
-        res,
-        await auth.refresh(readCookie(req, REFRESH_COOKIE), clientMeta(req)),
-      );
-    } catch (error) {
-      // A concurrent refresh already set a newer cookie; keep it.
-      if (!(
-        error instanceof HttpError && error.code === 'REFRESH_IN_PROGRESS'
-      )) {
-        res.clearCookie(REFRESH_COOKIE, cookieOptions);
-      }
-      throw error;
-    }
-  };
-
-  const logout: RequestHandler = async (req, res) => {
-    assertWebOrigin(req);
-    await auth.logout(readCookie(req, REFRESH_COOKIE));
-    res.clearCookie(REFRESH_COOKIE, cookieOptions).status(204).end();
-  };
-
-  // Wrong current passwords count per account, like sign-in attempts.
-  const perUser = createFailureLimiter(5, LIMIT_WINDOW_MS);
-  const changePassword: RequestHandler = async (req, res) => {
-    const userId: string = res.locals.auth.userId;
-    const parsed = changePasswordSchema.safeParse(req.body);
-    if (!parsed.success) {
-      throw new HttpError(
-        400,
-        'VALIDATION_ERROR',
-        parsed.error.issues[0]?.message ?? 'Check the passwords.',
-      );
-    }
-    if (perUser.isBlocked(userId)) {
-      res.set('Retry-After', String(LIMIT_WINDOW_MS / 1000));
-      throw new HttpError(
-        429,
-        'TOO_MANY_ATTEMPTS',
-        'Too many attempts. Try again in 15 minutes.',
-      );
-    }
-    perUser.hit(userId);
-    try {
-      await auth.changePassword(
-        userId,
-        parsed.data.currentPassword,
-        parsed.data.newPassword,
-        readCookie(req, REFRESH_COOKIE),
-      );
-      perUser.reset(userId);
-      res.status(204).end();
-    } catch (error) {
-      if (!(error instanceof HttpError && error.code === 'WRONG_PASSWORD')) {
-        perUser.forgive(userId);
-      }
-      throw error;
-    }
-  };
-
-  const me: RequestHandler = async (_req, res) => {
-    res.json({ user: await auth.me(res.locals.auth.userId) });
-  };
-
-  return { login, refresh, logout, changePassword, me };
+  return { ...handlers(false), native: handlers(true) };
 }

@@ -27,94 +27,111 @@ IOS-004–009 and IOS-011 can proceed in parallel after session foundations. Sta
 
 ## IOS-001 — Local baseline
 
-- [ ] Record Xcode, simulator, Expo/Node versions and a reproducible local setup.
-- [ ] Launch existing app on an iPhone simulator; test safe areas, keyboard and tabs.
+In progress: [simulator baseline and reproduction notes](../mobile/ios-docs/BASELINE.md).
+
+- [x] Record Xcode, simulator, Expo/Node versions and a reproducible local setup.
+- [x] Launch existing app on an iPhone simulator; check safe areas, hardware text entry and all five tabs.
+- [ ] Verify software keyboard presentation and form avoidance.
 - [ ] Decide supported iPhone/iOS versions and verify or explicitly revise declared iPad support.
-- [ ] Record baseline export/typecheck/lint failures separately from new work.
+- [x] Record baseline export/typecheck/lint results and dependency warnings separately from new work.
 
 Done: a teammate reproduces the local launch using [DEVELOPMENT.md](../mobile/ios-docs/DEVELOPMENT.md).
 
 ## IOS-002 — Native session contract
 
-- [ ] Document cookie versus native token handling with refresh, rotation, logout and password change semantics.
-- [ ] Test persistence/restart and native HTTP behavior; retain browser origin/cookie protections.
-- [ ] Add any required backend contract and permission/security tests; document endpoint changes before mobile use.
+Backend contract and native HTTP verification ready: [decision and evidence](../mobile/ios-docs/NATIVE_SESSION.md). Mobile Keychain/restart integration is IOS-003.
+
+- [x] Document cookie versus native token handling with refresh, rotation, logout and password change semantics.
+- [x] Verify cookie-free native HTTP login/rotation/logout/password change and a fresh client presenting a saved credential; retain browser origin/cookie protections.
+- [x] Verify actual persisted app restart with IOS-003; simulator cold restart restored the remembered session.
+- [x] Add required backend contract and permission/security tests; document endpoint changes before mobile use.
 
 Done: agreed transport works on native and existing browser session tests pass. No assumption that Bearer-only logout revokes the refresh session.
 
 ## IOS-003 — Secure client and session lifecycle
 
-- [ ] Implement secure persistence using the agreed contract; keep secrets out of ordinary storage/logs.
-- [ ] Restore session, serialize refresh, retry once, handle revocation and show useful errors.
-- [ ] Guard protected navigation; clear credentials, sockets and account-specific caches on logout/switch.
-- [ ] Ensure release sessions cannot enter demo mode after authentication or API failure.
+Implemented with [session verification evidence](../mobile/ios-docs/NATIVE_SESSION.md).
 
-Done: restart, expiry, parallel 401, password change, logout and account-switch tests pass on native.
+- [x] Implement secure persistence using the agreed contract; keep secrets out of ordinary storage/logs.
+- [x] Restore session, serialize refresh, retry once, handle revocation and show useful errors.
+- [x] Guard protected navigation; clear credentials and account-specific caches on logout/switch. Authenticated sockets are added in IOS-009.
+- [x] Ensure release sessions cannot enter demo mode after authentication or API failure.
+
+Verified: simulator cold restart, remembered/unremembered login, logout, account switching and protected deep links. Automated tests cover expiry, parallel 401, storage errors and races; IOS-002 verifies native password-change session isolation. Physical-device and full-role acceptance remains IOS-012–013; mobile password UI is IOS-011.
 
 ## IOS-004 — Home
 
-- [ ] Replace placeholder summaries with permitted live data; label unavailable values honestly.
-- [ ] Add refresh, independent loading/error/empty states and links to each source screen.
-- [ ] Verify no employee record does not become a department-wide personal dashboard.
+Implemented: [Home integration and verification](../mobile/ios-docs/HOME.md).
 
-Done: displayed values agree with the test account's backend records; no fake punch or balance appears offline.
+- [x] Replace placeholder summaries with permitted live data; label unavailable values honestly.
+- [x] Add refresh, independent loading/error/empty states and links to implemented source screens.
+- [x] Verify no employee record does not become a department-wide personal dashboard.
+
+Verified with disposable authenticated API fixtures in the iPhone simulator and the web build at 375/1280px. Read-only Home values match fixture responses; partial Attendance failure/retry leaves other summaries usable. No production HR records were accessed. Full role/device acceptance remains IOS-013. Dated duties were added in IOS-005. Attendance history/punches and the full notification inbox remain IOS-006 and IOS-009.
 
 ## IOS-005 — Timetable
 
-- [ ] Verify daily/week data and periods on iPhone with refresh/error recovery.
-- [ ] Render dated server duties; check timezone, midnight/week rollover and live class status updates.
-- [ ] Test empty/Sunday, long names and lab batches; keep demo assignments out of real sessions.
+Implemented: [dated timetable integration and evidence](../mobile/ios-docs/TIMETABLE.md).
 
-Done: own schedule agrees with the web/API and coverage never repeats on unrelated dates.
+- [x] Verify daily/week data and periods on iPhone simulator with refresh/error recovery.
+- [x] Render dated server duties; test IST midnight/year/week rollover and live class status boundaries.
+- [x] Test empty/Sunday, long names and lab batches; keep local demo assignments out of real sessions.
+
+Simulator and authenticated fixture checks confirm an assigned lab appears only on its exact date, not the following week. Home uses the same dated duties. Regular classes remain available when coverage fails; removed duties disappear after refresh. Physical iPhone, iPad, VoiceOver and the broader role/device matrix remain IOS-013. `/substitution/mine` supplies current/future duties only; historical coverage is explicitly unavailable.
 
 ## IOS-006 — Attendance
 
-- [ ] Integrate today, monthly history and correction requests.
-- [ ] Enable mobile punch only for permitted users/policy; guard duplicate taps and ambiguous failures.
-- [ ] Show server validation/permission errors without inventing a successful punch.
+Implemented: [attendance integration and verification](../mobile/ios-docs/ATTENDANCE.md).
 
-Done: permitted writes and rejected/offline cases agree with API records and policy.
+- [x] Integrate own today record, monthly history and paged correction requests.
+- [x] Enable explicit MOBILE punch actions only with permission and loaded policy/state; guard duplicate taps and ambiguous failures.
+- [x] Show server validation/permission errors without inventing a successful punch or approved correction.
+
+Browser and iPhone-simulator checks use disposable accounts and the actual attendance service with an in-memory repository. PostgreSQL tests verify atomic concurrent punches, scope, filtering and retained web behavior. Attendance policy/date semantics remain UTC and are labelled. Unknown correction outcomes require checking requests/HR; there is no automatic resend. Physical-device and full-role acceptance remains IOS-013.
 
 ## IOS-007 — Leave
 
-- [ ] Verify current DTOs, real balances/types, half days, date entry and request history.
-- [ ] Integrate apply/cancel and department-scoped HOD recommendations; preserve form input on failure.
-- [ ] Remove demo fallback from every live leave read/write path.
+- [x] Verify current DTOs, real balances/types, half days, date entry and request history.
+- [x] Integrate apply/cancel and department-scoped HOD recommendations; preserve form input on failure.
+- [x] Remove demo fallback from every live leave read/write path.
 
-Done: apply → recommendation/status → cancel/rejection paths work on native with correct API state.
+Verified: apply → recommendation/status → cancel/rejection paths work on the iPhone simulator against the actual leave service and a disposable repository. See [evidence and limits](../mobile/ios-docs/LEAVE.md). Physical-device acceptance remains IOS-013.
 
 ## IOS-008 — Substitution
 
-- [ ] Use affected-class/candidate endpoints and server eligibility scores, not the demo roster.
-- [ ] Assign/undo using the API; refresh coverage, timetable and recipient duties after confirmed writes.
-- [ ] Handle stale candidate conflicts and denial; do not report local-only real assignment success.
+- [x] Use affected-class/candidate endpoints and server eligibility scores, not the demo roster.
+- [x] Assign/undo using the API; refresh coverage, timetable and recipient duties after confirmed writes.
+- [x] Handle stale candidate conflicts and denial; do not report local-only real assignment success.
 
-Done: an authorized HOD's assignment appears on another account/device and undo removes it. Keep the local prototype demo-only until then.
+Verified with two separate HOD/Faculty sessions: assignment appears on the recipient's dated timetable and undo removes it after refresh. Native HOD assignment/undo passed on the simulator. The unused local prototype was removed. See [evidence and limits](../mobile/ios-docs/SUBSTITUTION.md); physical cross-device acceptance remains IOS-013.
 
 ## IOS-009 — In-app notifications
 
-- [ ] Implement paginated own list, unread count, read/read-all and foreground/reconnect refresh.
-- [ ] Authenticate sockets with the current token; tear down on logout.
-- [ ] Map allowed server links to native routes with auth/permission checks.
+- [x] Implement paginated own list, unread count, read/read-all and foreground/reconnect refresh.
+- [x] Authenticate sockets with the current token; tear down on logout.
+- [x] Map allowed server links to native routes with auth/permission checks.
 
-Done: changes persist across sessions and another user's notifications cannot be read.
+Verified: server read state survives a client restart, foreign IDs are rejected, live feeds/counts stay scoped across two accounts, and reconnect refetches missed changes. Native inbox/read/read-all/live delivery passed on the simulator. See [verification and limits](../mobile/ios-docs/NOTIFICATIONS.md). Physical-device acceptance remains IOS-013.
 
 ## IOS-010 — Remote push
 
-- [ ] Backend: define/register/remove owned device tokens; implement sender and invalid-token cleanup.
-- [ ] Configure the approved project/signing capabilities and handle permission refusal or later changes.
+Implementation ready: [session ownership, delivery worker and verification](../mobile/ios-docs/REMOTE_PUSH.md). Not complete: approved IOS-012 signing/project and real iPhone/APNs acceptance are still pending.
+
+- [x] Backend: define/register/remove owned device tokens; implement sender and invalid-token cleanup.
+- [x] Implement explicit permission controls, refusal/Settings recovery and foreground rechecks.
+- [ ] Configure the approved project/signing capabilities (IOS-012).
 - [ ] Test foreground/background/cold start, tap navigation, logout and account-switch cleanup on an iPhone.
-- [ ] Remove release-facing test-notification controls; keep sensitive details out of lock-screen payloads.
+- [x] Remove release-facing test-notification controls; keep sensitive details out of lock-screen payloads.
 
 Done: a real server event reaches the correct signed-in device; a local preview does not count.
 
 ## IOS-011 — Profile and documents
 
-- [ ] Load own employee record and allowed contact edits; verify password change using the session contract.
-- [ ] Integrate native document selection/upload/status and protected preview with server type/size limits.
-- [ ] Handle cancellation, offline upload and expired/forbidden sessions without exposing cached files.
+- [x] Load own employee record and allowed contact edits; verify password change using the session contract.
+- [x] Integrate native document selection/upload/status and protected preview with server type/size limits.
+- [x] Handle cancellation, offline upload and expired/forbidden sessions without exposing cached files.
 
-Done: own-record access/edit tests pass and restricted documents stay private after account changes.
+Implementation and automated/browser acceptance complete: own-record edits, password/session checks and document isolation pass. Native picker/PDF, VoiceOver and physical-device acceptance remain IOS-012/013; see [evidence and limits](../mobile/ios-docs/PROFILE_AND_DOCUMENTS.md).
 
 ## IOS-012 — Development build
 

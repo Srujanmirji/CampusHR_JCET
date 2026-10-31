@@ -1,21 +1,29 @@
-import React, { createContext, useContext, useState } from 'react';
-import { API_BASE_URL } from './api-config';
-
-export interface AuthUser {
-  id: string;
-  email: string;
-  role: string;
-  permissions: string[];
-  employeeId: string | null;
-  departmentId: number | null;
-  employeeCode?: string;
-  name?: string;
-}
-
-interface AuthContextType {
-  status: 'loading' | 'signedIn' | 'signedOut';
-  user: AuthUser | null;
-  accessToken: string | null;
+import React, {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from 'react';
+import { clearDocumentCache } from './document-picker';
+import { theme } from './theme';
+import { Button } from '../components/ui/Button';
+import { AppState, Text, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  getSession,
+  subscribeSession,
+  restoreSession,
+  signIn,
+  signOut,
+  signInDemo,
+  refreshIfExpired,
+  type AuthUser,
+  type SessionState,
+} from './session';
+export type { AuthUser } from './session';
+interface AuthContextType extends SessionState {
   login: (
     identifier: string,
     password: string,
@@ -23,7 +31,6 @@ interface AuthContextType {
   ) => Promise<void>;
   logout: () => Promise<void>;
 }
-
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const DEMO_ACCOUNTS: Record<string, AuthUser> = {
@@ -204,130 +211,85 @@ const DEMO_ACCOUNTS: Record<string, AuthUser> = {
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [status, setStatus] = useState<'loading' | 'signedIn' | 'signedOut'>(
-    'signedOut',
-  );
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-
-  async function login(
-    identifier: string,
-    password: string,
-    remember: boolean = false,
-  ) {
-    const trimmedId = identifier.trim().toLowerCase();
-
-    // Check development demo credentials first for seamless UI testing
-    const demoUser = DEMO_ACCOUNTS[trimmedId];
-    if (
-      demoUser &&
-      (password === 'campus123' ||
-        password === 'CampusHR@2026' ||
-        password === 'Srujan1@' ||
-        password === 'Password123!')
-    ) {
-      setAccessToken('demo-jwt-token-jcet');
-      setUser(demoUser);
-      setStatus('signedIn');
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({
-          identifier: identifier.trim(),
-          password,
-          remember,
+  const [cacheReady, setCacheReady] = useState(false);
+  const [cacheError, setCacheError] = useState(false);
+  const prepare = useCallback(
+    () =>
+      clearDocumentCache()
+        .then(async () => {
+          setCacheError(false);
+          setCacheReady(true);
+          await restoreSession();
+        })
+        .catch(() => {
+          setCacheError(true);
         }),
-      });
+    [],
+  );
+  const state = useSyncExternalStore(subscribeSession, getSession, getSession);
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    let account = getSession().user;
+    const unsubscribe = subscribeSession(() => {
+      const next = getSession();
+      if (next.user !== account || next.status === 'signedOut')
+        queryClient.clear();
+      account = next.user;
+    });
+    void prepare();
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void refreshIfExpired().catch(() => undefined);
+    });
+    return () => {
+      unsubscribe();
+      subscription.remove();
+    };
+  }, [queryClient, prepare]);
 
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        const errorMessage =
-          data?.error?.message ||
-          data?.message ||
-          (response.status === 401
-            ? 'Invalid employee ID, email, or password.'
-            : response.status === 429
-              ? 'Too many login attempts. Please wait 15 minutes.'
-              : 'Unable to connect to the authentication server.');
-        throw new Error(errorMessage);
-      }
-
-      if (!data?.accessToken) {
-        throw new Error(
-          'Authentication succeeded but no access token was returned.',
-        );
-      }
-
-      const rawUser = data.user || {};
-      const authenticatedUser: AuthUser = {
-        id: rawUser.id,
-        email: rawUser.email,
-        role: rawUser.role,
-        permissions: rawUser.permissions || [],
-        employeeId: rawUser.employeeId || null,
-        departmentId: rawUser.departmentId || null,
-        employeeCode:
-          rawUser.employeeCode ||
-          (identifier.includes('@') ? undefined : identifier),
-        name:
-          rawUser.name ||
-          (rawUser.email ? rawUser.email.split('@')[0] : 'Faculty Member'),
-      };
-
-      setAccessToken(data.accessToken);
-      setUser(authenticatedUser);
-      setStatus('signedIn');
-    } catch (error) {
-      if (
-        (error instanceof TypeError && error.message.includes('fetch')) ||
-        (error instanceof Error &&
-          error.message.includes('Network request failed'))
-      ) {
-        throw new Error(
-          `Backend server is offline at ${API_BASE_URL}.\nTo test in Development Mode, use:\nID: JCET-CSE-021\nPassword: campus123`,
-          { cause: error },
-        );
-      }
-      throw error;
-    }
-  }
-
-  async function logout() {
+  async function login(identifier: string, password: string, remember = false) {
     try {
-      if (accessToken) {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }).catch(() => null);
-      }
-    } finally {
-      setAccessToken(null);
-      setUser(null);
-      setStatus('signedOut');
+      await clearDocumentCache();
+    } catch {
+      throw new Error(
+        'Temporary document files could not be cleared. Unlock the device and retry.',
+      );
     }
+    const demo = DEMO_ACCOUNTS[identifier.trim().toLowerCase()];
+    if (__DEV__ && demo && password === 'campus123') await signInDemo(demo);
+    else await signIn(identifier, password, remember);
   }
-
+  async function logout() {
+    setCacheReady(false);
+    await signOut();
+    await prepare();
+  }
+  if (cacheError)
+    return (
+      <View style={{ padding: theme.spacing.section }}>
+        <Text>
+          Temporary document files could not be cleared. Unlock the device, then
+          retry.
+        </Text>
+        <Button onPress={() => void prepare()}>
+          Retry private storage cleanup
+        </Button>
+      </View>
+    );
   return (
-    <AuthContext.Provider value={{ status, user, accessToken, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        ...state,
+        status: cacheReady ? state.status : 'loading',
+        login,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
-
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }

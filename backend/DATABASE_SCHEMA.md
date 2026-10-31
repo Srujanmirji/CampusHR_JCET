@@ -223,3 +223,20 @@ change.
 - before_json
 - after_json
 - created_at
+
+## Remote push (IOS-010)
+
+Migration `20261022120000_push_devices` adds:
+
+- `push_devices`: UUID ID, unique Expo routing token, owned user ID, unique refresh
+  session ID, approved Expo project UUID, `ios|android` platform, registration update timestamp. Deleting the
+  user/session cascades; token rotation/account transfer updates ownership through
+  the validated API. Tokens must never be returned in list APIs or logs.
+- `push_deliveries`: UUID ID, notification/device foreign keys (cascade), unique
+  notification/device pair, attempt count, next attempt/lease time, optional Expo
+  ticket ID and creation time. Due-time indexing supports concurrent worker claims.
+
+Logout/password changes remove devices for ended sessions. Refresh rotation moves
+registrations to the replacement session while preserving queued jobs. The queue
+never stores private message text separately. Applying this migration to a real
+local/staging/production database remains an explicit deployment step.

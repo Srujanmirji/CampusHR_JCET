@@ -1,0 +1,91 @@
+{
+  "project": "12747977855754983799",
+  "title": "CampusHR: Academic Workforce Platform",
+  "colors": {
+    "primary": "#000b31",
+    "primary-container": "#051f5b",
+    "surface": "#f8f9ff",
+    "surface-container-lowest": "#ffffff",
+    "surface-container-low": "#eff4ff",
+    "on-surface": "#121c2a",
+    "on-surface-variant": "#444650",
+    "outline": "#757681",
+    "outline-variant": "#c5c6d1",
+    "primary-fixed": "#dbe1ff",
+    "on-primary-fixed": "#00164d",
+    "secondary": "#b22c00",
+    "secondary-container": "#fd592b"
+  },
+  "typography": {
+    "heading": 28,
+    "greeting": 22,
+    "title": 17,
+    "body": 16,
+    "secondary": 14,
+    "button": 16,
+    "caption": 14
+  },
+  "radius": {
+    "card": 16,
+    "control": 10,
+    "field": 12
+  },
+  "screens": [
+    {
+      "title": "Push Notification Center (Faculty & HOD)",
+      "name": "projects/12747977855754983799/screens/7a3b09afc12f4a4aa9eb0018b40ef574"
+    },
+    {
+      "title": "Faculty Timetable & Schedule",
+      "name": "projects/12747977855754983799/screens/2f83739025ce43cf9953170653994c24"
+    },
+    {
+      "title": "Faculty Leave Management",
+      "name": "projects/12747977855754983799/screens/09ea79ae70ab49018a93000f6b658f00"
+    },
+    {
+      "title": "Faculty Mobile Home",
+      "name": "projects/12747977855754983799/screens/1803c039632741fda26dfaf895e4b78f"
+    },
+    {
+      "title": "Faculty Substitute Assignment",
+      "name": "projects/12747977855754983799/screens/2beef363b1244b3897580a1a75083d01"
+    },
+    {
+      "title": "Push Notification Center (Faculty & HOD)",
+      "name": "projects/12747977855754983799/screens/91f763d9e1be469899a21db0eafb59d5"
+    },
+    {
+      "title": "Faculty Apply Leave & Academic Impact",
+      "name": "projects/12747977855754983799/screens/db703af17f0a4cd5906a30031eec6d76"
+    },
+    {
+      "title": "HOD Smart Faculty Substitution",
+      "name": "projects/12747977855754983799/screens/4d837f7d10014c78bdb950a4e97740b6"
+    },
+    {
+      "title": "HOD Mobile Dashboard",
+      "name": "projects/12747977855754983799/screens/5119a48a81aa4e57aceea80b797c6085"
+    },
+    {
+      "title": "Faculty Profile & Notification Settings",
+      "name": "projects/12747977855754983799/screens/788345a25960437f87c50309e18af8fc"
+    },
+    {
+      "title": "Faculty Mobile Home",
+      "name": "projects/12747977855754983799/screens/dc624e4c002c4af18153e7f3dce54ff5"
+    },
+    {
+      "title": "HOD Leave Approval & Academic Impact Review",
+      "name": "projects/12747977855754983799/screens/12a41c2b2879430ebae93df004646a0b"
+    },
+    {
+      "title": "Faculty Profile & Notification Settings",
+      "name": "projects/12747977855754983799/screens/f51463bfaa184a73a4dcfd7a94f6ded6"
+    },
+    {
+      "title": "Faculty Attendance & Biometrics",
+      "name": "projects/12747977855754983799/screens/99c5d1bef2fd42a1a517bc5d817dbd89"
+    }
+  ]
+}

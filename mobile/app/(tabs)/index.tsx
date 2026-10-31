@@ -1,969 +1,805 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { Badge } from '../../components/ui/Badge';
+import React, { useCallback, useEffect, useState } from 'react';
+import { AppState, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Icon } from '../../components/ui/Icon';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
 import { ScreenContainer } from '../../components/ui/ScreenContainer';
 import { useAuth } from '../../lib/auth-context';
-import { sendTestNotification } from '../../lib/notifications';
 import {
-  mergeSubstitutionsIntoTimetable,
-  subscribeToSubstitutionStore,
-} from '../../lib/substitution-store';
+  campusClock,
+  getHomeAttendance,
+  getHomeBalances,
+  getHomeNotifications,
+  getHomeSchedule,
+  getHomeUnread,
+  getHomeWorkload,
+  homeNotificationRoute,
+  homeUnavailable,
+} from '../../lib/home-api';
+import { parseTimeToMinutes } from '../../lib/timetable-api';
+import { getDatedDuties, mergeDatedDuties } from '../../lib/schedule-api';
+import { HodHome } from '../../components/home/HodHome';
 import { theme } from '../../lib/theme';
-import {
-  formatPeriodTime,
-  getCurrentTimeMinutes,
-  getPeriods,
-  getSystemDayOfWeek,
-  getTimetableEntries,
-  parseTimeToMinutes,
-  type DayOfWeek,
-} from '../../lib/timetable-api';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { DataFreshness } from '../../components/ui/DataFreshness';
 
-const DAY_LABELS: Record<DayOfWeek, string> = {
-  MON: 'Monday',
-  TUE: 'Tuesday',
-  WED: 'Wednesday',
-  THU: 'Thursday',
-  FRI: 'Friday',
-  SAT: 'Saturday',
-};
+function HomeState({
+  unavailable,
+  pending,
+  error,
+  retry,
+  children,
+  onDark = false,
+}: {
+  onDark?: boolean;
+  unavailable: string | null;
+  pending: boolean;
+  error: Error | null;
+  retry: () => void;
+  children: React.ReactNode;
+}) {
+  if (unavailable)
+    return (
+      <Text style={[styles.detail, onDark && styles.onHero]}>
+        {unavailable}
+      </Text>
+    );
+  if (pending) return <Skeleton label="Loading summary" inverse={onDark} />;
+  if (error)
+    return (
+      <View style={styles.stack}>
+        <Text
+          accessibilityRole="alert"
+          style={[styles.error, onDark && styles.onHero]}
+        >
+          Could not load this summary.{' '}
+          {error.name === 'ZodError'
+            ? 'The server returned an unexpected response. Refresh or contact support.'
+            : error.message}
+        </Text>
+        <Button variant="outline" onPress={retry}>
+          Retry
+        </Button>
+      </View>
+    );
+  return children;
+}
 
 export default function DashboardScreen() {
+  const { user } = useAuth();
+  return user?.role === 'HOD' ? <HodHome /> : <FacultyHome />;
+}
+function FacultyHome() {
   const router = useRouter();
-  const { user, accessToken, logout } = useAuth();
+  const { user, accessToken } = useAuth();
+  const queryClient = useQueryClient();
+  const [clock, setClock] = useState(() => campusClock());
   const isDemo = !!accessToken?.startsWith('demo-');
-  const [notificationStatus, setNotificationStatus] = useState<string | null>(
-    null,
+  const unavailable = (permission: string) =>
+    homeUnavailable(user, accessToken, permission);
+  const refresh = useCallback(() => {
+    setClock(campusClock());
+    void queryClient.invalidateQueries({ queryKey: ['home', user?.id] });
+    void queryClient.invalidateQueries({
+      queryKey: ['notifications', user?.id],
+    });
+    void queryClient.invalidateQueries({
+      queryKey: ['dated-duties', user?.id],
+    });
+  }, [queryClient, user?.id]);
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh]),
   );
-
-  // Current system day of week (MON - SAT) or Sunday holiday
-  const { day: todayDay, isSunday } = useMemo(() => getSystemDayOfWeek(), []);
-
-  // Fetch JCET period timetable definitions
-  const {
-    data: periods = [],
-    error: periodsError,
-    isPending: loadingPeriods,
-    refetch: refetchPeriods,
-  } = useQuery({
-    queryKey: ['timetable-periods', accessToken],
-    queryFn: () => getPeriods(accessToken),
-    staleTime: 1000 * 60 * 30, // 30 minutes cache
-  });
-
-  // Fetch timetable entries for today
-  const {
-    data: entries = [],
-    isLoading: loadingEntries,
-    isRefetching: refreshingClasses,
-    error: classesQueryError,
-    refetch: refetchClasses,
-  } = useQuery({
-    queryKey: ['timetable-entries', accessToken, todayDay, user?.employeeId],
-    queryFn: () =>
-      getTimetableEntries(accessToken, {
-        day: todayDay || undefined,
-        facultyId: user?.employeeId || undefined,
-      }),
-    enabled: !!todayDay && !isSunday,
-    staleTime: 1000 * 60 * 5, // 5 minutes cache
-  });
-
-  const loadingClasses = loadingEntries || loadingPeriods;
-  const scheduleError = classesQueryError || periodsError;
-  const classesError = scheduleError
-    ? scheduleError instanceof Error
-      ? scheduleError.message
-      : 'Unable to load today’s schedule.'
-    : null;
-
-  // Listen for smart substitution assignments updates
-  const [, setSubVersion] = useState(0);
-
   useEffect(() => {
-    return subscribeToSubstitutionStore(() => {
-      setSubVersion((v) => v + 1);
+    const interval = setInterval(() => setClock(campusClock()), 60_000);
+    const listener = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
     });
-  }, []);
-
-  const todayDateStr = useMemo(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }, []);
-
-  // Merge any assigned substitution duties for the authenticated faculty member for today
-  const mergedEntries = (() => {
-    if (!accessToken?.startsWith('demo-')) return entries;
-    return mergeSubstitutionsIntoTimetable(
-      entries,
-      {
-        id: user?.id,
-        employeeId: user?.employeeId,
-        employeeCode: user?.employeeCode,
-      },
-      todayDay,
-      todayDateStr,
-    );
-  })();
-
-  // Enrich timetable entries with period timings, formatted times, and live status
-  const enrichedEntries = useMemo(() => {
-    if (isSunday || !todayDay) return [];
-
-    const currentMinutes = getCurrentTimeMinutes();
-    const sorted = [...mergedEntries].sort(
-      (a, b) => a.startPeriod - b.startPeriod,
-    );
-
-    return sorted.map((entry) => {
-      const startPeriodObj = periods.find(
-        (p) => p.number === entry.startPeriod,
-      );
-      const endPeriodObj = periods.find((p) => p.number === entry.endPeriod);
-
-      const startTime = startPeriodObj?.startTime || '09:00';
-      const endTime = endPeriodObj?.endTime || '10:00';
-
-      const startMin = parseTimeToMinutes(startTime);
-      const endMin = parseTimeToMinutes(endTime);
-
-      const isActiveNow = currentMinutes >= startMin && currentMinutes < endMin;
-      const isUpcoming = currentMinutes < startMin;
-      const isCompleted = currentMinutes >= endMin;
-
-      const format12 = (t: string) => {
-        const [hStr, mStr] = t.split(':');
-        let h = parseInt(hStr, 10);
-        const m = mStr || '00';
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        h = h % 12 || 12;
-        return `${h}:${m} ${ampm}`;
-      };
-
-      return {
-        ...entry,
-        startTime,
-        endTime,
-        startTime12: format12(startTime),
-        endTime12: format12(endTime),
-        timeLabel: formatPeriodTime(startTime, endTime),
-        periodLabel:
-          entry.startPeriod === entry.endPeriod
-            ? `P${entry.startPeriod}`
-            : `P${entry.startPeriod}–${entry.endPeriod}`,
-        isActiveNow,
-        isUpcoming,
-        isCompleted,
-      };
-    });
-  }, [mergedEntries, periods, todayDay, isSunday]);
-
-  // Find active or next upcoming class for key metric teasers
-  const classStatus = useMemo(() => {
-    const active = enrichedEntries.find((e) => e.isActiveNow);
-    if (active) {
-      return { kind: 'ACTIVE' as const, entry: active };
-    }
-    const next = enrichedEntries.find((e) => e.isUpcoming);
-    if (next) {
-      return { kind: 'NEXT' as const, entry: next };
-    }
-    const allDone =
-      enrichedEntries.length > 0 && enrichedEntries.every((e) => e.isCompleted);
-    if (allDone) {
-      return { kind: 'COMPLETED' as const, entry: null };
-    }
-    return { kind: 'NONE' as const, entry: null };
-  }, [enrichedEntries]);
-
-  async function handleTestNotification() {
+    return () => {
+      clearInterval(interval);
+      listener.remove();
+    };
+  }, [refresh]);
+  const attendanceDate = new Date().toISOString().slice(0, 10);
+  const key = ['home', user?.id];
+  const schedule = useQuery({
+    queryKey: [...key, 'schedule', clock.date],
+    queryFn: () => getHomeSchedule(user, accessToken, clock.day),
+    enabled: !unavailable('timetable.read'),
+    retry: false,
+    staleTime: 30_000,
+  });
+  const duties = useQuery({
+    queryKey: ['dated-duties', user?.id, clock.date],
+    queryFn: () => getDatedDuties(user, accessToken),
+    enabled:
+      !unavailable('timetable.read') && !unavailable('substitution.read'),
+    retry: false,
+    staleTime: 30_000,
+  });
+  const attendance = useQuery({
+    queryKey: [...key, 'attendance', attendanceDate],
+    queryFn: () => getHomeAttendance(user, accessToken, attendanceDate),
+    enabled: !unavailable('attendance.read'),
+    retry: false,
+    staleTime: 30_000,
+  });
+  const balances = useQuery({
+    queryKey: [...key, 'balances', clock.year],
+    queryFn: () => getHomeBalances(user, accessToken, clock.year),
+    enabled: !unavailable('leave.read'),
+    retry: false,
+    staleTime: 30_000,
+  });
+  const workload = useQuery({
+    queryKey: [...key, 'workload'],
+    queryFn: () => getHomeWorkload(user, accessToken),
+    enabled: !unavailable('workload.read'),
+    retry: false,
+    staleTime: 30_000,
+  });
+  const notifications = useQuery({
+    queryKey: ['notifications', user?.id, 'preview'],
+    queryFn: () => getHomeNotifications(user, accessToken),
+    enabled: !unavailable('notification.read'),
+    retry: false,
+    staleTime: 30_000,
+  });
+  const unread = useQuery({
+    queryKey: ['notifications', user?.id, 'unread'],
+    queryFn: () => getHomeUnread(user, accessToken),
+    enabled: !unavailable('notification.read'),
+    retry: false,
+    staleTime: 30_000,
+  });
+  const refreshing = [
+    schedule,
+    duties,
+    attendance,
+    balances,
+    workload,
+    notifications,
+    unread,
+  ].some((query) => query.isFetching);
+  const attendanceRecord = attendance.data;
+  let scheduleRows = schedule.data?.entries ?? [];
+  let dutyError = duties.error;
+  if (schedule.data && !duties.isError) {
     try {
-      setNotificationStatus('Sending notification…');
-      const result = await sendTestNotification();
-      if (result.type === 'preview-simulated') {
-        setNotificationStatus(
-          '✓ Notification preview simulated (Expo Go: native push unavailable)',
-        );
-      } else {
-        setNotificationStatus('✓ Notification sent! Check your device tray.');
-      }
-      setTimeout(() => setNotificationStatus(null), 4000);
-    } catch {
-      setNotificationStatus('Failed to send notification.');
-      setTimeout(() => setNotificationStatus(null), 4000);
+      scheduleRows = mergeDatedDuties(
+        schedule.data.entries,
+        duties.data ?? [],
+        clock.date,
+        schedule.data.periods,
+      );
+    } catch (cause) {
+      dutyError =
+        cause instanceof Error
+          ? cause
+          : new Error('Duty timings could not be read.');
     }
   }
-
-  async function handleLogout() {
-    await logout();
-    router.replace('/(auth)/login');
-  }
-
-  const dayTitle = isSunday
-    ? 'Sunday · Campus Holiday'
-    : todayDay
-      ? `${DAY_LABELS[todayDay]} Schedule`
-      : 'Today’s Schedule';
-
+  const upcoming = scheduleRows.find((entry) => {
+    const period = schedule.data?.periods.find(
+      (p) => p.number === entry.endPeriod,
+    );
+    return period && parseTimeToMinutes(period.endTime) > clock.minutes;
+  });
+  const nextStart =
+    upcoming &&
+    schedule.data?.periods.find((p) => p.number === upcoming.startPeriod)
+      ?.startTime;
+  const greetingHour = Number(
+    new Date().toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      hour12: false,
+    }),
+  );
+  const firstName = user?.name
+    ?.replace(/^(Prof\.?|Dr\.?)\s+/i, '')
+    .split(' ')[0];
+  const honorific = user?.name?.match(/^(Prof\.?|Dr\.?)\s+/i)?.[0] || '';
+  const nextEnd =
+    upcoming &&
+    schedule.data?.periods.find((p) => p.number === upcoming.endPeriod)
+      ?.endTime;
   return (
     <ScreenContainer
+      testID="home-screen"
       contentContainerStyle={styles.container}
       refreshControl={
         <RefreshControl
-          refreshing={refreshingClasses}
-          onRefresh={() => {
-            if (!isSunday && todayDay) {
-              void refetchClasses();
-              void refetchPeriods();
-            }
-          }}
+          refreshing={refreshing}
+          onRefresh={refresh}
+          tintColor={theme.colors.primary}
           colors={[theme.colors.primary]}
         />
       }
     >
-      {/* Top Header Bar */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>
-            Hello, {user?.name || 'Faculty Member'}
+      <View style={styles.welcome}>
+        <Text accessibilityRole="header" style={styles.greeting}>
+          Good{' '}
+          {greetingHour < 12
+            ? 'morning'
+            : greetingHour < 17
+              ? 'afternoon'
+              : 'evening'}
+          ,
+          <Text style={styles.name}>
+            {'\n'}
+            {firstName ? `${honorific}${firstName}` : 'welcome back'}
           </Text>
-          <Text style={styles.subGreeting}>
-            {user?.employeeCode || user?.email} {isDemo ? '· Demo session' : ''}
-          </Text>
-        </View>
-        <Badge
-          label={user?.role || 'FACULTY'}
-          variant="default"
-          style={styles.roleBadge}
-        />
-      </View>
-
-      {/* Campus Hero Card */}
-      <Card style={styles.heroCard}>
-        <Image
-          // Metro resolves bundled assets through require.
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          source={require('../../assets/jcet-campus.png')}
-          style={styles.heroImage}
-          resizeMode="cover"
-        />
-        <View style={styles.heroOverlay}>
-          <Text style={styles.heroTagline}>JCET HUBBALLI · CAMPUSHR</Text>
-          <Text style={styles.heroTitle}>
-            People at the heart of our campus.
-          </Text>
-        </View>
-      </Card>
-
-      {/* 2x2 Key Status Metrics */}
-      <View style={styles.metricsGrid}>
-        {/* Metric 1: Today's Classes (Dynamic MB-003) */}
-        <Card
-          style={styles.metricCard}
-          onPress={() => router.push('/(tabs)/timetable')}
-        >
-          <View style={styles.metricHeader}>
-            <Text style={styles.metricLabel}>Today's Classes</Text>
-            {loadingClasses ? (
-              <Badge label="Loading…" variant="secondary" />
-            ) : classesError ? (
-              <Badge label="Offline" variant="secondary" />
-            ) : isSunday ? (
-              <Badge label="Holiday" variant="secondary" />
-            ) : enrichedEntries.length === 0 ? (
-              <Badge label="Free" variant="secondary" />
-            ) : classStatus.kind === 'ACTIVE' ? (
-              <Badge label="In Progress" variant="success" />
-            ) : classStatus.kind === 'COMPLETED' ? (
-              <Badge label="Completed" variant="secondary" />
-            ) : (
-              <Badge label="Active" variant="success" />
-            )}
-          </View>
-          <Text style={styles.metricValue}>
-            {loadingClasses
-              ? '…'
-              : classesError
-                ? '—'
-                : isSunday
-                  ? '0'
-                  : enrichedEntries.length}
-          </Text>
-          <Text style={styles.metricDetail} numberOfLines={1}>
-            {loadingClasses
-              ? 'Checking schedule…'
-              : classesError
-                ? 'Unable to load classes'
-                : isSunday
-                  ? 'Sunday · Campus Holiday'
-                  : enrichedEntries.length === 0
-                    ? 'No classes scheduled today'
-                    : classStatus.kind === 'ACTIVE'
-                      ? `Now: ${classStatus.entry?.subject.code} (${classStatus.entry?.room.name})`
-                      : classStatus.kind === 'NEXT'
-                        ? `Next: ${classStatus.entry?.subject.code} at ${classStatus.entry?.startTime12}`
-                        : 'All classes completed for today'}
-          </Text>
-        </Card>
-
-        {/* Metric 2: Attendance */}
-        <Card
-          style={styles.metricCard}
-          onPress={() => router.push('/(tabs)/attendance')}
-        >
-          <View style={styles.metricHeader}>
-            <Text style={styles.metricLabel}>Attendance</Text>
-            <Badge
-              label={isDemo ? 'Demo' : 'View status'}
-              variant="secondary"
-            />
-          </View>
-          <Text style={styles.metricValue}>{isDemo ? '9:15 AM' : '—'}</Text>
-          <Text style={styles.metricDetail}>
-            {isDemo ? 'Sample punch' : 'Open attendance to view status'}
-          </Text>
-        </Card>
-
-        {/* Metric 3: Leave Balance */}
-        <Card
-          style={styles.metricCard}
-          onPress={() => router.push('/(tabs)/leave')}
-        >
-          <View style={styles.metricHeader}>
-            <Text style={styles.metricLabel}>Leave Balance</Text>
-            <Badge label="CL" variant="secondary" />
-          </View>
-          <Text style={styles.metricValue}>{isDemo ? '8.5' : '—'}</Text>
-          <Text style={styles.metricDetail}>
-            {isDemo
-              ? 'Sample casual leave balance'
-              : 'Open leave to view balance'}
-          </Text>
-        </Card>
-
-        {/* Metric 4: Workload */}
-        <Card
-          style={styles.metricCard}
-          onPress={() => router.push('/(tabs)/timetable')}
-        >
-          <View style={styles.metricHeader}>
-            <Text style={styles.metricLabel}>Workload</Text>
-            <Badge
-              label={isDemo ? 'Demo' : 'View timetable'}
-              variant="secondary"
-            />
-          </View>
-          <Text style={styles.metricValue}>{isDemo ? '16 / 18' : '—'}</Text>
-          <Text style={styles.metricDetail}>
-            {isDemo
-              ? 'Sample weekly teaching hours'
-              : 'View workload on the web'}
-          </Text>
-        </Card>
-      </View>
-
-      {/* Today's Schedule Section Header */}
-      <View style={styles.sectionHeader}>
-        <View style={styles.sectionHeaderLeft}>
-          <Text style={styles.sectionTitle}>Today's Class Schedule</Text>
-          <Text style={styles.sectionSubtitle}>{dayTitle}</Text>
-        </View>
-        <View style={styles.sectionHeaderActions}>
-          {!isSunday && (
-            <Pressable
-              onPress={() => {
-                void refetchClasses();
-                void refetchPeriods();
-              }}
-              style={styles.refreshBtn}
-              accessibilityLabel="Refresh today's timetable"
-              accessibilityRole="button"
-            >
-              <Text style={styles.refreshIcon}>↻</Text>
-            </Pressable>
+        </Text>
+        <Text style={styles.detail}>
+          {new Date(clock.date + 'T12:00:00+05:30').toLocaleDateString(
+            'en-IN',
+            {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              timeZone: 'Asia/Kolkata',
+            },
           )}
-          <Pressable onPress={() => router.push('/(tabs)/timetable')}>
-            <Text style={styles.sectionAction}>View all</Text>
-          </Pressable>
-        </View>
+        </Text>
       </View>
-
-      {/* Today's Class Schedule Card */}
-      <Card style={styles.scheduleCard}>
-        {loadingClasses ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="small" color={theme.colors.primary} />
-            <Text style={styles.stateText}>Loading today's classes…</Text>
-          </View>
-        ) : classesError ? (
-          <View style={styles.stateContainer}>
-            <Text style={styles.errorTitle}>Could not load schedule</Text>
-            <Text style={styles.errorDetail}>{classesError}</Text>
-            <Button
-              variant="outline"
-              onPress={() => {
-                void refetchClasses();
-                void refetchPeriods();
-              }}
-              style={styles.retryButton}
-            >
-              Retry
-            </Button>
-          </View>
-        ) : isSunday || enrichedEntries.length === 0 ? (
-          <View style={styles.stateContainer}>
-            <View style={styles.emptyPill}>
-              <Text style={styles.emptyPillText}>
-                {isSunday ? 'Campus Holiday' : 'Free Day'}
+      {isDemo && (
+        <Text style={styles.detail}>
+          Preview account · Sign in with your institutional account for personal
+          records.
+        </Text>
+      )}
+      <View style={styles.hero}>
+        <View style={styles.header}>
+          <Text style={styles.heroMeta}>
+            {upcoming
+              ? nextStart && parseTimeToMinutes(nextStart) <= clock.minutes
+                ? 'In progress'
+                : 'Up next'
+              : 'Your teaching day'}
+          </Text>
+          <Icon name="school" color={theme.colors.heroMuted} />
+        </View>
+        <HomeState
+          onDark
+          unavailable={unavailable('timetable.read')}
+          pending={schedule.isPending}
+          error={schedule.error}
+          retry={() => void schedule.refetch()}
+        >
+          <Text style={styles.heroTitle}>
+            {upcoming?.subject.name ||
+              (scheduleRows.length
+                ? 'Teaching day complete'
+                : 'A little room to focus')}
+          </Text>
+          <Text style={styles.heroMeta}>
+            {upcoming
+              ? `${upcoming.subject.code} · Semester ${upcoming.semester}${upcoming.section}`
+              : scheduleRows.length
+                ? `${scheduleRows.length} ${scheduleRows.length === 1 ? 'class' : 'classes'} on today’s schedule`
+                : 'No regular classes on today’s schedule'}
+          </Text>
+          <View style={styles.heroFooter}>
+            <View style={styles.grow}>
+              {upcoming && (
+                <Text style={styles.heroTime}>
+                  {nextStart?.slice(0, 5)} – {nextEnd?.slice(0, 5)}
+                </Text>
+              )}
+              <Text style={styles.heroMeta}>
+                {upcoming ? upcoming.room.name : 'View your week at a glance'}
               </Text>
             </View>
-            <Text style={styles.emptyTitle}>
-              {isSunday
-                ? 'Sunday · Campus Closed'
-                : 'No classes scheduled for today'}
-            </Text>
-            <Text style={styles.emptyDetail}>
-              {isSunday
-                ? 'The college is closed on Sundays. View your full schedule for the week ahead.'
-                : 'You have no teaching periods or laboratory sessions scheduled for today.'}
-            </Text>
             <Button
-              variant="outline"
+              variant="secondary"
+              accessibilityLabel="View timetable"
+              style={styles.heroButton}
               onPress={() => router.push('/(tabs)/timetable')}
-              style={styles.viewWeekButton}
             >
-              View Full Week Timetable
+              <Icon name="next" color={theme.colors.primary} size={20} />
             </Button>
           </View>
-        ) : (
-          enrichedEntries.map((item, index) => (
-            <React.Fragment key={item.id}>
-              {index > 0 && <View style={styles.itemSeparator} />}
-              <View
-                style={[
-                  styles.classItem,
-                  item.isActiveNow && styles.classItemActive,
-                ]}
+        </HomeState>
+        <DataFreshness
+          updatedAt={schedule.dataUpdatedAt}
+          refreshing={schedule.isFetching}
+          inverse
+        />
+      </View>
+      <View style={styles.attendance}>
+        <View style={styles.statusIcon}>
+          <Icon name="attendance" color={theme.colors.mintInk} />
+        </View>
+        <View style={styles.grow}>
+          <HomeState
+            unavailable={unavailable('attendance.read')}
+            pending={attendance.isPending}
+            error={attendance.error}
+            retry={() => void attendance.refetch()}
+          >
+            <Text style={styles.label}>
+              {attendanceRecord?.checkOut
+                ? 'Your day is recorded'
+                : attendanceRecord?.checkIn
+                  ? 'You’re checked in'
+                  : 'Ready for your day?'}
+            </Text>
+            <Text style={styles.detail}>
+              {attendanceRecord?.checkIn
+                ? `${new Date(attendanceRecord.checkIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} UTC · ${attendanceRecord.checkOut ? 'Checked out' : 'Checked in'}`
+                : 'No check-in recorded · UTC day'}
+            </Text>
+          </HomeState>
+          <DataFreshness
+            updatedAt={attendance.dataUpdatedAt}
+            refreshing={attendance.isFetching}
+          />
+        </View>
+        <Button
+          variant="text"
+          accessibilityLabel="Open attendance"
+          onPress={() => router.push('/(tabs)/attendance')}
+        >
+          <Icon name="next" color={theme.colors.mintInk} size={20} />
+        </Button>
+      </View>
+      <View style={styles.summary}>
+        <View style={styles.summaryPart}>
+          <View
+            style={[
+              styles.bentoIconBadge,
+              { backgroundColor: theme.colors.violetContainer },
+            ]}
+          >
+            <Icon name="leave" color={theme.colors.violet} size={18} />
+          </View>
+          <Text style={styles.detail}>Leaves</Text>
+          <HomeState
+            unavailable={unavailable('leave.read')}
+            pending={balances.isPending}
+            error={balances.error}
+            retry={() => void balances.refetch()}
+          >
+            <Text style={styles.summaryValue}>
+              {balances.data?.length
+                ? balances.data.every((b) => b.remaining === null)
+                  ? 'No limit'
+                  : `${balances.data.reduce((sum, b) => sum + (b.remaining ?? 0), 0)} days`
+                : 'Not configured'}
+            </Text>
+            <Text style={styles.detail}>
+              {balances.data?.length
+                ? `${
+                    balances.data
+                      .filter((b) => b.remaining !== null)
+                      .map((b) => `${b.leaveType.code}: ${b.remaining}`)
+                      .join(' · ') || 'Unlimited'
+                  } remaining`
+                : 'Annual entitlement'}
+            </Text>
+          </HomeState>
+          <DataFreshness
+            updatedAt={balances.dataUpdatedAt}
+            refreshing={balances.isFetching}
+          />
+          <Button
+            variant="text"
+            style={styles.inlineAction}
+            onPress={() => router.push('/(tabs)/leave')}
+          >
+            Manage leave
+          </Button>
+        </View>
+        <View style={styles.summaryPart}>
+          <View
+            style={[
+              styles.bentoIconBadge,
+              { backgroundColor: theme.colors.blueContainer },
+            ]}
+          >
+            <Icon name="workload" color={theme.colors.primary} size={18} />
+          </View>
+          <Text style={styles.detail}>Weekly workload</Text>
+          <HomeState
+            unavailable={unavailable('workload.read')}
+            pending={workload.isPending}
+            error={workload.error}
+            retry={() => void workload.refetch()}
+          >
+            <Text style={styles.summaryValue}>
+              {workload.isSuccess ? `${workload.data.totalHours} hours` : '—'}
+            </Text>
+            <Text style={styles.detail}>
+              {workload.data?.maxHours != null
+                ? `of ${workload.data.maxHours} hour capacity`
+                : 'Teaching allocation'}
+            </Text>
+          </HomeState>
+          <DataFreshness
+            updatedAt={workload.dataUpdatedAt}
+            refreshing={workload.isFetching}
+          />
+          <Text style={styles.detail}>
+            {schedule.isSuccess
+              ? `${scheduleRows.length} ${scheduleRows.length === 1 ? 'class' : 'classes'} today`
+              : 'Schedule unavailable'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.section}>
+        <View style={styles.header}>
+          <Text accessibilityRole="header" style={styles.title}>
+            Today’s schedule
+          </Text>
+          <Button
+            variant="text"
+            onPress={() => router.push('/(tabs)/timetable')}
+          >
+            View all
+          </Button>
+        </View>
+        <HomeState
+          unavailable={unavailable('timetable.read')}
+          pending={schedule.isPending}
+          error={schedule.error}
+          retry={() => void schedule.refetch()}
+        >
+          {dutyError ? (
+            <View style={styles.notice}>
+              <Text style={styles.error}>
+                Substitution duties could not be loaded. Regular classes are
+                shown; coverage may be missing.
+              </Text>
+              <Button variant="text" onPress={() => void duties.refetch()}>
+                Retry duties
+              </Button>
+            </View>
+          ) : duties.isPending && !unavailable('substitution.read') ? (
+            <Text style={styles.detail}>
+              Checking dated substitution duties…
+            </Text>
+          ) : null}
+          {!scheduleRows.length && (
+            <View style={styles.empty}>
+              <Icon name="timetable" color={theme.colors.primary} />
+              <Text style={styles.body}>
+                No regular classes scheduled today.
+              </Text>
+              <Button
+                variant="text"
+                onPress={() => router.push('/(tabs)/timetable')}
               >
-                {/* Time & Period Column */}
-                <View style={styles.classTime}>
-                  <Text
-                    style={[
-                      styles.classTimeStart,
-                      item.isActiveNow && styles.textActive,
-                    ]}
-                  >
-                    {item.startTime12}
-                  </Text>
-                  <Text style={styles.classTimeEnd}>{item.endTime12}</Text>
+                Explore your week
+              </Button>
+            </View>
+          )}
+          {scheduleRows.map((entry) => {
+            const start = schedule.data?.periods.find(
+              (p) => p.number === entry.startPeriod,
+            )?.startTime;
+            const end = schedule.data?.periods.find(
+              (p) => p.number === entry.endPeriod,
+            )?.endTime;
+            const finished = end && parseTimeToMinutes(end) <= clock.minutes;
+            return (
+              <View key={entry.id} style={styles.scheduleRow}>
+                <View style={styles.timeRail}>
+                  <Text style={styles.time}>{start?.slice(0, 5)}</Text>
+                  <Text style={styles.detail}>{end?.slice(0, 5)}</Text>
+                </View>
+                <View style={styles.track}>
                   <View
                     style={[
-                      styles.periodBadge,
-                      item.isActiveNow && styles.periodBadgeActive,
+                      styles.timelineDot,
+                      entry.isSubstitute && styles.coverDot,
+                      finished && styles.finishedDot,
                     ]}
-                  >
-                    <Text
-                      style={[
-                        styles.periodBadgeText,
-                        item.isActiveNow && styles.periodBadgeTextActive,
-                      ]}
-                    >
-                      {item.periodLabel}
-                    </Text>
-                  </View>
+                  />
+                  <View style={styles.timelineLine} />
                 </View>
-
-                {/* Vertical Divider */}
-                <View
-                  style={[
-                    styles.classDivider,
-                    item.isActiveNow && styles.classDividerActive,
-                    item.isCompleted && styles.classDividerCompleted,
-                  ]}
-                />
-
-                {/* Class Details Column */}
-                <View style={styles.classDetails}>
-                  <View style={styles.subjectRow}>
-                    <Text
-                      style={[
-                        styles.classSubject,
-                        item.isActiveNow && styles.textActive,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {item.subject.code} · {item.subject.name}
-                    </Text>
-                  </View>
-
-                  {/* Active Now Pill */}
-                  {item.isActiveNow && (
-                    <View style={styles.activePill}>
-                      <View style={styles.activeDot} />
-                      <Text style={styles.activePillText}>In Progress Now</Text>
-                    </View>
-                  )}
-
-                  {/* Substitution Badge */}
-                  {item.isSubstitute && (
-                    <View style={styles.substitutePill}>
-                      <Text style={styles.substitutePillText}>
-                        Covering Substitution
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Class Meta (Section, Batch, Room, Kind) */}
-                  <Text style={styles.classMeta}>
-                    {`Sem ${item.semester}${item.section}`}
-                    {item.batch ? ` · ${item.batch}` : ''}
-                    {` · ${item.room.name}`}
-                    {` · ${item.subject.kind === 'LAB' ? 'Lab' : 'Theory'}`}
+                <View style={styles.classCopy}>
+                  <Text style={styles.subjectCode}>
+                    {entry.subject.code}
+                    {entry.isSubstitute ? ' · Cover duty' : ''}
                   </Text>
-
-                  {/* Substitute Note if assigned */}
-                  {item.substituteNote && (
-                    <Text style={styles.substituteNote} numberOfLines={2}>
-                      {item.substituteNote}
+                  <Text style={styles.label}>{entry.subject.name}</Text>
+                  <Text style={styles.detail}>
+                    Sem {entry.semester}
+                    {entry.section} · {entry.room.name}
+                  </Text>
+                  <Text style={styles.detail}>
+                    {entry.subject.kind}
+                    {finished ? ' · Completed' : ''}
+                  </Text>
+                  {entry.isSubstitute && (
+                    <Text style={styles.coverText}>
+                      {entry.dutyDate} · {entry.substituteNote}
                     </Text>
                   )}
                 </View>
               </View>
-            </React.Fragment>
-          ))
-        )}
-      </Card>
-
-      {/* Quick Actions Grid */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+            );
+          })}
+        </HomeState>
       </View>
-
-      <View style={styles.quickActionsGrid}>
-        <Button
-          variant="secondary"
-          onPress={() => router.push('/(tabs)/leave')}
-          style={styles.actionBtn}
-        >
-          Apply for Leave
-        </Button>
-        <Button
-          variant="secondary"
-          onPress={() => router.push('/(tabs)/timetable')}
-          style={styles.actionBtn}
-        >
-          My Timetable
-        </Button>
-      </View>
-
-      {/* Integrated Notification Demonstration Card */}
-      <Card style={styles.notificationCard}>
-        <Text style={styles.notificationCardTitle}>Notifications Channel</Text>
-        <Text style={styles.notificationCardBody}>
-          Try a notification on this device. Server push delivery is not
-          connected yet.
-        </Text>
-        <Button
-          variant="outline"
-          onPress={handleTestNotification}
-          style={styles.notificationTestButton}
-        >
-          Send Test Notification
-        </Button>
-        {notificationStatus && (
-          <Text style={styles.notificationStatusText}>
-            {notificationStatus}
+      <View style={styles.section}>
+        <View style={styles.header}>
+          <Text accessibilityRole="header" style={styles.title}>
+            Recent updates
           </Text>
-        )}
-      </Card>
-
-      {/* Sign Out Option */}
+          <Text style={styles.detail}>
+            {unread.isSuccess ? `${unread.data} unread` : ''}
+          </Text>
+        </View>
+        <HomeState
+          unavailable={unavailable('notification.read')}
+          pending={notifications.isPending}
+          error={notifications.error}
+          retry={() => void notifications.refetch()}
+        >
+          {!notifications.data?.length && (
+            <Text style={styles.body}>No notifications yet.</Text>
+          )}
+          {notifications.data?.map((item) => (
+            <View key={item.id} style={styles.updateRow}>
+              <View style={styles.updateIcon}>
+                <Icon name="bell" color={theme.colors.primary} size={20} />
+              </View>
+              <View style={styles.grow}>
+                <Text style={styles.label}>{item.title}</Text>
+                <Text style={styles.detail}>{item.body}</Text>
+                {homeNotificationRoute(item.link, user) && (
+                  <Button
+                    variant="text"
+                    style={styles.inlineAction}
+                    accessibilityLabel={`Open related screen for ${item.title}`}
+                    onPress={() =>
+                      router.push(homeNotificationRoute(item.link, user)!)
+                    }
+                  >
+                    Open update
+                  </Button>
+                )}
+              </View>
+            </View>
+          ))}
+        </HomeState>
+        <Button
+          variant="secondary"
+          onPress={() => router.push('/notifications')}
+        >
+          Open inbox
+        </Button>
+      </View>
       <Button
-        variant="outline"
-        onPress={handleLogout}
-        style={styles.logoutButton}
+        variant="text"
+        onPress={refresh}
+        loading={refreshing}
+        accessibilityLabel="Refresh all Home summaries"
       >
-        Sign Out from CampusHR
+        Refresh
       </Button>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    gap: theme.spacing.section,
-    paddingBottom: theme.spacing.xl,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xs,
-  },
-  headerLeft: {
-    flex: 1,
-    gap: 2,
-  },
+  container: { gap: theme.spacing.page, paddingBottom: theme.spacing.xl },
+  welcome: { gap: theme.spacing.sm, paddingTop: theme.spacing.sm },
   greeting: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.subheading,
-    color: theme.colors.primary,
+    fontWeight: '400',
+    fontSize: theme.typography.greeting,
+    lineHeight: theme.typography.greetingLineHeight,
+    letterSpacing: -0.6,
+    color: theme.colors.foreground,
   },
-  subGreeting: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
+  name: { fontWeight: '700' },
+  hero: {
+    backgroundColor: theme.colors.hero,
+    borderRadius: theme.radius.hero,
+    padding: theme.spacing.page,
+    gap: theme.spacing.md,
+    shadowColor: '#0F2557',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    elevation: 4,
   },
-  roleBadge: {
-    marginLeft: theme.spacing.sm,
-  },
-  heroCard: {
-    padding: 0,
-    overflow: 'hidden',
-    height: 140,
-    position: 'relative',
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-  },
-  heroOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(5, 31, 91, 0.75)',
-    padding: theme.spacing.md,
-  },
-  heroTagline: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 10,
-    color: theme.colors.accentInk,
-    letterSpacing: 0.5,
+  onHero: { color: theme.colors.onHero },
+  heroMeta: {
+    fontSize: theme.typography.secondary,
+    lineHeight: theme.typography.secondaryLineHeight,
+    color: theme.colors.heroMuted,
   },
   heroTitle: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.surface,
-    marginTop: 2,
+    fontSize: theme.typography.greeting,
+    lineHeight: theme.typography.greetingLineHeight,
+    fontWeight: '700',
+    letterSpacing: -0.6,
+    color: theme.colors.onHero,
   },
-  metricsGrid: {
+  heroTime: {
+    fontSize: theme.typography.body,
+    fontWeight: '600',
+    color: theme.colors.onHero,
+  },
+  heroFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    paddingTop: theme.spacing.section,
+  },
+  heroButton: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.full,
+  },
+  attendance: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    padding: theme.spacing.section,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    ...theme.shadows.card,
+  },
+  statusIcon: {
+    width: theme.sizes.tapTarget,
+    height: theme.sizes.tapTarget,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.mintContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summary: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: theme.spacing.md,
   },
-  metricCard: {
+  summaryPart: {
     flex: 1,
-    minWidth: '47%',
-    padding: theme.spacing.md,
-    gap: theme.spacing.xs,
+    minWidth: 130,
+    gap: theme.spacing.sm,
+    padding: theme.spacing.section,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    ...theme.shadows.card,
   },
-  metricHeader: {
+  bentoIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryValue: {
+    fontSize: theme.typography.metric,
+    lineHeight: theme.typography.greetingLineHeight,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    color: theme.colors.foreground,
+    fontVariant: ['tabular-nums'],
+  },
+  inlineAction: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 0,
+    justifyContent: 'flex-start',
+  },
+  grow: { flex: 1, gap: theme.spacing.xs },
+  header: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  metricLabel: {
-    fontFamily: theme.typography.headingFamily,
+  title: {
+    fontSize: theme.typography.subheading,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+    color: theme.colors.foreground,
+  },
+  label: {
+    fontSize: theme.typography.body,
+    fontWeight: '600',
+    lineHeight: theme.typography.lineHeight,
+    color: theme.colors.foreground,
+  },
+  body: {
+    fontSize: theme.typography.body,
+    lineHeight: theme.typography.lineHeight,
+    color: theme.colors.foreground,
+  },
+  detail: {
     fontSize: theme.typography.caption,
+    lineHeight: theme.typography.captionLineHeight,
     color: theme.colors.mutedForeground,
   },
-  metricValue: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 22,
-    color: theme.colors.primary,
-    marginTop: 2,
-  },
-  metricDetail: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: theme.spacing.xs,
-  },
-  sectionHeaderLeft: {
-    flex: 1,
-  },
-  sectionHeaderActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  sectionTitle: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.title,
-    color: theme.colors.primary,
-  },
-  sectionSubtitle: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-    marginTop: 1,
-  },
-  sectionAction: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.accentInk,
-  },
-  refreshBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  refreshIcon: {
-    fontSize: 16,
-    color: theme.colors.accentInk,
-    fontWeight: 'bold',
-    marginTop: -2,
-  },
-  scheduleCard: {
-    padding: theme.spacing.md,
-    gap: theme.spacing.md,
-  },
-  centerContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.lg,
-    gap: theme.spacing.sm,
-  },
-  stateContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.md,
-    gap: theme.spacing.xs,
-  },
-  stateText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-  },
-  errorTitle: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.label,
+  error: {
+    fontSize: theme.typography.secondary,
+    lineHeight: theme.typography.secondaryLineHeight,
     color: theme.colors.errorInk,
   },
-  errorDetail: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-    textAlign: 'center',
-    marginBottom: theme.spacing.xs,
-  },
-  retryButton: {
-    marginTop: 4,
-    minWidth: 100,
-  },
-  emptyPill: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 3,
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  emptyPillText: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 10,
-    color: theme.colors.mutedForeground,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  emptyTitle: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.primary,
-    textAlign: 'center',
-  },
-  emptyDetail: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-    textAlign: 'center',
-    maxWidth: 280,
-    lineHeight: 18,
-    marginBottom: 6,
-  },
-  viewWeekButton: {
-    marginTop: 4,
-  },
-  classItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: theme.spacing.md,
-    paddingVertical: 2,
-  },
-  classItemActive: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: theme.radius.control,
-    padding: 6,
-    marginHorizontal: -6,
-  },
-  classTime: {
-    width: 72,
-    alignItems: 'flex-start',
-    gap: 2,
-  },
-  classTimeStart: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.primary,
-  },
-  classTimeEnd: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: 11,
-    color: theme.colors.mutedForeground,
-  },
-  periodBadge: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-    marginTop: 2,
-  },
-  periodBadgeActive: {
-    backgroundColor: '#DCFCE7',
-  },
-  periodBadgeText: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 9,
-    color: theme.colors.mutedForeground,
-  },
-  periodBadgeTextActive: {
-    color: '#15803D',
-    fontWeight: 'bold',
-  },
-  classDivider: {
-    width: 2.5,
-    height: 48,
-    backgroundColor: theme.colors.border,
-    borderRadius: 1.5,
-    marginTop: 2,
-  },
-  classDividerActive: {
-    backgroundColor: theme.colors.accent,
-  },
-  classDividerCompleted: {
-    backgroundColor: '#CBD5E1',
-  },
-  classDetails: {
-    flex: 1,
-    gap: 3,
-  },
-  subjectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  classSubject: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.foreground,
-    flex: 1,
-  },
-  textActive: {
-    color: theme.colors.accentInk,
-  },
-  activePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-  },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#16A34A',
-  },
-  activePillText: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 10,
-    color: '#15803D',
-  },
-  substitutePill: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-  },
-  substitutePillText: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: 10,
-    color: '#B45309',
-  },
-  classMeta: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-  },
-  substituteNote: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: 11,
-    color: '#92400E',
-    fontStyle: 'italic',
-  },
-  itemSeparator: {
-    height: 1,
-    backgroundColor: theme.colors.muted,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-  },
-  actionBtn: {
-    flex: 1,
-  },
-  notificationCard: {
-    gap: theme.spacing.sm,
-    backgroundColor: '#FAFCFF',
-  },
-  notificationCardTitle: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.label,
-    color: theme.colors.primary,
-  },
-  notificationCardBody: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-    lineHeight: 18,
-  },
-  notificationTestButton: {
-    marginTop: 4,
-  },
-  notificationStatusText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.success,
-    textAlign: 'center',
-  },
-  logoutButton: {
-    marginTop: theme.spacing.sm,
+  stack: { gap: theme.spacing.sm },
+  section: {
+    gap: theme.spacing.section,
+    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border,
+    ...theme.shadows.card,
+  },
+  notice: {
+    gap: theme.spacing.sm,
+    backgroundColor: theme.colors.amberContainer,
+    borderRadius: theme.radius.control,
+    padding: theme.spacing.section,
+  },
+  empty: {
+    padding: theme.spacing.page,
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  scheduleRow: { flexDirection: 'row', gap: theme.spacing.md },
+  timeRail: { width: 48, gap: theme.spacing.xs, paddingTop: theme.spacing.xs },
+  time: {
+    fontSize: theme.typography.caption,
+    fontWeight: '600',
+    color: theme.colors.foreground,
+    fontVariant: ['tabular-nums'],
+  },
+  track: { alignItems: 'center', width: 8, paddingTop: theme.spacing.sm },
+  timelineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.primary,
+  },
+  coverDot: { backgroundColor: theme.colors.violet },
+  finishedDot: { backgroundColor: theme.colors.mint },
+  timelineLine: {
+    flex: 1,
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: theme.colors.border,
+    marginTop: theme.spacing.sm,
+  },
+  classCopy: {
+    flex: 1,
+    gap: theme.spacing.xs,
+    paddingBottom: theme.spacing.page,
+  },
+  subjectCode: {
+    fontSize: theme.typography.caption,
+    fontWeight: '600',
+    color: theme.colors.primary,
+  },
+  coverText: {
+    fontSize: theme.typography.caption,
+    lineHeight: theme.typography.captionLineHeight,
+    color: theme.colors.violet,
+  },
+  updateRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+  },
+  updateIcon: {
+    width: theme.sizes.avatar,
+    height: theme.sizes.avatar,
+    backgroundColor: theme.colors.blueContainer,
+    borderRadius: theme.radius.control,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

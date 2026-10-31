@@ -25,7 +25,7 @@ In a second terminal, use the existing iOS script:
 npm run ios --workspace @campushr/mobile
 ```
 
-This starts Expo and requests the iOS simulator. For a physical phone, start `npm run dev:mobile` and open the development session in the supported client. The API must be reachable from that phone; use the Mac's LAN address, not the phone's localhost.
+This starts Expo and requests the iOS simulator. For the verified local launch, simulator UI location and a localhost IPv4/IPv6 workaround, see [IOS-001 baseline](BASELINE.md). If Expo Go cannot reach an advertised localhost URL, retry with `npm run ios --workspace @campushr/mobile -- --lan --port 8081`. For a physical phone, start `npm run dev:mobile` and open the development session in the supported client. The API must be reachable from that phone; use the Mac's LAN address, not the phone's localhost.
 
 Example public development values in `mobile/.env`:
 
@@ -50,7 +50,11 @@ The socket value is an origin; Socket.IO uses `/api/v1/socket.io`. Every `EXPO_P
 | Phone cannot reach the API                          | Same network, LAN host/port, API bind address and firewall; test API reachability before changing application code |
 | Native networking differs from browser              | Device URL, TLS and development networking policy; do not disable release transport protections to fix local HTTP  |
 | Typed routes appear missing                         | Start Expo so its ignored `.expo/types` declarations regenerate, then rerun typecheck; do not cast routes to `any` |
-| Login works until restart                           | IOS-002–003 are incomplete; an in-memory access token is not session persistence                                   |
-| Notification preview works but remote push does not | Local scheduling is not server delivery; complete IOS-010 and use a suitable native build                          |
+| Login works until restart                           | Enable Remember me for native restart restoration; inspect the login error if renewal or Keychain access fails     |
+| Remote notifications unavailable in Expo Go | Use the approved signed development build and matching project/API settings; see REMOTE_PUSH.md                          |
 
 Generated `.expo/`, exports, local environment files, signing keys and generated native project files must remain outside committed source unless a reviewed build-strategy change explicitly needs them.
+
+Remote push implementation and its signing/device acceptance gate are documented in [IOS-010 Remote push](REMOTE_PUSH.md). Delivery is disabled until an approved project and signed build are configured.
+
+Profile now needs the existing `employee.read/update` and `document.read/upload` grants. Preview uses authenticated `/documents/:id/content`; public upload URLs are intentionally unavailable. See [IOS-011](PROFILE_AND_DOCUMENTS.md) for the fixture checks and native picker/PDF acceptance.

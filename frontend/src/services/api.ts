@@ -19,14 +19,17 @@ export class ApiError extends Error {
 
 // The access token lives in memory only, never in browser storage.
 let accessToken: string | undefined;
+let sessionIdentity: string | undefined;
+export const getSessionIdentity = () => sessionIdentity;
 // Renews the token from the refresh cookie; resolves false if signed out.
 let renewSession: (() => Promise<boolean>) | undefined;
 
 /** The current access token, e.g. to authenticate the notification socket. */
 export const getAccessToken = () => accessToken;
 
-export function setAccessToken(token: string | undefined) {
+export function setAccessToken(token: string | undefined, userId?: string) {
   accessToken = token;
+  sessionIdentity = userId;
 }
 export function onSessionExpired(renew: () => Promise<boolean>) {
   renewSession = renew;
@@ -37,7 +40,8 @@ async function send(
   method: string,
   body: unknown,
 ): Promise<Response> {
-  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const isFormData =
+    typeof FormData !== 'undefined' && body instanceof FormData;
   try {
     return await fetch(`${baseUrl}${path}`, {
       method,
@@ -69,7 +73,11 @@ const SESSION_PATHS = ['/auth/login', '/auth/refresh', '/auth/logout'];
 
 export async function apiRequest(
   path: string,
-  { method = 'GET', body }: { method?: string; body?: unknown } = {},
+  {
+    method = 'GET',
+    body,
+    responseType = 'json',
+  }: { method?: string; body?: unknown; responseType?: 'json' | 'blob' } = {},
 ): Promise<unknown> {
   let response = await send(path, method, body);
   // An expired access token: renew once from the refresh cookie and retry.
@@ -82,6 +90,7 @@ export async function apiRequest(
     response = await send(path, method, body);
   }
   if (response.status === 204) return undefined;
+  if (response.ok && responseType === 'blob') return response.blob();
   const data: unknown = await response.json().catch(() => undefined);
   if (!response.ok) {
     const error = (data as { error?: { code?: unknown; message?: unknown } })

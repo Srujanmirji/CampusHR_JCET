@@ -1,0 +1,351 @@
+{
+  "verifiedAt": "2026-10-24T12:13:09.286Z",
+  "leaveId": "24d52787-f1a2-4cf2-80f5-48256f3fe3e3",
+  "date": "2026-10-26",
+  "employeeId": "23458c32-261f-4270-95da-b8b9329e71ad",
+  "substituteId": "dc76ba9b-69db-4cf7-ba50-fc88e2ac0e46",
+  "assignments": [
+    "6c7a47f1-8d32-4bc4-8f85-f03bf42b679c",
+    "a9c3d4af-9885-43f8-afed-6a7ae3240eb3"
+  ],
+  "leave": {
+    "id": "24d52787-f1a2-4cf2-80f5-48256f3fe3e3",
+    "employee": {
+      "id": "23458c32-261f-4270-95da-b8b9329e71ad",
+      "employeeCode": "JCET-CSE-021",
+      "name": "Asha Patil"
+    },
+    "department": {
+      "id": 1,
+      "code": "CSE",
+      "name": "Computer Science & Engineering"
+    },
+    "leaveType": {
+      "id": 1,
+      "code": "CL",
+      "name": "Casual Leave"
+    },
+    "startDate": "2026-10-26",
+    "endDate": "2026-10-26",
+    "halfDay": null,
+    "days": 1,
+    "reason": "Native approval cycle - academic workshop",
+    "status": "APPROVED",
+    "approverRoles": [
+      "HOD",
+      "HR Admin"
+    ],
+    "pendingRole": null,
+    "decisions": [
+      {
+        "step": 0,
+        "role": "HOD",
+        "approved": true,
+        "note": null,
+        "decidedAt": "2026-10-24T11:55:10.252Z",
+        "decidedBy": "Ramesh Kulkarni"
+      },
+      {
+        "step": 1,
+        "role": "HR Admin",
+        "approved": true,
+        "note": "Balance and HOD recommendation reviewed. Final approval.",
+        "decidedAt": "2026-10-24T12:01:50.527Z",
+        "decidedBy": "Maya Desai"
+      }
+    ],
+    "createdAt": "2026-10-24T11:54:45.084Z"
+  },
+  "classes": [
+    {
+      "date": "2026-10-26",
+      "hours": 1,
+      "entry": {
+        "id": "de000000-0000-4000-8000-000000000001",
+        "department": {
+          "id": 1,
+          "code": "CSE",
+          "name": "Computer Science & Engineering"
+        },
+        "semester": 5,
+        "section": "A",
+        "batch": null,
+        "subject": {
+          "id": 1,
+          "code": "BCS501",
+          "name": "Database Management Systems",
+          "kind": "THEORY"
+        },
+        "faculty": {
+          "id": "23458c32-261f-4270-95da-b8b9329e71ad",
+          "employeeCode": "JCET-CSE-021",
+          "name": "Asha Patil"
+        },
+        "room": {
+          "id": 1,
+          "name": "Room 302",
+          "kind": "CLASSROOM"
+        },
+        "day": "MON",
+        "startPeriod": 1,
+        "endPeriod": 1
+      },
+      "coverage": {
+        "id": "6c7a47f1-8d32-4bc4-8f85-f03bf42b679c",
+        "kind": "SUBSTITUTE",
+        "substitute": {
+          "id": "dc76ba9b-69db-4cf7-ba50-fc88e2ac0e46",
+          "employeeCode": "JCET-CSE-022",
+          "name": "Priya Kulkarni"
+        },
+        "note": null,
+        "assignedAt": "2026-10-24T12:03:18.566Z"
+      }
+    },
+    {
+      "date": "2026-10-26",
+      "hours": 2,
+      "entry": {
+        "id": "de000000-0000-4000-8000-000000000002",
+        "department": {
+          "id": 1,
+          "code": "CSE",
+          "name": "Computer Science & Engineering"
+        },
+        "semester": 5,
+        "section": "A",
+        "batch": null,
+        "subject": {
+          "id": 2,
+          "code": "BCSL504",
+          "name": "Database Management Systems Laboratory",
+          "kind": "LAB"
+        },
+        "faculty": {
+          "id": "23458c32-261f-4270-95da-b8b9329e71ad",
+          "employeeCode": "JCET-CSE-021",
+          "name": "Asha Patil"
+        },
+        "room": {
+          "id": 2,
+          "name": "Computer Lab 3",
+          "kind": "LAB"
+        },
+        "day": "MON",
+        "startPeriod": 3,
+        "endPeriod": 4
+      },
+      "coverage": {
+        "id": "a9c3d4af-9885-43f8-afed-6a7ae3240eb3",
+        "kind": "SUBSTITUTE",
+        "substitute": {
+          "id": "dc76ba9b-69db-4cf7-ba50-fc88e2ac0e46",
+          "employeeCode": "JCET-CSE-022",
+          "name": "Priya Kulkarni"
+        },
+        "note": null,
+        "assignedAt": "2026-10-24T12:05:18.628Z"
+      }
+    }
+  ],
+  "duties": [
+    {
+      "id": "6c7a47f1-8d32-4bc4-8f85-f03bf42b679c",
+      "kind": "SUBSTITUTE",
+      "substitute": {
+        "id": "dc76ba9b-69db-4cf7-ba50-fc88e2ac0e46",
+        "employeeCode": "JCET-CSE-022",
+        "name": "Priya Kulkarni"
+      },
+      "note": null,
+      "assignedAt": "2026-10-24T12:03:18.566Z",
+      "date": "2026-10-26",
+      "entry": {
+        "id": "de000000-0000-4000-8000-000000000001",
+        "department": {
+          "id": 1,
+          "code": "CSE",
+          "name": "Computer Science & Engineering"
+        },
+        "semester": 5,
+        "section": "A",
+        "batch": null,
+        "subject": {
+          "id": 1,
+          "code": "BCS501",
+          "name": "Database Management Systems",
+          "kind": "THEORY"
+        },
+        "faculty": {
+          "id": "23458c32-261f-4270-95da-b8b9329e71ad",
+          "employeeCode": "JCET-CSE-021",
+          "name": "Asha Patil"
+        },
+        "room": {
+          "id": 1,
+          "name": "Room 302",
+          "kind": "CLASSROOM"
+        },
+        "day": "MON",
+        "startPeriod": 1,
+        "endPeriod": 1
+      },
+      "coveringFor": {
+        "id": "23458c32-261f-4270-95da-b8b9329e71ad",
+        "employeeCode": "JCET-CSE-021",
+        "name": "Asha Patil"
+      }
+    },
+    {
+      "id": "a9c3d4af-9885-43f8-afed-6a7ae3240eb3",
+      "kind": "SUBSTITUTE",
+      "substitute": {
+        "id": "dc76ba9b-69db-4cf7-ba50-fc88e2ac0e46",
+        "employeeCode": "JCET-CSE-022",
+        "name": "Priya Kulkarni"
+      },
+      "note": null,
+      "assignedAt": "2026-10-24T12:05:18.628Z",
+      "date": "2026-10-26",
+      "entry": {
+        "id": "de000000-0000-4000-8000-000000000002",
+        "department": {
+          "id": 1,
+          "code": "CSE",
+          "name": "Computer Science & Engineering"
+        },
+        "semester": 5,
+        "section": "A",
+        "batch": null,
+        "subject": {
+          "id": 2,
+          "code": "BCSL504",
+          "name": "Database Management Systems Laboratory",
+          "kind": "LAB"
+        },
+        "faculty": {
+          "id": "23458c32-261f-4270-95da-b8b9329e71ad",
+          "employeeCode": "JCET-CSE-021",
+          "name": "Asha Patil"
+        },
+        "room": {
+          "id": 2,
+          "name": "Computer Lab 3",
+          "kind": "LAB"
+        },
+        "day": "MON",
+        "startPeriod": 3,
+        "endPeriod": 4
+      },
+      "coveringFor": {
+        "id": "23458c32-261f-4270-95da-b8b9329e71ad",
+        "employeeCode": "JCET-CSE-021",
+        "name": "Asha Patil"
+      }
+    }
+  ],
+  "facultyNotifications": [
+    {
+      "id": "65a25a5d-6bad-4919-834c-7807653d4fb8",
+      "kind": "leave.approved",
+      "title": "Leave approved",
+      "body": "Casual Leave · 2026-10-26 · 1 day",
+      "link": "/leave?tab=mine&request=24d52787-f1a2-4cf2-80f5-48256f3fe3e3",
+      "readAt": "2026-10-24T12:11:31.897Z",
+      "createdAt": "2026-10-24T12:01:50.538Z"
+    },
+    {
+      "id": "5d1b2ccb-a520-4643-b7dc-87b5fb99781a",
+      "kind": "leave.progress",
+      "title": "Leave approved by the HOD",
+      "body": "Casual Leave · 2026-10-26 · 1 day. Now with the HR Admin.",
+      "link": "/leave?tab=mine&request=24d52787-f1a2-4cf2-80f5-48256f3fe3e3",
+      "readAt": null,
+      "createdAt": "2026-10-24T11:55:10.257Z"
+    }
+  ],
+  "substituteNotifications": [
+    {
+      "id": "5ed671c6-ced4-4250-84c9-9775488beff4",
+      "kind": "substitution.assigned",
+      "title": "You are covering Database Management Systems Laboratory",
+      "body": "CSE 5A · 2026-10-26 · periods 3–4 · Computer Lab 3 · for Asha Patil",
+      "link": "/substitution",
+      "readAt": null,
+      "createdAt": "2026-10-24T12:05:18.631Z"
+    },
+    {
+      "id": "247b25ce-fe04-4d47-b8c7-bde75e3d9705",
+      "kind": "substitution.assigned",
+      "title": "You are covering Database Management Systems",
+      "body": "CSE 5A · 2026-10-26 · period 1 · Room 302 · for Asha Patil",
+      "link": "/substitution",
+      "readAt": null,
+      "createdAt": "2026-10-24T12:03:18.572Z"
+    }
+  ],
+  "balances": [
+    {
+      "leaveType": {
+        "id": 1,
+        "code": "CL",
+        "name": "Casual Leave"
+      },
+      "active": true,
+      "year": 2026,
+      "entitled": 15,
+      "carriedIn": 0,
+      "used": 4,
+      "pending": 0,
+      "remaining": 11
+    },
+    {
+      "leaveType": {
+        "id": 2,
+        "code": "DL",
+        "name": "Duty Leave"
+      },
+      "active": true,
+      "year": 2026,
+      "entitled": null,
+      "carriedIn": 0,
+      "used": 0,
+      "pending": 0,
+      "remaining": null
+    },
+    {
+      "leaveType": {
+        "id": 4,
+        "code": "EL",
+        "name": "Earned Leave"
+      },
+      "active": true,
+      "year": 2026,
+      "entitled": 45,
+      "carriedIn": 15,
+      "used": 0,
+      "pending": 0,
+      "remaining": 45
+    },
+    {
+      "leaveType": {
+        "id": 3,
+        "code": "RH",
+        "name": "Restricted Holiday"
+      },
+      "active": true,
+      "year": 2026,
+      "entitled": 2,
+      "carriedIn": 0,
+      "used": 0,
+      "pending": 0,
+      "remaining": 2
+    }
+  ],
+  "interfaces": {
+    "faculty": "native iPhone",
+    "hod": "native iPhone",
+    "hr": "same-origin web",
+    "substitute": "native iPhone"
+  }
+}

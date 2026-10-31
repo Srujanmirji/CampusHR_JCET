@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 export const punchSchema = z.object({
+  action: z.enum(['CHECK_IN', 'CHECK_OUT']).optional(),
+  date: z.iso.date().optional(),
   source: z.enum(['WEB', 'MOBILE', 'BIOMETRIC', 'MANUAL']).default('WEB'),
   notes: z.string().max(250).optional(),
 });
@@ -10,7 +12,9 @@ export const manualRecordSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
   checkIn: z.string().datetime().optional().nullable(),
   checkOut: z.string().datetime().optional().nullable(),
-  status: z.enum(['PRESENT', 'ABSENT', 'HALF_DAY', 'ON_LEAVE', 'LATE']).default('PRESENT'),
+  status: z
+    .enum(['PRESENT', 'ABSENT', 'HALF_DAY', 'ON_LEAVE', 'LATE'])
+    .default('PRESENT'),
   notes: z.string().max(250).optional().nullable(),
 });
 
@@ -18,7 +22,9 @@ export const correctionRequestSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
   requestedCheckIn: z.string().datetime().optional().nullable(),
   requestedCheckOut: z.string().datetime().optional().nullable(),
-  requestedStatus: z.enum(['PRESENT', 'ABSENT', 'HALF_DAY', 'ON_LEAVE', 'LATE']).default('PRESENT'),
+  requestedStatus: z
+    .enum(['PRESENT', 'ABSENT', 'HALF_DAY', 'ON_LEAVE', 'LATE'])
+    .default('PRESENT'),
   reason: z.string().min(3, 'Reason must be at least 3 characters').max(500),
 });
 
@@ -28,12 +34,23 @@ export const reviewCorrectionSchema = z.object({
 });
 
 export const listAttendanceQuerySchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  startDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  endDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   departmentId: z.coerce.number().int().positive().optional(),
   employeeId: z.string().uuid().optional(),
-  status: z.enum(['PRESENT', 'ABSENT', 'HALF_DAY', 'ON_LEAVE', 'LATE']).optional(),
+  status: z
+    .enum(['PRESENT', 'ABSENT', 'HALF_DAY', 'ON_LEAVE', 'LATE'])
+    .optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
@@ -52,3 +69,10 @@ export type CorrectionRequestInput = z.infer<typeof correctionRequestSchema>;
 export type ReviewCorrectionInput = z.infer<typeof reviewCorrectionSchema>;
 export type ListAttendanceQuery = z.infer<typeof listAttendanceQuerySchema>;
 export type AttendanceSettingsInput = z.infer<typeof attendanceSettingsSchema>;
+
+export const listCorrectionsQuerySchema = z.object({
+  employeeId: z.uuid().optional(),
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});

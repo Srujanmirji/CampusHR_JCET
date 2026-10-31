@@ -10,7 +10,7 @@ const CONCURRENT_REFRESH_RETRY_MS = 1_000;
 async function restore(retried = false): Promise<Session> {
   try {
     const { accessToken, user } = await authApi.refresh();
-    setAccessToken(accessToken);
+    setAccessToken(accessToken, user.id);
     return { status: 'signedIn', user };
   } catch (error) {
     // Another tab is refreshing the same cookie; its new cookie arrives shortly.
@@ -55,7 +55,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     remember: boolean;
   }) {
     const { accessToken, user } = await authApi.login(input);
-    setAccessToken(accessToken);
+    setAccessToken(accessToken, user.id);
     setSession({ status: 'signedIn', user });
   }
 

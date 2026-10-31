@@ -26,7 +26,13 @@ export interface ExecutiveSummaryDto {
   leave: {
     monthlyLeaveDays: number;
     activeLeavesToday: number;
-    monthlyTrends: { month: string; CL: number; ML: number; EL: number; other: number }[];
+    monthlyTrends: {
+      month: string;
+      CL: number;
+      ML: number;
+      EL: number;
+      other: number;
+    }[];
   };
   continuity: {
     affectedClasses: number;
@@ -87,9 +93,9 @@ export interface WorkloadReportDto {
     theoryHours: number;
     labHours: number;
     totalHours: number;
-    minThreshold: number;
-    maxThreshold: number;
-    status: 'NORMAL' | 'OVERLOAD' | 'UNDERLOAD';
+    minThreshold: number | null;
+    maxThreshold: number | null;
+    status: 'NORMAL' | 'OVERLOAD' | 'UNDERLOAD' | 'UNCONFIGURED';
   }[];
 }
 
@@ -117,35 +123,51 @@ export function useReportsSummary() {
   return useQuery({
     queryKey: ['reports', 'summary'],
     queryFn: async () => {
-      const res = (await apiRequest('/reports/summary')) as { data: ExecutiveSummaryDto };
+      const res = (await apiRequest('/reports/summary')) as {
+        data: ExecutiveSummaryDto;
+      };
       return res.data;
     },
   });
 }
 
-export function useAttendanceReport(params?: { from?: string; to?: string; departmentId?: number }) {
+export function useAttendanceReport(params?: {
+  from?: string;
+  to?: string;
+  departmentId?: number;
+}) {
   return useQuery({
     queryKey: ['reports', 'attendance', params],
     queryFn: async () => {
       const query = new URLSearchParams();
       if (params?.from) query.set('from', params.from);
       if (params?.to) query.set('to', params.to);
-      if (params?.departmentId) query.set('departmentId', String(params.departmentId));
-      const res = (await apiRequest(`/reports/attendance?${query.toString()}`)) as { data: AttendanceReportDto };
+      if (params?.departmentId)
+        query.set('departmentId', String(params.departmentId));
+      const res = (await apiRequest(
+        `/reports/attendance?${query.toString()}`,
+      )) as { data: AttendanceReportDto };
       return res.data;
     },
   });
 }
 
-export function useLeaveReport(params?: { from?: string; to?: string; departmentId?: number }) {
+export function useLeaveReport(params?: {
+  from?: string;
+  to?: string;
+  departmentId?: number;
+}) {
   return useQuery({
     queryKey: ['reports', 'leave', params],
     queryFn: async () => {
       const query = new URLSearchParams();
       if (params?.from) query.set('from', params.from);
       if (params?.to) query.set('to', params.to);
-      if (params?.departmentId) query.set('departmentId', String(params.departmentId));
-      const res = (await apiRequest(`/reports/leave?${query.toString()}`)) as { data: LeaveReportDto };
+      if (params?.departmentId)
+        query.set('departmentId', String(params.departmentId));
+      const res = (await apiRequest(`/reports/leave?${query.toString()}`)) as {
+        data: LeaveReportDto;
+      };
       return res.data;
     },
   });
@@ -156,22 +178,32 @@ export function useWorkloadReport(params?: { departmentId?: number }) {
     queryKey: ['reports', 'workload', params],
     queryFn: async () => {
       const query = new URLSearchParams();
-      if (params?.departmentId) query.set('departmentId', String(params.departmentId));
-      const res = (await apiRequest(`/reports/workload?${query.toString()}`)) as { data: WorkloadReportDto };
+      if (params?.departmentId)
+        query.set('departmentId', String(params.departmentId));
+      const res = (await apiRequest(
+        `/reports/workload?${query.toString()}`,
+      )) as { data: WorkloadReportDto };
       return res.data;
     },
   });
 }
 
-export function useContinuityReport(params?: { from?: string; to?: string; departmentId?: number }) {
+export function useContinuityReport(params?: {
+  from?: string;
+  to?: string;
+  departmentId?: number;
+}) {
   return useQuery({
     queryKey: ['reports', 'continuity', params],
     queryFn: async () => {
       const query = new URLSearchParams();
       if (params?.from) query.set('from', params.from);
       if (params?.to) query.set('to', params.to);
-      if (params?.departmentId) query.set('departmentId', String(params.departmentId));
-      const res = (await apiRequest(`/reports/continuity?${query.toString()}`)) as { data: ContinuityReportDto };
+      if (params?.departmentId)
+        query.set('departmentId', String(params.departmentId));
+      const res = (await apiRequest(
+        `/reports/continuity?${query.toString()}`,
+      )) as { data: ContinuityReportDto };
       return res.data;
     },
   });
@@ -185,19 +217,12 @@ export async function downloadReportCsv(
   query.set('format', 'csv');
   if (params?.from) query.set('from', params.from);
   if (params?.to) query.set('to', params.to);
-  if (params?.departmentId) query.set('departmentId', String(params.departmentId));
+  if (params?.departmentId)
+    query.set('departmentId', String(params.departmentId));
 
-  const url = `/api/v1/reports/${reportType}?${query.toString()}`;
-  const response = await fetch(url, {
-    method: 'GET',
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to generate CSV export.');
-  }
-
-  const blob = await response.blob();
+  const blob = (await apiRequest(`/reports/${reportType}?${query.toString()}`, {
+    responseType: 'blob',
+  })) as Blob;
   const downloadUrl = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = downloadUrl;

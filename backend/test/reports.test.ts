@@ -219,10 +219,16 @@ test('Reports service generates valid CSV export when format=csv requested', asy
     departmentId: null,
   };
 
-  const result = await service.getAttendanceReport(adminAccess, { format: 'csv' });
+  const result = await service.getAttendanceReport(adminAccess, {
+    format: 'csv',
+  });
   assert.ok(result.csv);
   assert.ok(result.csv.includes('Employee Code,Name,Department,Designation'));
-  assert.ok(result.csv.includes('JCET-CSE-001,Prof. Zeeshan Madras,CSE,Assistant Professor'));
+  assert.ok(
+    result.csv.includes(
+      'JCET-CSE-001,Prof. Zeeshan Madras,CSE,Assistant Professor',
+    ),
+  );
 });
 
 test('Workload and Continuity reports calculate metrics and CSV headers correctly', async () => {
@@ -238,9 +244,51 @@ test('Workload and Continuity reports calculate metrics and CSV headers correctl
 
   const workload = await service.getWorkloadReport(hrAccess, { format: 'csv' });
   assert.equal(workload.data.records[0].status, 'NORMAL');
-  assert.ok(workload.csv?.includes('Theory Hours/Wk,Lab Hours/Wk,Total Teaching Hours'));
+  assert.ok(
+    workload.csv?.includes('Theory Hours/Wk,Lab Hours/Wk,Total Teaching Hours'),
+  );
 
-  const continuity = await service.getContinuityReport(hrAccess, { format: 'csv' });
+  const continuity = await service.getContinuityReport(hrAccess, {
+    format: 'csv',
+  });
   assert.equal(continuity.data.summary.coverageRate, 100);
-  assert.ok(continuity.csv?.includes('Original Faculty,Department,Subject,Period'));
+  assert.ok(
+    continuity.csv?.includes('Original Faculty,Department,Subject,Period'),
+  );
+});
+
+test('report dates reject impossible dates and reversed ranges', async () => {
+  const { reportQuerySchema } =
+    await import('../src/modules/reports/reports.schema.js');
+  for (const input of [
+    { from: '2026-02-30' },
+    { to: '2026-13-01' },
+    { from: '2026-10-22', to: '2026-10-01' },
+  ]) {
+    assert.equal(reportQuerySchema.safeParse(input).success, false);
+  }
+  assert.equal(
+    reportQuerySchema.safeParse({ from: '2024-02-29', to: '2024-03-01' })
+      .success,
+    true,
+  );
+});
+
+test('CSV quotes delimiters and makes formula-looking employee text inert', async () => {
+  const repo = createMockReportsRepository();
+  const original = repo.getAttendanceReport;
+  repo.getAttendanceReport = async (query) => {
+    const data = await original(query);
+    data.records[0]!.name = '=HYPERLINK("https://example.test","open")';
+    data.records[0]!.department = 'CSE\rECE';
+    return data;
+  };
+  const result = await createReportsService(repo).getAttendanceReport(
+    { scope: 'all', userId: 'csv', employeeId: null, departmentId: null },
+    { format: 'csv' },
+  );
+  assert.ok(
+    result.csv?.includes(`"'=HYPERLINK(""https://example.test"",""open"")"`),
+  );
+  assert.ok(result.csv?.includes('"CSE\rECE"'));
 });

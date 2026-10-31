@@ -31,7 +31,9 @@ export function DocumentReviewDialog({
 
   const handleSubmit = () => {
     if (action === 'REJECTED' && !reviewNote.trim()) {
-      toast.error('Please enter a rejection reason so the faculty member knows what to correct.');
+      toast.error(
+        'Please enter a rejection reason so the faculty member knows what to correct.',
+      );
       return;
     }
 
@@ -52,7 +54,9 @@ export function DocumentReviewDialog({
           setReviewNote('');
         },
         onError: (err: unknown) => {
-          toast.error(err instanceof Error ? err.message : 'Review action failed.');
+          toast.error(
+            err instanceof Error ? err.message : 'Review action failed.',
+          );
         },
       },
     );
@@ -76,11 +80,15 @@ export function DocumentReviewDialog({
           <div className="bg-slate-50 border rounded-lg p-3 text-sm space-y-1">
             <p className="font-semibold text-foreground">{document.title}</p>
             <p className="text-xs text-muted-foreground">
-              Type: <span className="font-medium text-foreground">{document.documentType}</span>
+              Type:{' '}
+              <span className="font-medium text-foreground">
+                {document.documentType}
+              </span>
             </p>
             <p className="text-xs text-muted-foreground">
-              Employee: {document.employee.firstName} {document.employee.lastName} (
-              {document.employee.employeeCode} · {document.employee.department.code})
+              Employee: {document.employee.firstName}{' '}
+              {document.employee.lastName} ({document.employee.employeeCode} ·{' '}
+              {document.employee.department.code})
             </p>
           </div>
 
@@ -119,7 +127,9 @@ export function DocumentReviewDialog({
           {/* Review Note */}
           <div className="space-y-1.5">
             <Label htmlFor="reviewNote">
-              {action === 'REJECTED' ? 'Reason for Rejection *' : 'Verification Remarks (Optional)'}
+              {action === 'REJECTED'
+                ? 'Reason for Rejection *'
+                : 'Verification Remarks (Optional)'}
             </Label>
             <Textarea
               id="reviewNote"
@@ -148,7 +158,10 @@ export function DocumentReviewDialog({
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={reviewMutation.isPending || (action === 'REJECTED' && !reviewNote.trim())}
+            disabled={
+              reviewMutation.isPending ||
+              (action === 'REJECTED' && !reviewNote.trim())
+            }
             className={
               action === 'VERIFIED'
                 ? 'bg-emerald-600 hover:bg-emerald-700'

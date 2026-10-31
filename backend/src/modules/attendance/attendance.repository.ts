@@ -1,3 +1,4 @@
+import { HttpError } from '../../common/http-error.js';
 import { Prisma, type PrismaClient } from '../../generated/prisma/client.js';
 import type {
   AttendanceStatus,
@@ -81,9 +82,13 @@ export interface AttendanceSettingsData {
 export interface AttendanceRepository {
   getSettings(): Promise<AttendanceSettingsData>;
   updateSettings(data: AttendanceSettingsData): Promise<AttendanceSettingsData>;
-  findByEmployeeAndDate(employeeId: string, date: Date): Promise<AttendanceRecord | null>;
+  findByEmployeeAndDate(
+    employeeId: string,
+    date: Date,
+  ): Promise<AttendanceRecord | null>;
   findById(id: string): Promise<AttendanceRecord | null>;
   recordPunch(params: {
+    action?: 'CHECK_IN' | 'CHECK_OUT';
     employeeId: string;
     date: Date;
     checkIn?: Date;
@@ -137,7 +142,9 @@ export interface AttendanceRepository {
   }): Promise<AttendanceRecord>;
 }
 
-export function createAttendanceRepository(prisma: PrismaClient): AttendanceRepository {
+export function createAttendanceRepository(
+  prisma: PrismaClient,
+): AttendanceRepository {
   return {
     async getSettings() {
       const existing = await prisma.attendanceSettings.findFirst();
@@ -204,6 +211,48 @@ export function createAttendanceRepository(prisma: PrismaClient): AttendanceRepo
     },
 
     async recordPunch(params) {
+      if (params.action) {
+        const where = { employeeId: params.employeeId, date: params.date };
+        const data = {
+          checkIn: params.checkIn,
+          checkOut: params.checkOut,
+          status: params.status,
+          source: params.source,
+          notes: params.notes,
+        };
+        let count: number;
+        if (params.action === 'CHECK_IN') {
+          const created = await prisma.attendance.createMany({
+            data: { ...where, ...data },
+            skipDuplicates: true,
+          });
+          count = created.count;
+          if (!count)
+            count = (
+              await prisma.attendance.updateMany({
+                where: { ...where, checkIn: null, checkOut: null },
+                data,
+              })
+            ).count;
+        } else {
+          count = (
+            await prisma.attendance.updateMany({
+              where: { ...where, checkIn: params.checkIn, checkOut: null },
+              data,
+            })
+          ).count;
+        }
+        if (!count)
+          throw new HttpError(
+            409,
+            'PUNCH_CHANGED',
+            'Attendance changed. Refresh before punching again.',
+          );
+        return prisma.attendance.findUniqueOrThrow({
+          where: { employeeId_date: where },
+          select: attendanceSelect,
+        });
+      }
       return prisma.attendance.upsert({
         where: {
           employeeId_date: {
@@ -290,7 +339,8 @@ export function createAttendanceRepository(prisma: PrismaClient): AttendanceRepo
       const where: Prisma.AttendanceCorrectionWhereInput = {};
       if (params.employeeId) where.employeeId = params.employeeId;
       if (params.status) where.status = params.status;
-      if (params.departmentId) where.employee = { departmentId: params.departmentId };
+      if (params.departmentId)
+        where.employee = { departmentId: params.departmentId };
 
       const [items, total] = await Promise.all([
         prisma.attendanceCorrection.findMany({

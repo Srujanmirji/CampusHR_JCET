@@ -8,7 +8,7 @@ import {
 
 const day = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
-test('leave days count Monday–Saturday, inclusive; Sundays are free', () => {
+test('leave days count Monday–Saturday, inclusive; Sundays and holidays are free', () => {
   // 2026-10-12 is a Monday; 2026-10-18 a Sunday.
   assert.equal(countLeaveDays(day('2026-10-12'), day('2026-10-12'), false), 1);
   assert.equal(countLeaveDays(day('2026-10-12'), day('2026-10-18'), false), 6);
@@ -16,6 +16,9 @@ test('leave days count Monday–Saturday, inclusive; Sundays are free', () => {
   assert.equal(countLeaveDays(day('2026-10-18'), day('2026-10-18'), false), 0);
   assert.equal(countLeaveDays(day('2026-10-13'), day('2026-10-13'), true), 0.5);
   assert.equal(countLeaveDays(day('2026-10-18'), day('2026-10-18'), true), 0);
+  // 2026-10-02 is Friday (Gandhi Jayanti holiday)
+  assert.equal(countLeaveDays(day('2026-10-01'), day('2026-10-03'), false), 2);
+  assert.equal(countLeaveDays(day('2026-10-02'), day('2026-10-02'), true), 0);
 });
 
 test('approval chain follows the decided roles', () => {

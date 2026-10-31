@@ -27,3 +27,12 @@ export const changePasswordSchema = z
     newPassword: newPasswordSchema,
   })
   .strict();
+
+// 32 random bytes encoded as unpadded base64url, as issued by auth.service.
+const nativeRefreshTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+export const nativeSessionSchema = z
+  .object({ refreshToken: nativeRefreshTokenSchema })
+  .strict();
+export const nativeChangePasswordSchema = changePasswordSchema.extend({
+  refreshToken: nativeRefreshTokenSchema,
+});

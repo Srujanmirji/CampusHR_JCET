@@ -1,0 +1,34 @@
+{
+  "verifiedAt": "2026-10-25T14:19:46.863Z",
+  "leaveId": "24d52787-f1a2-4cf2-80f5-48256f3fe3e3",
+  "status": "APPROVED",
+  "decisions": [
+    {
+      "step": 0,
+      "role": "HOD",
+      "approved": true,
+      "note": null,
+      "decidedAt": "2026-10-24T11:55:10.252Z",
+      "decidedBy": "Ramesh Kulkarni"
+    },
+    {
+      "step": 1,
+      "role": "HR Admin",
+      "approved": true,
+      "note": "Balance and HOD recommendation reviewed. Final approval.",
+      "decidedAt": "2026-10-24T12:01:50.527Z",
+      "decidedBy": "Maya Desai"
+    }
+  ],
+  "approvalNotification": {
+    "id": "65a25a5d-6bad-4919-834c-7807653d4fb8",
+    "kind": "leave.approved",
+    "title": "Leave approved",
+    "body": "Casual Leave · 2026-10-26 · 1 day",
+    "link": "/leave?tab=mine&request=24d52787-f1a2-4cf2-80f5-48256f3fe3e3",
+    "readAt": "2026-10-24T12:11:31.897Z",
+    "createdAt": "2026-10-24T12:01:50.538Z"
+  },
+  "apiSavedRecordCheck": "PASS",
+  "nativeSavedRecordCheck": "PASS"
+}

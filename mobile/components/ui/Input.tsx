@@ -9,8 +9,10 @@ import {
   type KeyboardTypeOptions,
   type StyleProp,
   type TextStyle,
+  type TextInputProps,
   type ViewStyle,
 } from 'react-native';
+import { Icon } from './Icon';
 import { theme } from '../../lib/theme';
 
 interface InputProps {
@@ -26,6 +28,10 @@ interface InputProps {
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   helperText?: string;
+  autoComplete?: TextInputProps['autoComplete'];
+  onSubmitEditing?: () => void;
+  multiline?: boolean;
+  maxLength?: number;
 }
 
 export function Input({
@@ -41,9 +47,15 @@ export function Input({
   disabled = false,
   style,
   helperText,
+  autoComplete,
+  onSubmitEditing,
+  multiline = false,
+  maxLength,
 }: InputProps) {
   const labelId = useId();
+  const messageId = `${labelId}-message`;
   const [showPassword, setShowPassword] = useState(false);
+  const [eyeFocused, setEyeFocused] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
   return (
@@ -62,12 +74,33 @@ export function Input({
         ]}
       >
         <TextInput
+          multiline={multiline}
+          maxLength={maxLength}
+          textAlignVertical={multiline ? 'top' : 'center'}
+          accessibilityHint={error || helperText}
+          accessibilityState={{ disabled }}
+          aria-invalid={!!error}
+          aria-describedby={error || helperText ? messageId : undefined}
+          autoComplete={autoComplete}
+          onSubmitEditing={onSubmitEditing}
+          returnKeyType={onSubmitEditing ? 'go' : undefined}
           accessibilityLabel={label}
           aria-labelledby={label ? labelId : undefined}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor={theme.colors.mutedForeground}
+          textContentType={
+            autoComplete === 'new-password'
+              ? 'newPassword'
+              : autoComplete === 'username'
+                ? 'username'
+                : isPassword
+                  ? 'password'
+                  : keyboardType === 'email-address'
+                    ? 'username'
+                    : undefined
+          }
           secureTextEntry={isPassword && !showPassword}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
@@ -76,7 +109,7 @@ export function Input({
           underlineColorAndroid="transparent"
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          style={styles.input}
+          style={[styles.input, multiline && styles.multiline]}
         />
         {isPassword && (
           <Pressable
@@ -85,18 +118,44 @@ export function Input({
               showPassword ? 'Hide password' : 'Show password'
             }
             onPress={() => setShowPassword((prev) => !prev)}
-            style={styles.eyeButton}
+            disabled={disabled}
+            accessibilityState={{ disabled }}
+            onFocus={() => setEyeFocused(true)}
+            onBlur={() => setEyeFocused(false)}
+            style={[
+              styles.eyeButton,
+              eyeFocused &&
+                Platform.OS === 'web' && {
+                  outlineWidth: 2,
+                  outlineColor: theme.colors.primary,
+                  outlineStyle: 'solid',
+                },
+            ]}
             hitSlop={8}
           >
-            <Text style={styles.eyeText}>{showPassword ? 'Hide' : 'Show'}</Text>
+            <Icon name={showPassword ? 'eyeOff' : 'eye'} />
           </Pressable>
         )}
       </View>
       {error ? (
-        <Text style={styles.errorText}>{error}</Text>
+        <Text
+          nativeID={messageId}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          style={styles.errorText}
+        >
+          {error}
+        </Text>
       ) : helperText ? (
-        <Text style={styles.helperText}>{helperText}</Text>
+        <Text nativeID={messageId} style={styles.helperText}>
+          {helperText}
+        </Text>
       ) : null}
+      {multiline && maxLength !== undefined && (
+        <Text style={styles.helperText}>
+          {value.length} / {maxLength} characters
+        </Text>
+      )}
     </View>
   );
 }
@@ -104,46 +163,56 @@ export function Input({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    gap: 6,
+    gap: theme.spacing.sm,
   },
   label: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: 13,
-    color: '#334155',
+    fontWeight: '600',
+    fontSize: theme.typography.label,
+    color: theme.colors.foreground,
     marginBottom: 2,
     letterSpacing: 0.2,
   },
   inputWrapper: {
-    minHeight: 50,
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
+    minHeight: theme.sizes.tapTarget,
+    borderWidth: 1,
+    borderColor: theme.colors.input,
+    borderRadius: theme.radius.field,
+    backgroundColor: theme.colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: theme.spacing.section,
     ...(Platform.OS === 'web'
       ? ({
           outlineWidth: 0,
         } as unknown as ViewStyle)
       : {}),
   },
+  multiline: { minHeight: 120 },
   inputWrapperFocused: {
+    ...(Platform.OS === 'web'
+      ? {
+          outlineWidth: 2,
+          outlineStyle: 'solid' as const,
+          outlineColor: theme.colors.primary,
+          outlineOffset: 2,
+        }
+      : {}),
     borderColor: theme.colors.primary,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
   },
   inputWrapperError: {
     borderColor: theme.colors.error,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: theme.colors.coralContainer,
   },
   inputWrapperDisabled: {
-    backgroundColor: theme.colors.muted,
+    backgroundColor: theme.colors.surface,
     opacity: 0.7,
   },
   input: {
     flex: 1,
     fontFamily: theme.typography.bodyFamily,
-    fontSize: 15,
+    fontSize: theme.typography.body,
     color: theme.colors.foreground,
     paddingVertical: 12,
     ...(Platform.OS === 'web'
@@ -153,25 +222,30 @@ const styles = StyleSheet.create({
       : {}),
   },
   eyeButton: {
+    minWidth: theme.sizes.tapTarget,
+    minHeight: theme.sizes.tapTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: theme.colors.surface,
   },
   eyeText: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: 12,
+    fontWeight: '600',
+    fontSize: theme.typography.caption,
     color: theme.colors.primary,
   },
   errorText: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: 12,
+    fontSize: theme.typography.caption,
     color: theme.colors.errorInk,
     marginTop: 2,
   },
   helperText: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: 12,
+    fontSize: theme.typography.caption,
     color: theme.colors.mutedForeground,
     marginTop: 2,
   },

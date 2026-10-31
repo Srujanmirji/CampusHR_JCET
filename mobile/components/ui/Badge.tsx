@@ -6,10 +6,11 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { Icon } from './Icon';
 import { theme } from '../../lib/theme';
 
 export type BadgeVariant =
-  'default' | 'accent' | 'success' | 'warning' | 'secondary';
+  'default' | 'accent' | 'success' | 'warning' | 'secondary' | 'danger';
 
 interface BadgeProps {
   label: string;
@@ -18,59 +19,113 @@ interface BadgeProps {
 }
 
 export function Badge({ label, variant = 'default', style }: BadgeProps) {
+  const resolved = label.toUpperCase() === 'REJECTED' ? 'danger' : variant;
+  const glyph =
+    label.toUpperCase() === 'PENDING'
+      ? 'clock'
+      : label.toUpperCase() === 'APPROVED'
+        ? 'check'
+        : label.toUpperCase() === 'REJECTED'
+          ? 'close'
+          : null;
   return (
-    <View style={[styles.badge, styles[variant], style]}>
-      <Text style={[styles.text, textStyles[variant]]}>{label}</Text>
+    <View style={[styles.badge, styles[resolved], style]}>
+      {glyph ? (
+        <Icon
+          name={glyph}
+          size={14}
+          color={
+            resolved === 'danger'
+              ? theme.colors.coralInk
+              : resolved === 'warning'
+                ? theme.colors.amberInk
+                : theme.colors.mintInk
+          }
+        />
+      ) : (
+        <View
+          style={[
+            styles.dot,
+            {
+              backgroundColor:
+                resolved === 'danger'
+                  ? theme.colors.coralInk
+                  : resolved === 'warning'
+                    ? theme.colors.amberInk
+                    : resolved === 'success'
+                      ? theme.colors.mintInk
+                      : resolved === 'accent'
+                        ? theme.colors.violet
+                        : theme.colors.primary,
+            },
+          ]}
+        />
+      )}
+      <Text style={[styles.text, textStyles[resolved]]}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  danger: {
+    backgroundColor: theme.colors.coralContainer,
+    borderWidth: 1,
+    borderColor: theme.colors.coralContainer,
+  },
   badge: {
+    flexDirection: 'row',
+    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.status,
     alignSelf: 'flex-start',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
   default: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.blueContainer,
   },
   accent: {
-    backgroundColor: theme.colors.accentInk,
+    backgroundColor: theme.colors.violetContainer,
   },
   success: {
-    backgroundColor: '#E6F9F0',
+    backgroundColor: theme.colors.mintContainer,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: theme.colors.mintContainer,
   },
   warning: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: theme.colors.amberContainer,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: theme.colors.amberContainer,
   },
   secondary: {
     backgroundColor: theme.colors.muted,
   },
   text: {
     fontFamily: theme.typography.headingFamily,
+    fontWeight: '600',
     fontSize: theme.typography.caption,
   },
 });
 
 const textStyles = StyleSheet.create({
+  danger: { color: theme.colors.coralInk },
   default: {
-    color: theme.colors.surface,
+    color: theme.colors.primary,
   },
   accent: {
-    color: theme.colors.surface,
+    color: theme.colors.violet,
   },
   success: {
-    color: '#065F46',
+    color: theme.colors.mintInk,
   },
   warning: {
-    color: '#92400E',
+    color: theme.colors.amberInk,
   },
   secondary: {
     color: theme.colors.primary,

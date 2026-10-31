@@ -20,7 +20,10 @@ export interface NewNotification {
 
 type Audit = Omit<AuditEntry, 'resource' | 'resourceId' | 'before' | 'after'>;
 
-export function createNotificationRepository(prisma: PrismaClient) {
+export function createNotificationRepository(
+  prisma: PrismaClient,
+  pushEnabled = false,
+) {
   return {
     list(userId: string, after: string | undefined, take: number) {
       return prisma.notification.findMany({
@@ -29,6 +32,12 @@ export function createNotificationRepository(prisma: PrismaClient) {
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take,
         ...(after ? { cursor: { id: after }, skip: 1 } : {}),
+      });
+    },
+    find(userId: string, id: string) {
+      return prisma.notification.findFirst({
+        where: { id, userId },
+        select: notificationSelect,
       });
     },
     unread(userId: string) {
@@ -54,8 +63,29 @@ export function createNotificationRepository(prisma: PrismaClient) {
       });
     },
     async create(userIds: string[], notification: NewNotification) {
-      await prisma.notification.createMany({
-        data: userIds.map((userId) => ({ userId, ...notification })),
+      await prisma.$transaction(async (tx) => {
+        const rows = await tx.notification.createManyAndReturn({
+          data: userIds.map((userId) => ({ userId, ...notification })),
+          select: { id: true, userId: true },
+        });
+        if (!pushEnabled) return;
+        const devices = await tx.pushDevice.findMany({
+          where: {
+            userId: { in: userIds },
+            session: { revokedAt: null, expiresAt: { gt: new Date() } },
+          },
+          select: { id: true, userId: true },
+        });
+        await tx.pushDelivery.createMany({
+          data: rows.flatMap((row) =>
+            devices
+              .filter((device) => device.userId === row.userId)
+              .map((device) => ({
+                notificationId: row.id,
+                deviceId: device.id,
+              })),
+          ),
+        });
       });
     },
 

@@ -23,6 +23,15 @@ const tooltipStyle = {
   fontSize: 'var(--text-sm)',
 };
 
+const departmentPalette = [
+  '#0071e3',
+  '#5856d6',
+  '#0a84ff',
+  '#32ade6',
+  '#af52de',
+  '#ff9500',
+];
+
 export function DashboardCharts() {
   return (
     <div className="dashboard-charts">
@@ -73,17 +82,15 @@ export function DashboardCharts() {
                   <Bar
                     dataKey="employees"
                     name="Employees"
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={40}
+                    radius={[8, 8, 4, 4]}
+                    maxBarSize={42}
                     isAnimationActive={false}
                   >
                     {departmentData.map((item, index) => (
                       <Cell
                         key={item.department}
                         fill={
-                          index === 0
-                            ? 'var(--brand-orange)'
-                            : 'var(--brand-navy)'
+                          departmentPalette[index % departmentPalette.length]
                         }
                       />
                     ))}
@@ -152,10 +159,15 @@ export function DashboardCharts() {
                   <Line
                     type="monotone"
                     dataKey="Present"
-                    stroke="var(--brand-navy)"
-                    strokeWidth={2.5}
-                    dot={{ r: 3, fill: 'var(--card)', strokeWidth: 2 }}
-                    activeDot={{ r: 5 }}
+                    stroke="var(--brand-blue)"
+                    strokeWidth={3}
+                    dot={{
+                      r: 4,
+                      fill: 'var(--card)',
+                      stroke: 'var(--brand-blue)',
+                      strokeWidth: 2.5,
+                    }}
+                    activeDot={{ r: 6, fill: 'var(--brand-blue)' }}
                     isAnimationActive={false}
                   />
                   <Line

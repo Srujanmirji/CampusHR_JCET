@@ -1,5 +1,7 @@
 # Mobile UX Specification
 
+> **Canonical mobile visual authority:** [CampusHR Mobile Design System V2](mobile-v2/DESIGN_SYSTEM.md). Use V2 for all later Faculty/HOD screens, role-specific navigation and component states. This earlier UX outline is historical context; it does not override V2. Runtime migration is separate.
+
 ## Bottom Navigation
 
 - Home

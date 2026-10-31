@@ -5,16 +5,49 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const SUNDAY = 0;
 
 /**
- * Working days in an inclusive date range, Sundays excluded (JCET works
- * Monday–Saturday); 0.5 for a half day.
- * ponytail: holidays are not subtracted yet; add a holiday calendar when HR
- * publishes one.
+ * Institutional holidays observed at JCET Hubballi (`MM-DD` recurring or
+ * `YYYY-MM-DD` specific dates).
  */
-export function countLeaveDays(start: Date, end: Date, halfDay: boolean) {
-  if (halfDay) return start.getUTCDay() === SUNDAY ? 0 : 0.5;
+export const CAMPUS_HOLIDAYS: Readonly<Record<string, string>> = {
+  '01-26': 'Republic Day',
+  '05-01': 'May Day',
+  '08-15': 'Independence Day',
+  '10-02': 'Gandhi Jayanti',
+  '11-01': 'Karnataka Rajyotsava',
+  '12-25': 'Christmas',
+};
+
+const DEFAULT_HOLIDAYS = new Set(Object.keys(CAMPUS_HOLIDAYS));
+
+export function isCampusHoliday(
+  date: Date,
+  holidays: ReadonlySet<string> = DEFAULT_HOLIDAYS,
+) {
+  const iso = date.toISOString().slice(0, 10);
+  return holidays.has(iso) || holidays.has(iso.slice(5));
+}
+
+/**
+ * Working days in an inclusive date range, Sundays and institutional holidays
+ * excluded (JCET works Monday–Saturday); 0.5 for a half day.
+ */
+export function countLeaveDays(
+  start: Date,
+  end: Date,
+  halfDay: boolean,
+  holidays: ReadonlySet<string> = DEFAULT_HOLIDAYS,
+) {
+  if (halfDay) {
+    return start.getUTCDay() === SUNDAY || isCampusHoliday(start, holidays)
+      ? 0
+      : 0.5;
+  }
   let days = 0;
   for (let at = start.getTime(); at <= end.getTime(); at += DAY_MS) {
-    if (new Date(at).getUTCDay() !== SUNDAY) days += 1;
+    const current = new Date(at);
+    if (current.getUTCDay() !== SUNDAY && !isCampusHoliday(current, holidays)) {
+      days += 1;
+    }
   }
   return days;
 }

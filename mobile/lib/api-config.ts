@@ -15,7 +15,8 @@ import { Platform } from 'react-native';
  *    (e.g., `http://10.169.71.20:4000/api/v1`), it will be used as configured.
  */
 export function resolveApiBaseUrl(): string {
-  const configured = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+  const configured =
+    process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
   if (Platform.OS === 'web') {
     return configured;
