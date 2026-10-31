@@ -16,6 +16,7 @@ import { DashboardSkeleton } from '../components/DashboardSkeleton';
 import { FacultyDashboard } from '../components/FacultyDashboard';
 import { HodDashboard } from '../components/HodDashboard';
 import { PrincipalDashboard } from '../components/PrincipalDashboard';
+import { NonTeachingDashboard } from '../components/NonTeachingDashboard';
 
 export default function DashboardPage() {
   const queryClient = useQueryClient();
@@ -24,6 +25,7 @@ export default function DashboardPage() {
   const isFaculty = user?.role === 'Faculty';
   const isHod = user?.role === 'HOD';
   const isPrincipal = user?.role === 'Principal';
+  const isNonTeaching = user?.role === 'Non-Teaching Staff';
 
   const pending = useLeaveWaiting().data?.length ?? 0;
   const [loading, setLoading] = useState(true);
@@ -44,7 +46,9 @@ export default function DashboardPage() {
               ? 'HOD Dashboard'
               : isPrincipal
                 ? 'Principal Executive Dashboard'
-                : 'Dashboard'
+                : isNonTeaching
+                  ? 'Staff & Technical Services Dashboard'
+                  : 'Dashboard'
         }
         description={
           isFaculty
@@ -53,7 +57,9 @@ export default function DashboardPage() {
               ? 'Department academic schedule, faculty attendance, substitutions, and approvals.'
               : isPrincipal
                 ? 'Campus-wide academic governance, departmental health, AICTE compliance, and institutional operations.'
-                : 'Your people and campus operations, at a glance.'
+                : isNonTeaching
+                  ? 'Laboratory facilities, equipment maintenance, daily attendance, and staff self-service.'
+                  : 'Your people and campus operations, at a glance.'
         }
         action={
           <div className="dashboard-heading-actions">
@@ -88,6 +94,8 @@ export default function DashboardPage() {
         <HodDashboard />
       ) : isPrincipal ? (
         <PrincipalDashboard />
+      ) : isNonTeaching ? (
+        <NonTeachingDashboard />
       ) : (
         <>
           <section className="welcome-banner" aria-labelledby="welcome-title">

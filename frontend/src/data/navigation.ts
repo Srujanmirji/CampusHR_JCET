@@ -312,3 +312,46 @@ export const principalNavigation: {
     group: 'Executive & Reports',
   },
 ];
+
+export const nonTeachingNavigation: {
+  path: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  group: string;
+  permission?: string;
+}[] = [
+  {
+    path: '/dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    group: 'Overview',
+  },
+  {
+    path: '/attendance',
+    permission: 'attendance.read',
+    label: 'My Attendance',
+    icon: CalendarCheck2,
+    group: 'My Services & Duties',
+  },
+  {
+    path: '/leave',
+    permission: 'leave.read',
+    label: 'Leave Applications',
+    icon: CalendarDays,
+    group: 'My Services & Duties',
+  },
+  {
+    path: '/documents',
+    permission: 'document.read',
+    label: 'My Documents',
+    icon: Files,
+    group: 'My Services & Duties',
+  },
+  {
+    path: '/notifications',
+    permission: 'notification.read',
+    label: 'Campus Notices',
+    icon: Bell,
+    group: 'Communication',
+  },
+];
