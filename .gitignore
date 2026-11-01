@@ -21,3 +21,4 @@ backend/.demo/
 *.mobileprovision
 mobile/credentials.json
 .vscode/
+backend/scripts/
