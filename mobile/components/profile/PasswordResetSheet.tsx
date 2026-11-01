@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type ViewInstance,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -33,13 +34,13 @@ export function PasswordResetSheet({
 }: {
   visible: boolean;
   onClose: () => void;
-  returnFocusRef: React.RefObject<View | null>;
+  returnFocusRef: React.RefObject<ViewInstance | null>;
   onComplete: (email: string) => void;
 }) {
   const generation = useRef({ active: false });
   const reduced = useReducedMotion(),
     busyRef = useRef(false),
-    titleRef = useRef<View>(null);
+    titleRef = useRef<ViewInstance>(null);
   const [enabled, setEnabled] = useState<boolean | null>(null),
     [step, setStep] = useState<'email' | 'code' | 'done'>('email');
   const [email, setEmail] = useState(''),
@@ -111,7 +112,7 @@ export function PasswordResetSheet({
   }, [visible, seconds]);
   function focusTitle() {
     if (Platform.OS === 'web') {
-      titleRef.current?.focus();
+      (titleRef.current as unknown as { focus?: () => void })?.focus?.();
       return;
     }
     const node = findNodeHandle(titleRef.current);
