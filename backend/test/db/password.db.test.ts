@@ -65,7 +65,7 @@ describe('own password change (PostgreSQL)', () => {
     );
     const wrong = await change(here, {
       currentPassword: 'not-the-password',
-      newPassword: 'brand-new-password-1',
+      newPassword: 'BrandNewPassword42!',
     });
     assert.equal(wrong.status, 400);
     assert.equal(
@@ -84,7 +84,7 @@ describe('own password change (PostgreSQL)', () => {
     const laptop = await signIn(password);
     const done = await change(here, {
       currentPassword: password,
-      newPassword: 'brand-new-password-1',
+      newPassword: 'BrandNewPassword42!',
     });
     assert.equal(done.status, 204);
     assert.equal(
@@ -98,7 +98,7 @@ describe('own password change (PostgreSQL)', () => {
       'others are signed out',
     );
     assert.equal((await signIn(password)).status, 401);
-    assert.equal((await signIn('brand-new-password-1')).status, 200);
+    assert.equal((await signIn('BrandNewPassword42!')).status, 200);
     const audit = await t.prisma.auditLog.findFirst({
       where: { action: 'user.password_change', resourceId: userId },
     });

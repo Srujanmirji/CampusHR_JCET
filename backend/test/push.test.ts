@@ -12,7 +12,7 @@ import {
 test('device persistence failures cannot expose routing tokens through API responses or global error logs', async () => {
   const token = 'ExpoPushToken[private-test-routing-token]';
   const auth = {
-    verifyAccessToken: () => ({ userId: 'owner' }),
+    authenticateAccessToken: async () => ({ userId: 'owner' }),
     authorize: async () => ({
       userId: 'owner',
       employeeId: null,

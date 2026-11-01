@@ -2,19 +2,17 @@
 
 Prepared 25 October 2026. This is a staged rollout environment, separate from production.
 
-## Current status
+## Current status — 1 November 2026
 
-- User selected the existing Railway workspace and project `acceptable-presence`.
-- Railway authentication was restored. Creating the `staging` environment was refused:
-  **“Your trial has expired. Please select a plan to continue using Railway.”**
-- No staging environment, database, volume, domain or deployment was created by this task.
-  No billing plan was purchased and production was not redeployed or migrated.
-- EAS CLI 25.3.0 initially reported **Not logged in**; browser sign-in was then opened and is awaiting completion. No Expo project, Apple App ID, certificate,
-  provisioning profile, cloud build or submission was created.
-- One Apple Development identity is available in this Mac's Keychain, but it does not
-  establish paid membership or institution ownership. No physical iPhone is connected.
-- The standalone staging iOS JavaScript bundle exports locally with validation-only
-  account/API fixtures. That artifact is not a signed IPA and must not be distributed.
+- **Staging is live:** <https://campushr-jcet-staging.up.railway.app>.
+- [Deployment record and verification](DEPLOYMENT_2026-11-01.md) contains resource IDs,
+  source revision, live smoke results and the post-redeploy session check.
+- The earlier Railway trial block is cleared. A fresh database, private document volume,
+  app service and HTTPS domain were created in a separate staging environment.
+- Administrator `srujanmirji10@gmail.com` was initialized with a private generated password
+  in ignored `.env.admin.local`. Temporary seed variables were removed from Railway.
+- No signed iPhone build or TestFlight submission was performed. Expo ownership, Apple
+  signing and device acceptance remain separate prerequisites below.
 
 ## What is prepared
 
@@ -37,8 +35,8 @@ Prepared 25 October 2026. This is a staged rollout environment, separate from pr
 
 ## Account details needed
 
-1. **Railway:** activate a suitable plan in the selected workspace. Share confirmation;
-   do not send a billing login or card details. CLI access is already restored on this Mac.
+1. **Railway:** staging is provisioned in the selected existing workspace. CLI access is
+   restored and linked to staging; use explicit selectors to keep production separate.
 2. **Expo:** account/organization slug, existing CampusHR project UUID (or confirmation that
    a new project should be created under that owner), and sign in locally with
    `npx --yes eas-cli@25.3.0 login` from `mobile/`. EAS access must permit building for that owner.
@@ -48,8 +46,8 @@ Prepared 25 October 2026. This is a staged rollout environment, separate from pr
 4. **App/device:** approved staging bundle identifier; then connect and trust the test iPhone,
    or register it through EAS's device flow. Internal iOS distribution requires a registered
    device and valid provisioning. Device identifiers need not be posted in chat.
-5. **Staging administration:** initial administrator email/name and institution support contact.
-   Generate/set the initial password privately and use only sanitized pilot data.
+5. **Staging administration:** the initial email/account is configured. Confirm the institutional
+   support contact and pilot data before inviting faculty.
 
 ## Provision Railway after billing is active
 

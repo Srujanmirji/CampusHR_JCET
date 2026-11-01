@@ -12,7 +12,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Icon } from '../../components/ui/Icon';
 import { ScreenContainer } from '../../components/ui/ScreenContainer';
-import { AccountSupportSheet } from '../../components/profile/AccountSupportSheet';
+import { PasswordResetSheet } from '../../components/profile/PasswordResetSheet';
 import { ProfileListRow } from '../../components/profile/ProfileListRow';
 import { useAuth } from '../../lib/auth-context';
 import { theme } from '../../lib/theme';
@@ -258,11 +258,14 @@ export default function LoginScreen() {
           )}
         </View>
       )}
-      <AccountSupportSheet
+      <PasswordResetSheet
         visible={help}
         onClose={() => setHelp(false)}
         returnFocusRef={helpRef}
-        passwordHelp
+        onComplete={(email) => {
+          setIdentifier(email);
+          setPassword('');
+        }}
       />
     </ScreenContainer>
   );

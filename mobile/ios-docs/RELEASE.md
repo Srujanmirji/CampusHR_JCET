@@ -6,7 +6,7 @@ This is future release work, not permission to deploy or publish. Start with loc
 
 [Staging and signed iPhone handoff](../../deploy/staging/README.md) records the prepared
 Railway config, guarded startup, private volume path, standalone EAS profiles and exact
-account blockers. No hosted staging deployment or signed iPhone installation is complete.
+account prerequisites. [Hosted staging deployed on 1 November 2026](../../deploy/staging/DEPLOYMENT_2026-11-01.md); signed iPhone installation remains pending.
 The checklist below retains acceptance items; earlier statements about missing build profiles
 are superseded by this handoff. Expo ownership and Apple signing identifiers remain pending.
 

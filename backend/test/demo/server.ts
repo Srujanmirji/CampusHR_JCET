@@ -94,7 +94,7 @@ const server = app.listen(4012, '127.0.0.1');
 await once(server, 'listening');
 const io = realtime.attach(server, {
   origin: env.CORS_ORIGIN,
-  verify: (token) => auth.verifyAccessToken(token).userId,
+  verify: async (token) => (await auth.authenticateAccessToken(token)).userId,
 });
 console.log(
   'Persistent CampusHR demo: http://127.0.0.1:4012; database backend/.demo/pgdata; local accounts only.',
