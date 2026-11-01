@@ -12,9 +12,21 @@ export const pushProjectId = z
       Constants.expoConfig?.extra?.eas?.projectId ??
       process.env.EXPO_PUBLIC_EXPO_PROJECT_ID,
   );
-const supported =
-  Platform.OS !== 'web' &&
-  Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
+let inExpoGo = false;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { isRunningInExpoGo } = require('expo');
+  inExpoGo = typeof isRunningInExpoGo === 'function' ? isRunningInExpoGo() : false;
+} catch {
+  inExpoGo = false;
+}
+if (!inExpoGo) {
+  inExpoGo =
+    Constants.appOwnership === 'expo' ||
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+}
+
+const supported = Platform.OS !== 'web' && !inExpoGo;
 let notifications: typeof import('expo-notifications') | null = null;
 if (supported) {
   try {
