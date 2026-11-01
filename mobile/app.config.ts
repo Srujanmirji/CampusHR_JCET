@@ -24,9 +24,11 @@ export function makeAppConfig(
     throw new Error(
       'APP_IOS_BUNDLE_IDENTIFIER must be an approved reverse-DNS ID.',
     );
-  const owner = required('EXPO_ACCOUNT_OWNER');
-  const projectId = required('EXPO_PUBLIC_EXPO_PROJECT_ID');
-  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(projectId))
+  const owner = env.EXPO_ACCOUNT_OWNER?.trim() || config.owner;
+  if (!owner) throw new Error('EXPO_ACCOUNT_OWNER is required for staging builds.');
+  const projectId =
+    env.EXPO_PUBLIC_EXPO_PROJECT_ID?.trim() || config.extra?.eas?.projectId;
+  if (!projectId || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(projectId))
     throw new Error(
       'EXPO_PUBLIC_EXPO_PROJECT_ID must be the approved project UUID.',
     );
@@ -52,6 +54,10 @@ export function makeAppConfig(
     name: 'CampusHR Staging',
     owner,
     scheme: 'campushr-staging',
+    android: {
+      ...config.android,
+      package: 'in.jcet.campushr',
+    },
     ios: {
       ...config.ios,
       bundleIdentifier,

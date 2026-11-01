@@ -12,6 +12,9 @@
     "ios": {
       "supportsTablet": true
     },
+    "android": {
+      "package": "in.jcet.campushr"
+    },
     "web": {
       "bundler": "metro"
     },
@@ -21,6 +24,13 @@
       "expo-splash-screen",
       "expo-notifications",
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f1a99bf1-4768-4ef7-9075-8f7962a8893d"
+      }
+    },
+    "owner": "pranavangadi"
   }
 }
