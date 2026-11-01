@@ -258,7 +258,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (
       __DEV__ &&
       demo &&
-      (password === 'campus123' || password === 'CampusHR@2026')
+      (password === 'CampusHR@2026' ||
+        password === 'campus123' ||
+        password === 'home-check-only')
     )
       await signInDemo(demo);
     else await signIn(identifier, password, remember);
