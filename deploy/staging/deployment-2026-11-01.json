@@ -1,0 +1,55 @@
+{
+  "date": "2026-11-01",
+  "environment": "staging",
+  "projectId": "0b628b3d-5ef8-4bb6-91cf-975c2f59a315",
+  "environmentId": "714d634d-500c-4fe1-835e-eb81e65e6294",
+  "serviceId": "3871ec62-4521-4dc5-8914-677a9fddb5a3",
+  "databaseServiceId": "e34e4f74-8320-4505-aa19-767148ddfcfe",
+  "documentVolumeId": "d31c0262-4b40-4ce6-96e6-c754912f3441",
+  "deploymentId": "3ebf3dce-1c23-4753-a8b4-ba7981f67951",
+  "url": "https://campushr-jcet-staging.up.railway.app",
+  "sourceCommit": "257b1c05014bdcd0d9f5e46fef0d74c93dc33cfe",
+  "adminEmail": "srujanmirji10@gmail.com",
+  "state": "SUCCESS",
+  "verifiedAt": "2026-11-01T13:33:48.967918+00:00",
+  "bootstrapDeploymentId": "336a9b5a-f67a-4474-9c65-eeac51fa981b",
+  "initialDeploymentId": "3e69180a-76f1-4fbe-bff2-bfa7d46a0bd0",
+  "source": "Railway CLI local upload",
+  "bootstrapCredentialsRemoved": true,
+  "startCommand": "npm run staging:start",
+  "pushEnabled": false,
+  "authVerification": {
+    "verifiedAt": "2026-11-01T13:30:02.862Z",
+    "login": "PASS",
+    "role": "Super Admin",
+    "adminEmail": "srujanmirji10@gmail.com",
+    "userId": "0fe78280-e0d0-48f9-8c51-e4464bf48dde",
+    "ownProfile": "PASS",
+    "referenceDepartments": 7,
+    "secureHttpOnlySameSiteStrictCookie": "PASS"
+  },
+  "restartVerification": {
+    "verifiedAt": "2026-11-01T13:32:21.737Z",
+    "userId": "0fe78280-e0d0-48f9-8c51-e4464bf48dde",
+    "adminEmail": "srujanmirji10@gmail.com",
+    "existingAccessAfterRedeploy": "PASS",
+    "storedRefreshAfterRedeploy": "PASS",
+    "sameAccountAfterRedeploy": "PASS",
+    "logoutAndRefreshRevocation": "PASS"
+  },
+  "checks": {
+    "httpsAndDatabaseReadiness": "PASS",
+    "webLoginAndProtectedApi": "PASS",
+    "privateFileRouting": "PASS",
+    "adminLogin": "PASS",
+    "cookieSecurity": "PASS",
+    "sessionPersistenceAcrossRedeploy": "PASS",
+    "temporarySeedCredentialRemoval": "PASS"
+  },
+  "testCounts": {
+    "backend": 65,
+    "mobile": 122,
+    "database": 44,
+    "staging": 4
+  }
+}

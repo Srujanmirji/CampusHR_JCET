@@ -11,7 +11,7 @@ describe('logins (PostgreSQL)', () => {
   const roleIds: Record<string, number> = {};
   let ravi: string;
   let raviLogin: string;
-  const firstPassword = 'first-password-123';
+  const firstPassword = 'FirstPassword123!';
 
   const signIn = async (identifier: string, password: string) => {
     const response = await fetch(`${t.base}/auth/login`, {
@@ -151,11 +151,11 @@ describe('logins (PostgreSQL)', () => {
 
     await t.request('PATCH', `/users/${raviLogin}`, hr.token, {
       status: 'ACTIVE',
-      password: 'second-password-456',
+      password: 'SecondPassword456!',
       roleId: roleIds.HOD,
     });
     assert.equal((await signIn('US-CSE-030', firstPassword)).status, 401);
-    const back = await signIn('US-CSE-030', 'second-password-456');
+    const back = await signIn('US-CSE-030', 'SecondPassword456!');
     assert.equal(back.status, 200);
     assert.equal(back.user?.role, 'HOD');
   });
@@ -182,7 +182,7 @@ describe('logins (PostgreSQL)', () => {
     assert.equal(
       (
         await t.request('PATCH', `/users/${adminLogin.data.id}`, hr.token, {
-          password: 'taken-over-password',
+          password: 'TakenOverPassword42!',
         })
       ).status,
       403,

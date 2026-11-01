@@ -1,3 +1,4 @@
+import { startResetDelivery } from './modules/auth/password-reset.service.js';
 import 'dotenv/config';
 import { createApp } from './app.js';
 import { envSchema } from './config/env.js';
@@ -27,6 +28,7 @@ const server = createApp(parsed.data, {
 }).listen(parsed.data.PORT, () => {
   console.log(`CampusHR API listening on port ${parsed.data.PORT}`);
 });
+const stopReset = startResetDelivery(prisma, parsed.data);
 const stopPush = parsed.data.PUSH_ENABLED
   ? createPushWorker(
       createPushRepository(prisma, parsed.data.EXPO_PROJECT_ID),
@@ -36,7 +38,7 @@ const stopPush = parsed.data.PUSH_ENABLED
 const auth = createAuthService(authRepository, parsed.data.JWT_ACCESS_SECRET);
 realtime.attach(server, {
   origin: parsed.data.CORS_ORIGIN,
-  verify: (token) => auth.verifyAccessToken(token).userId,
+  verify: async (token) => (await auth.authenticateAccessToken(token)).userId,
 });
 server.on('error', (error) => {
   console.error('API failed to start:', error.message);
@@ -48,6 +50,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     const timeout = setTimeout(() => process.exit(1), 10_000).unref();
     server.close(async (error) => {
       clearTimeout(timeout);
+      await stopReset();
       await stopPush();
       await prisma.$disconnect();
       process.exit(error ? 1 : 0);

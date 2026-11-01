@@ -6,7 +6,7 @@
 
 Planning baseline: 21 October 2026. Build the iOS app in the existing `mobile/` Expo project; keep shared Android behavior working. This folder is documentation, not the generated native `mobile/ios/` directory (which Git ignores).
 
-**Staging and signed iPhone preparation:** [Configuration, verification and required accounts](../../deploy/staging/README.md). Hosting and signed installation remain pending.
+**Staging and signed iPhone preparation:** [Configuration, verification and required accounts](../../deploy/staging/README.md). [Staging is live](../../deploy/staging/DEPLOYMENT_2026-11-01.md); signed iPhone installation remains pending.
 
 ## Read in this order
 

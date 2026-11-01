@@ -1,3 +1,4 @@
+import { HttpError } from '../../common/http-error.js';
 import { z } from 'zod';
 import { writeAudit } from '../../common/audit.js';
 import type { PrismaClient } from '../../generated/prisma/client.js';
@@ -6,6 +7,7 @@ export interface AuthUser {
   id: string;
   email: string;
   status: 'ACTIVE' | 'INACTIVE';
+  authVersion?: number;
   role: string;
   /** Granted permission keys, e.g. `leave.approve.department`. */
   permissions: string[];
@@ -23,6 +25,7 @@ export interface AuthSession {
 }
 
 export interface NewSession {
+  authVersion?: number;
   userId: string;
   tokenHash: string;
   expiresAt: Date;
@@ -58,12 +61,14 @@ export interface AuthRepository {
     passwordHash: string,
     keepSessionId: string | null,
     at: Date,
+    expected?: { passwordHash: string; authVersion: number },
   ): Promise<void>;
 }
 
 const userSelect = {
   id: true,
   email: true,
+  authVersion: true,
   status: true,
   role: {
     select: {
@@ -78,6 +83,7 @@ type SelectedUser = {
   id: string;
   email: string;
   status: AuthUser['status'];
+  authVersion: number;
   role: { name: string; permissions: { permission: { key: string } }[] };
   employee: { id: string; departmentId: number } | null;
 };
@@ -123,7 +129,26 @@ export function createPrismaAuthRepository(
     },
     async createSession(session, replacesSessionId) {
       await prisma.$transaction(async (tx) => {
-        const created = await tx.refreshSession.create({ data: session });
+        const { authVersion, ...data } = session;
+        // Serialize issuance with recovery, so an old login/refresh cannot
+        // recreate a session after the password-reset transaction revoked it.
+        const current = await tx.$queryRaw<
+          Array<{ id: string }>
+        >`SELECT id FROM users WHERE id = ${session.userId}::uuid AND auth_version = ${authVersion ?? 0} AND status = 'ACTIVE' FOR UPDATE`;
+        if (!current.length)
+          throw new HttpError(401, 'INVALID_SESSION', 'Sign in again.');
+        if (replacesSessionId) {
+          const previous = await tx.refreshSession.findUnique({
+            where: { id: replacesSessionId },
+          });
+          if (
+            !previous ||
+            previous.userId !== session.userId ||
+            previous.expiresAt <= new Date()
+          )
+            throw new HttpError(401, 'INVALID_SESSION', 'Sign in again.');
+        }
+        const created = await tx.refreshSession.create({ data });
         if (replacesSessionId)
           await tx.pushDevice.updateMany({
             where: { sessionId: replacesSessionId, userId: session.userId },
@@ -177,9 +202,26 @@ export function createPrismaAuthRepository(
       });
       return user?.passwordHash ?? null;
     },
-    async changePassword(userId, passwordHash, keepSessionId, at) {
+    async changePassword(userId, passwordHash, keepSessionId, at, expected) {
       await prisma.$transaction(async (tx) => {
-        await tx.user.update({ where: { id: userId }, data: { passwordHash } });
+        const changed = await tx.user.updateMany({
+          where: {
+            id: userId,
+            ...(expected
+              ? {
+                  passwordHash: expected.passwordHash,
+                  authVersion: expected.authVersion,
+                }
+              : {}),
+          },
+          data: { passwordHash },
+        });
+        if (!changed.count)
+          throw new HttpError(
+            400,
+            'PASSWORD_CHANGED',
+            'Your password changed while this request was pending. Sign in again.',
+          );
         await tx.refreshSession.updateMany({
           where: {
             userId,

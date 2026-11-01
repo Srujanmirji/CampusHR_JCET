@@ -1,3 +1,5 @@
+import { passwordIsValid, passwordProblem } from '@campushr/password-policy';
+import { PasswordRequirements } from '@/features/auth/components/PasswordRequirements';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { KeyRound, LoaderCircle, RefreshCw, UserCog } from 'lucide-react';
@@ -12,12 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-} from '@/components/ui/field';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -46,11 +43,22 @@ const errorText = (error: unknown) =>
     ? error.message
     : 'Something went wrong. Try again.';
 
-// 16 characters without look-alikes (0/O, 1/l/I), easy to read out.
-const ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+// Rejection sampling avoids modulo bias; retry until every required class occurs.
+const ALPHABET =
+  'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*?';
 function generatePassword() {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return Array.from(bytes, (byte) => ALPHABET[byte % ALPHABET.length]).join('');
+  const limit = 256 - (256 % ALPHABET.length);
+  let password: string;
+  do {
+    password = '';
+    while (password.length < 16) {
+      for (const byte of crypto.getRandomValues(new Uint8Array(32))) {
+        if (byte < limit && password.length < 16)
+          password += ALPHABET[byte % ALPHABET.length];
+      }
+    }
+  } while (!passwordIsValid(password));
+  return password;
 }
 
 type Mode = 'create' | 'role' | 'password';
@@ -268,8 +276,8 @@ function LoginDialog({
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (needsRole && !roleId) return setProblem('Choose a role.');
-    if (needsPassword && password.length < 12) {
-      return setProblem('Use at least 12 characters.');
+    if (needsPassword && !passwordIsValid(password)) {
+      return setProblem(passwordProblem(password));
     }
     setProblem('');
     save.mutate();
@@ -318,6 +326,8 @@ function LoginDialog({
                   autoComplete="new-password"
                   spellCheck={false}
                   value={password}
+                  maxLength={72}
+                  aria-describedby="login-password-requirements"
                   onChange={(event) => setPassword(event.target.value)}
                 />
                 <Button
@@ -328,9 +338,10 @@ function LoginDialog({
                   Generate
                 </Button>
               </div>
-              <FieldDescription>
-                At least 12 characters. Shown here so you can hand it over.
-              </FieldDescription>
+              <PasswordRequirements
+                password={password}
+                id="login-password-requirements"
+              />
             </Field>
           )}
           {problem && <FieldError>{problem}</FieldError>}
@@ -338,7 +349,12 @@ function LoginDialog({
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={save.isPending}>
+            <Button
+              type="submit"
+              disabled={
+                save.isPending || (needsPassword && !passwordIsValid(password))
+              }
+            >
               {save.isPending && <LoaderCircle className="animate-spin" />}
               {TITLES[mode]}
             </Button>

@@ -10,11 +10,24 @@
       "environment": "preview",
       "autoIncrement": true,
       "env": {
-        "APP_VARIANT": "staging"
+        "APP_VARIANT": "staging",
+        "APP_IOS_BUNDLE_IDENTIFIER": "in.jcet.campushr",
+        "EXPO_PUBLIC_API_URL": "https://campushr-jcet-staging.up.railway.app/api/v1",
+        "EXPO_PUBLIC_SOCKET_URL": "https://campushr-jcet-staging.up.railway.app"
+      },
+      "android": {
+        "buildType": "apk"
       },
       "ios": {
         "buildConfiguration": "Release",
         "simulator": false
+      }
+    },
+    "staging-apk": {
+      "extends": "staging",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
       }
     },
     "staging-simulator": {

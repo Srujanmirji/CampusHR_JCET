@@ -1,3 +1,5 @@
+import { passwordIsValid, passwordProblem } from '@campushr/password-policy';
+import { PasswordRequirements } from './PasswordRequirements';
 import { useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { LoaderCircle } from 'lucide-react';
@@ -11,17 +13,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-} from '@/components/ui/field';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ApiError } from '@/services/api';
 import { changePassword } from '../api/auth';
-
-const MIN_LENGTH = 12;
 
 /** The signed-in user replaces their own password. */
 export function ChangePasswordDialog({
@@ -64,8 +59,8 @@ export function ChangePasswordDialog({
     event.preventDefault();
     const missing = !current
       ? 'Enter your current password.'
-      : next.length < MIN_LENGTH
-        ? `Use at least ${MIN_LENGTH} characters.`
+      : !passwordIsValid(next)
+        ? passwordProblem(next)
         : next !== confirm
           ? 'The new passwords don’t match.'
           : next === current
@@ -111,11 +106,14 @@ export function ChangePasswordDialog({
               type="password"
               autoComplete="new-password"
               value={next}
+              maxLength={72}
+              aria-describedby="change-password-requirements"
               onChange={(event) => setNext(event.target.value)}
             />
-            <FieldDescription>
-              At least {MIN_LENGTH} characters.
-            </FieldDescription>
+            <PasswordRequirements
+              password={next}
+              id="change-password-requirements"
+            />
           </Field>
           <Field>
             <FieldLabel htmlFor="confirm-password">
@@ -123,11 +121,25 @@ export function ChangePasswordDialog({
             </FieldLabel>
             <Input
               id="confirm-password"
+              aria-describedby="change-password-match"
               type="password"
               autoComplete="new-password"
               value={confirm}
               onChange={(event) => setConfirm(event.target.value)}
             />
+            <p
+              id="change-password-match"
+              aria-live="polite"
+              className="text-sm text-foreground"
+            >
+              {next && next === current
+                ? 'Choose a password different from your current one.'
+                : confirm
+                  ? next === confirm
+                    ? 'Passwords match.'
+                    : 'Passwords do not match yet.'
+                  : 'Enter the same new password again.'}
+            </p>
           </Field>
           {problem && <FieldError role="alert">{problem}</FieldError>}
           <DialogFooter>
@@ -141,7 +153,16 @@ export function ChangePasswordDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={save.isPending}>
+            <Button
+              type="submit"
+              disabled={
+                save.isPending ||
+                !current ||
+                !passwordIsValid(next) ||
+                next !== confirm ||
+                next === current
+              }
+            >
               {save.isPending && <LoaderCircle className="animate-spin" />}
               Change password
             </Button>

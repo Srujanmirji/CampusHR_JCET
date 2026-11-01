@@ -10,7 +10,8 @@
   "workspaces": [
     "frontend",
     "backend",
-    "mobile"
+    "mobile",
+    "packages/*"
   ],
   "scripts": {
     "dev:web": "npm run dev --workspace @campushr/web",

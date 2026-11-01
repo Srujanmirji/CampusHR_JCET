@@ -23,7 +23,7 @@ password by email waits for SMTP.
 - `GET /auth/me` (`Authorization: Bearer <accessToken>`) → `{ user }`.
   Error: 401 `UNAUTHENTICATED`.
 - `POST /auth/password` (Bearer, plus the refresh cookie) `{ currentPassword,
-newPassword }` (12–72 bytes) → 204. Every other session of the user ends;
+newPassword }` (at least 12 characters, at most 72 UTF-8 bytes) → 204. Every other session of the user ends;
   the one whose cookie came with the request stays. Errors: 400
   `WRONG_PASSWORD`, `SAME_PASSWORD`, `VALIDATION_ERROR`; 429
   `TOO_MANY_ATTEMPTS` (5 wrong passwords per account per 15 minutes).
@@ -57,7 +57,7 @@ with the employee's college email or employee ID. Changes are audit-logged
 - `GET /users/roles` → `[{ id, name }]` the caller may give (HR Admin does not
   see Super Admin).
 - `GET /users/employee/:employeeId` → the employee's login or `null`.
-- `POST /users` `{ employeeId, roleId, password }` (password 12–72 bytes) →
+- `POST /users` `{ employeeId, roleId, password }` (password follows the new-password policy below) →
   201 `{ id, email, status, employeeId, role: { id, name }, lastLoginAt,
 createdAt }`. 409 if the employee already has a login; 400 for an archived
   employee.
@@ -380,3 +380,13 @@ session. Confirmed logout and password-change revocation remove the relevant
 registrations. Expired sessions and inactive accounts are pruned by the enabled
 worker. Notification creation queues private generic payloads transactionally;
 worker/provider errors do not roll back leave/substitution operations.
+
+## New-password policy
+
+All newly set passwords require at least 12 characters, one ASCII lowercase letter,
+one ASCII uppercase letter, one digit, and one punctuation character or symbol.
+Whitespace alone does not satisfy the symbol requirement. Maximum: 72 UTF-8 bytes
+(the bcrypt limit). The canonical implementation is `@campushr/password-policy`,
+shared by API, website and mobile. It applies to email recovery, web/native own
+password changes, HR user creation/reset and administrator seeding. Existing
+passwords continue to be accepted by the unchanged sign-in contract.

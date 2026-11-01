@@ -1,3 +1,5 @@
+import { createPasswordResetService } from './modules/auth/password-reset.service.js';
+import { createPasswordResetRouter } from './modules/auth/password-reset.routes.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -69,7 +71,8 @@ export function createApp(
     prisma: PrismaClient;
     webDir?: string;
     /** Live unread counts; absent in tests that need no sockets. */
-    realtime?: Pick<Realtime, 'publish'>;
+    realtime?: Pick<Realtime, 'publish'> &
+      Partial<Pick<Realtime, 'disconnect'>>;
   },
 ) {
   const auth = createAuthService(authRepository, env.JWT_ACCESS_SECRET);
@@ -112,6 +115,15 @@ export function createApp(
       clearTimeout(timeout);
     }
   });
+  app.use(
+    '/api/v1/auth/password-reset',
+    createPasswordResetRouter(
+      createPasswordResetService(prisma, env, (id) =>
+        realtime?.disconnect?.(id),
+      ),
+      env.CORS_ORIGIN,
+    ),
+  );
   app.use(
     '/api/v1/auth',
     createAuthRouter(auth, {

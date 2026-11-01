@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { passwordIsValid, passwordProblem } from '@campushr/password-policy';
 
 export const loginSchema = z.object({
   // College email or employee ID (e.g. JCET-CSE-021); matching ignores case.
@@ -13,13 +14,11 @@ export const loginSchema = z.object({
 });
 
 // bcrypt only uses the first 72 bytes of a password.
-export const newPasswordSchema = z
-  .string()
-  .min(12, 'Use at least 12 characters.')
-  .refine(
-    (password) => Buffer.byteLength(password) <= 72,
-    'Use at most 72 bytes.',
-  );
+export const newPasswordSchema = z.string().superRefine((password, ctx) => {
+  if (!passwordIsValid(password)) {
+    ctx.addIssue({ code: 'custom', message: passwordProblem(password) });
+  }
+});
 
 export const changePasswordSchema = z
   .object({

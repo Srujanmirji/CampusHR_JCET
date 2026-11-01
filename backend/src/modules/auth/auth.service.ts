@@ -99,6 +99,7 @@ export function createAuthService(
     await repo.createSession(
       {
         userId: user.id,
+        authVersion: user.authVersion ?? 0,
         tokenHash: hashToken(refreshToken),
         expiresAt: new Date(now().getTime() + REFRESH_TOKEN_TTL_MS),
         persistent,
@@ -107,12 +108,16 @@ export function createAuthService(
       },
       replacesSessionId,
     );
-    const accessToken = jwt.sign({ role: user.role }, accessSecret, {
-      ...JWT_OPTIONS,
-      subject: user.id,
-      algorithm: 'HS256',
-      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
-    });
+    const accessToken = jwt.sign(
+      { role: user.role, version: user.authVersion ?? 0 },
+      accessSecret,
+      {
+        ...JWT_OPTIONS,
+        subject: user.id,
+        algorithm: 'HS256',
+        expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      },
+    );
     return {
       accessToken,
       expiresIn: ACCESS_TOKEN_TTL_SECONDS,
@@ -232,6 +237,7 @@ export function createAuthService(
         await bcrypt.hash(newPassword, BCRYPT_COST),
         session?.userId === userId ? session.id : null,
         now(),
+        { passwordHash: hash, authVersion: user.authVersion ?? 0 },
       );
     },
 
@@ -239,6 +245,21 @@ export function createAuthService(
       const user = await repo.findUserById(userId);
       if (!user || user.status !== 'ACTIVE') throw invalidSession();
       return toPublic(user);
+    },
+
+    async authenticateAccessToken(token: string): Promise<AccessClaims> {
+      const access = this.verifyAccessToken(token);
+      const claims = jwt.decode(token) as jwt.JwtPayload;
+      const version = claims.version ?? 0;
+      const user = await repo.findUserById(access.userId);
+      if (
+        !Number.isSafeInteger(version) ||
+        !user ||
+        user.status !== 'ACTIVE' ||
+        (user.authVersion ?? 0) !== version
+      )
+        throw invalidSession();
+      return access;
     },
 
     verifyAccessToken(token: string): AccessClaims {

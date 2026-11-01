@@ -15,7 +15,13 @@ import type { RoleName } from '../../src/modules/auth/permissions.js';
 export const password = 'db-test-password';
 
 export async function startTestApp(
-  push: { PUSH_ENABLED?: 'true' | 'false'; EXPO_PROJECT_ID?: string } = {},
+  push: {
+    PUSH_ENABLED?: 'true' | 'false';
+    EXPO_PROJECT_ID?: string;
+    PASSWORD_RESET_ENABLED?: 'true' | 'false';
+    PASSWORD_RESET_SCRIPT_URL?: string;
+    PASSWORD_RESET_SCRIPT_SECRET?: string;
+  } = {},
 ) {
   const prisma = createPrismaClient(process.env.DATABASE_URL!);
   await seedReferenceData(prisma);
@@ -37,11 +43,13 @@ export async function startTestApp(
   // As in server.ts: sockets authenticate with the access token.
   const io = realtime.attach(server, {
     origin: env.CORS_ORIGIN,
-    verify: (token) =>
-      createAuthService(
-        authRepository,
-        env.JWT_ACCESS_SECRET,
-      ).verifyAccessToken(token).userId,
+    verify: async (token) =>
+      (
+        await createAuthService(
+          authRepository,
+          env.JWT_ACCESS_SECRET,
+        ).authenticateAccessToken(token)
+      ).userId,
   });
   const address = server.address();
   assert.ok(address && typeof address === 'object');

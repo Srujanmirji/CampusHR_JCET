@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { apiRequest } from '@/services/api';
+import { apiRequest, ApiError } from '@/services/api';
 
 const sessionUserSchema = z.object({
   id: z.string(),
@@ -50,4 +50,84 @@ export async function changePassword(input: {
   newPassword: string;
 }) {
   await apiRequest('/auth/password', { method: 'POST', body: input });
+}
+
+const resetOptionsSchema = z.object({ enabled: z.boolean() });
+const resetRequestSchema = z.object({
+  challengeId: z.uuid(),
+  expiresIn: z.number().int().positive(),
+  resendAfter: z.number().int().nonnegative(),
+  message: z.string(),
+});
+const resetCompleteSchema = z.object({
+  passwordUpdated: z.literal(true),
+  message: z.string(),
+});
+async function publicResetRequest(
+  path: string,
+  body?: unknown,
+): Promise<unknown> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/auth/password-reset/${path}`,
+      {
+        method: body ? 'POST' : 'GET',
+        credentials: 'omit',
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal: controller.signal,
+      },
+    );
+    const result: unknown = await response.json();
+    if (!response.ok) {
+      const failure = z
+        .object({ error: z.object({ code: z.string(), message: z.string() }) })
+        .safeParse(result);
+      throw new ApiError(
+        response.status,
+        failure.success ? failure.data.error.code : 'RESET_FAILED',
+        failure.success
+          ? failure.data.error.message
+          : 'Could not complete recovery. Please retry.',
+      );
+    }
+    return result;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new Error(
+      path === 'confirm'
+        ? 'Could not confirm the update. Try signing in with your new password before requesting another code.'
+        : 'Cannot reach CampusHR. Check your connection and try again.',
+      { cause: error },
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function resetResponse<T>(schema: z.ZodType<T>, value: unknown): T {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success)
+    throw new Error('CampusHR returned an unexpected response. Please retry.');
+  return parsed.data;
+}
+export async function passwordResetOptions() {
+  return resetResponse(resetOptionsSchema, await publicResetRequest('options'));
+}
+export async function requestPasswordReset(email: string) {
+  return resetResponse(
+    resetRequestSchema,
+    await publicResetRequest('request', { email }),
+  );
+}
+export async function confirmPasswordReset(input: {
+  challengeId: string;
+  code: string;
+  newPassword: string;
+}) {
+  return resetResponse(
+    resetCompleteSchema,
+    await publicResetRequest('confirm', input),
+  );
 }

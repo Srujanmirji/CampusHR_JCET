@@ -10,7 +10,7 @@ import { defaultGrants } from '../src/modules/auth/permissions.js';
 import { createMemoryAuthRepository, unusedPrisma } from './fakes.js';
 
 const password = 'native-contract-test-password';
-const nextPassword = 'native-contract-replacement-password';
+const nextPassword = 'NativeReplacement42!';
 const env = envSchema.parse({
   NODE_ENV: 'test',
   DATABASE_URL: 'postgresql://localhost/campushr_test',

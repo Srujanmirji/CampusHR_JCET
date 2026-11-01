@@ -49,6 +49,7 @@ model User {
   // Stored lowercase; lookups lowercase their input.
   email                 String           @unique
   passwordHash          String           @map("password_hash")
+  authVersion           Int              @default(0) @map("auth_version")
   roleId                Int              @map("role_id")
   role                  Role             @relation(fields: [roleId], references: [id], onDelete: Restrict)
   // Staff accounts link to their employee record; the Super Admin system
@@ -64,6 +65,7 @@ model User {
   documentsReviewed     Document[]             @relation("DocumentReviewed")
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt             DateTime         @updatedAt @map("updated_at")
+  passwordResets        PasswordResetChallenge[]
   sessions              RefreshSession[]
   pushDevices           PushDevice[]
 
@@ -609,4 +611,36 @@ model PushDelivery {
   @@unique([notificationId, deviceId])
   @@index([nextAttemptAt])
   @@map("push_deliveries")
+}
+
+// One-use recovery challenges. OTP mail is encrypted until delivery, never plaintext.
+model PasswordResetChallenge {
+  id               String    @id @db.Uuid
+  userId           String?   @map("user_id") @db.Uuid
+  user             User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountKey       String    @map("account_key")
+  otpHash          String    @map("otp_hash")
+  passwordStamp    String?   @map("password_stamp")
+  expiresAt        DateTime  @map("expires_at")
+  consumedAt       DateTime? @map("consumed_at")
+  attempts         Int       @default(0)
+  encryptedMail    String?   @map("encrypted_mail")
+  deliveryAttempts Int       @default(0) @map("delivery_attempts")
+  nextDeliveryAt   DateTime  @default(now()) @map("next_delivery_at")
+  leaseUntil       DateTime? @map("lease_until")
+  deliveredAt      DateTime? @map("delivered_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@index([accountKey, createdAt])
+  @@index([nextDeliveryAt])
+  @@map("password_reset_challenges")
+}
+
+model PasswordResetThrottle {
+  key          String   @id
+  startedAt    DateTime @map("started_at")
+  lastAttempt  DateTime @map("last_attempt")
+  count        Int      @default(0)
+
+  @@map("password_reset_throttles")
 }
