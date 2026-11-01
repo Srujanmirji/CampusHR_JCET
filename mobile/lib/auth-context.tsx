@@ -255,7 +255,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
     }
     const demo = DEMO_ACCOUNTS[identifier.trim().toLowerCase()];
-    if (__DEV__ && demo && password === 'campus123') await signInDemo(demo);
+    if (
+      __DEV__ &&
+      demo &&
+      (password === 'campus123' || password === 'CampusHR@2026')
+    )
+      await signInDemo(demo);
     else await signIn(identifier, password, remember);
   }
   async function logout() {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 import { Icon, type IconName } from '../ui/Icon';
 import { theme } from '../../lib/theme';
 
@@ -21,7 +21,7 @@ export function ProfileListRow({
   destructive?: boolean;
   last?: boolean;
   disabled?: boolean;
-  pressRef?: React.RefObject<View | null>;
+  pressRef?: React.RefObject<ViewInstance | null>;
 }) {
   const [focused, setFocused] = useState(false);
   return (

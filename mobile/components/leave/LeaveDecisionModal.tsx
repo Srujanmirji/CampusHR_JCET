@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  type ScrollViewInstance,
   StyleSheet,
   Text,
   View,
@@ -61,7 +62,7 @@ export function LeaveDecisionModal({
   const reduceMotion = useReducedMotion();
   const { fontScale } = useWindowDimensions();
   const { user } = useAuth();
-  const scroll = useRef<ScrollView>(null);
+  const scroll = useRef<ScrollViewInstance>(null);
   const [choice, setChoice] = useState<'APPROVE' | 'REJECT' | null>(null);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [note, setNote] = useState('');

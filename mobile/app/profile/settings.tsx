@@ -7,6 +7,7 @@ import {
   Switch,
   Text,
   View,
+  type ViewInstance,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { DetailScreen } from '../../components/ui/DetailScreen';
@@ -36,7 +37,7 @@ export default function Settings() {
   const [pendingEnabled, setPendingEnabled] = useState<boolean | null>(null);
   const [notice, setNotice] = useState('');
   const [switchFocused, setSwitchFocused] = useState(false);
-  const supportRef = useRef<View>(null);
+  const supportRef = useRef<ViewInstance>(null);
   async function updateAlerts(enabled: boolean) {
     if (push.status === 'busy' || pendingEnabled !== null) return;
     setPendingEnabled(enabled);

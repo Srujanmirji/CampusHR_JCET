@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type ViewInstance,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -17,7 +18,7 @@ import { Icon } from '../ui/Icon';
 import { ProfileListRow } from './ProfileListRow';
 import { theme } from '../../lib/theme';
 
-export function restoreAccountFocus(element: View | null) {
+export function restoreAccountFocus(element: ViewInstance | null) {
   if (!element) return;
   element.focus();
   if (Platform.OS !== 'web') {
@@ -35,11 +36,11 @@ export function AccountSupportSheet({
 }: {
   visible: boolean;
   onClose: () => void;
-  returnFocusRef: React.RefObject<View | null>;
+  returnFocusRef: React.RefObject<ViewInstance | null>;
   passwordHelp?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
-  const headingRef = useRef<View>(null);
+  const headingRef = useRef<ViewInstance>(null);
   const [notice, setNotice] = useState('');
   function close() {
     onClose();

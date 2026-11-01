@@ -1,6 +1,6 @@
 import { Alert } from '../../lib/dialogs';
 import React, { useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, type ViewInstance } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { ScreenContainer } from '../../components/ui/ScreenContainer';
@@ -17,7 +17,7 @@ export default function ProfileTab() {
   const { user, accessToken, logout } = useAuth();
   const router = useRouter();
   const [support, setSupport] = useState(false);
-  const supportRef = useRef<View>(null);
+  const supportRef = useRef<ViewInstance>(null);
   const profileUnavailable = homeUnavailable(
     user,
     accessToken,

@@ -6,6 +6,7 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type ViewInstance,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button } from '../../components/ui/Button';
@@ -39,7 +40,7 @@ export default function LoginScreen() {
     [demoNotice, setDemoNotice] = useState(''),
     [error, setError] = useState('');
   const [focused, setFocused] = useState<string | null>(null);
-  const helpRef = useRef<View>(null);
+  const helpRef = useRef<ViewInstance>(null);
   const submitBusy = useRef(false);
   const [invalid, setInvalid] = useState<{
     identifier?: string;
@@ -76,7 +77,7 @@ export default function LoginScreen() {
     setIdentifier(
       role === 'Faculty' ? 'JCET-CSE-021' : 'hod.cse@jcethbl.edu.in',
     );
-    setPassword('campus123');
+    setPassword('CampusHR@2026');
     setInvalid({});
     setError('');
     setDemoNotice(`${role} demo selected. Tap Sign in to continue.`);
