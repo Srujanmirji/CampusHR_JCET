@@ -1,3 +1,5 @@
+import { passwordIsValid, passwordProblem } from '@campushr/password-policy';
+import { PasswordRequirements } from './PasswordRequirements';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -51,6 +53,14 @@ export function PasswordForm() {
   }, [clear]);
   async function save() {
     if (guard.current || uncertain) return;
+    if (!passwordIsValid(next)) {
+      setNotice(passwordProblem(next));
+      return;
+    }
+    if (next === current) {
+      setNotice('Choose a password different from your current one.');
+      return;
+    }
     if (next !== confirm) {
       setNotice('The new passwords do not match.');
       return;
@@ -91,8 +101,8 @@ export function PasswordForm() {
         Change password
       </Text>
       <Text style={styles.text}>
-        Use at least 12 characters, up to 72 UTF-8 bytes. Your current session
-        stays signed in.
+        Use lowercase, uppercase, a number and a special symbol. Your current
+        session stays signed in.
       </Text>
       <Input
         autoComplete="current-password"
@@ -110,9 +120,19 @@ export function PasswordForm() {
         isPassword
         disabled={busy || uncertain}
       />
+      <PasswordRequirements password={next} />
       <Input
         autoComplete="new-password"
         label="Confirm new password"
+        helperText={
+          next && next === current
+            ? 'Choose a password different from your current one.'
+            : confirm
+              ? next === confirm
+                ? 'Passwords match.'
+                : 'Passwords do not match yet.'
+              : 'Enter the same new password again.'
+        }
         value={confirm}
         onChangeText={setConfirm}
         error={
@@ -121,7 +141,17 @@ export function PasswordForm() {
         isPassword
         disabled={busy || uncertain}
       />
-      <Button onPress={() => void save()} loading={busy} disabled={uncertain}>
+      <Button
+        onPress={() => void save()}
+        loading={busy}
+        disabled={
+          uncertain ||
+          !current ||
+          !passwordIsValid(next) ||
+          next !== confirm ||
+          next === current
+        }
+      >
         {busy ? 'Changing password…' : 'Change password'}
       </Button>
       {!!notice && (

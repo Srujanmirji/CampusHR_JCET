@@ -1,0 +1,16 @@
+{
+  "name": "@campushr/password-policy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --allowJs --checkJs --noEmit --target es2023 --module nodenext --moduleResolution nodenext index.js",
+    "lint": "eslint index.js"
+  }
+}

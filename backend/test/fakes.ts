@@ -33,6 +33,7 @@ export function createMemoryAuthRepository(users: StoredUser[] = []) {
             id: user.id,
             email: user.email,
             status: user.status,
+            authVersion: user.authVersion ?? 0,
             role: user.role,
             permissions: user.permissions,
             employeeId: user.employeeId ?? null,
@@ -76,8 +77,15 @@ export function createMemoryAuthRepository(users: StoredUser[] = []) {
     async findPasswordHash(userId) {
       return users.find((user) => user.id === userId)?.passwordHash ?? null;
     },
-    async changePassword(userId, passwordHash, keepSessionId, at) {
+    async changePassword(userId, passwordHash, keepSessionId, at, expected) {
       const user = users.find((candidate) => candidate.id === userId);
+      if (
+        expected &&
+        (!user ||
+          user.passwordHash !== expected.passwordHash ||
+          (user.authVersion ?? 0) !== expected.authVersion)
+      )
+        throw new Error('Password changed while request was pending.');
       if (user) user.passwordHash = passwordHash;
       for (const session of sessions) {
         if (

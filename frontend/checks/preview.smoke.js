@@ -367,15 +367,19 @@ try {
     .fill('wrong password');
   await passwordDialog
     .getByLabel('New password', { exact: true })
-    .fill('a-new-password-123');
+    .fill('ANewPassword123!');
   await passwordDialog
     .getByLabel('Repeat new password', { exact: true })
     .fill('something else');
-  await passwordDialog.getByRole('button', { name: 'Change password' }).click();
-  await passwordDialog.getByText('The new passwords don’t match.').waitFor();
+  assert(
+    await passwordDialog
+      .getByRole('button', { name: 'Change password' })
+      .isDisabled(),
+  );
+  await passwordDialog.getByText('Passwords do not match yet.').waitFor();
   await passwordDialog
     .getByLabel('Repeat new password', { exact: true })
-    .fill('a-new-password-123');
+    .fill('ANewPassword123!');
   await passwordDialog.getByRole('button', { name: 'Change password' }).click();
   await passwordDialog
     .getByText('Your current password is not right.')

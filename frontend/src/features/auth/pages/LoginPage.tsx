@@ -26,14 +26,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@/components/ui/input-group';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { PasswordResetDialog } from '../components/PasswordResetDialog';
 import { FullPageLoader } from '@/components/shared/FullPageLoader';
 import { ApiError } from '@/services/api';
 import { useSession } from '../hooks/useSession';
@@ -58,6 +51,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const {
     register,
+    setValue,
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
@@ -229,22 +223,12 @@ export default function LoginPage() {
                 />
                 Remember me
               </label>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="link" type="button">
-                    Forgot password?
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Password assistance</DialogTitle>
-                    <DialogDescription>
-                      Contact the HR office at JCET to reset your CampusHR
-                      password.
-                    </DialogDescription>
-                  </DialogHeader>
-                </DialogContent>
-              </Dialog>
+              <PasswordResetDialog
+                onComplete={(email) => {
+                  setValue('identifier', email);
+                  setValue('password', '');
+                }}
+              />
             </div>
             {errors.root && (
               <FieldError id="login-error">{errors.root.message}</FieldError>

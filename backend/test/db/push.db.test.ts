@@ -343,7 +343,7 @@ test('password changes revoke other-device pushes and deactivation/expired sessi
     current.accessToken,
     {
       currentPassword: password,
-      newPassword: 'changed-push-test-password',
+      newPassword: 'ChangedPushTest42!',
       refreshToken: current.refreshToken,
     },
   );
