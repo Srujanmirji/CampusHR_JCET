@@ -79,11 +79,11 @@ export function ChangePasswordDialog({
       }}
     >
       <DialogContent
-        className="sm:max-w-md"
+        className="max-h-[calc(100dvh-var(--spacing)*8)] overflow-y-auto sm:max-w-md [&_[data-slot=dialog-close]]:min-h-11 [&_[data-slot=dialog-close]]:min-w-11"
         onCloseAutoFocus={onCloseAutoFocus}
       >
         <DialogHeader>
-          <DialogTitle>Change password</DialogTitle>
+          <DialogTitle className="pr-11">Change password</DialogTitle>
           <DialogDescription>
             You stay signed in here; your other devices are signed out.
           </DialogDescription>
@@ -93,6 +93,7 @@ export function ChangePasswordDialog({
             <FieldLabel htmlFor="current-password">Current password</FieldLabel>
             <Input
               id="current-password"
+              className="min-h-11"
               type="password"
               autoComplete="current-password"
               value={current}
@@ -103,6 +104,7 @@ export function ChangePasswordDialog({
             <FieldLabel htmlFor="new-password">New password</FieldLabel>
             <Input
               id="new-password"
+              className="min-h-11"
               type="password"
               autoComplete="new-password"
               value={next}
@@ -121,6 +123,8 @@ export function ChangePasswordDialog({
             </FieldLabel>
             <Input
               id="confirm-password"
+              className="min-h-11"
+              maxLength={72}
               aria-describedby="change-password-match"
               type="password"
               autoComplete="new-password"
@@ -155,6 +159,7 @@ export function ChangePasswordDialog({
             </Button>
             <Button
               type="submit"
+              className="bg-foreground text-background hover:bg-foreground/90"
               disabled={
                 save.isPending ||
                 !current ||
