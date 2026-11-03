@@ -37,7 +37,8 @@ const label = (value: string, options: Intl.DateTimeFormatOptions) =>
 
 export default function TimetableScreen() {
   const { user, accessToken } = useAuth();
-  const { fontScale } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
+  const isTablet = width >= 768;
   const client = useQueryClient();
   const [clock, setClock] = useState(() => campusClock());
   const [view, setView] = useState<'TODAY' | 'WEEK'>('TODAY');
@@ -259,271 +260,276 @@ export default function TimetableScreen() {
           </Button>
         </View>
       ) : (
-        <>
-          <View style={styles.scheduleHeading}>
-            <Text accessibilityRole="header" style={styles.sectionTitle}>
-              {view === 'TODAY'
-                ? `${entries.length} ${entries.length === 1 ? 'class' : 'classes'} today`
-                : label(date, {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                  })}
-            </Text>
-            <Text style={styles.detail}>
-              {view === 'WEEK' &&
-                `${entries.length} ${entries.length === 1 ? 'slot' : 'slots'} · `}
-              All class times in IST
-            </Text>
-          </View>
-          {past ? (
-            <Text style={styles.detail}>
-              Regular timetable for this weekday. Past substitution history is
-              not provided by the API.
-            </Text>
-          ) : dutiesUnavailable ? (
-            <Text style={styles.detail}>
-              Regular classes only. Substitution duties are not available for
-              your account.
-            </Text>
-          ) : duties.isPending ? (
-            <Text style={styles.detail}>
-              Checking dated substitution duties…
-            </Text>
-          ) : dutyError ? (
-            <View style={styles.notice}>
-              <Text accessibilityRole="alert" style={styles.error}>
-                Substitution duties could not be loaded. Regular classes are
-                shown; coverage may be missing.
+        <View style={isTablet ? styles.tabletSplit : undefined}>
+          <View style={isTablet ? styles.tabletScheduleColumn : undefined}>
+            <View style={styles.scheduleHeading}>
+              <Text accessibilityRole="header" style={styles.sectionTitle}>
+                {view === 'TODAY'
+                  ? `${entries.length} ${entries.length === 1 ? 'class' : 'classes'} today`
+                  : label(date, {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                    })}
               </Text>
-              <Button
-                variant="outline"
-                onPress={() => {
-                  void duties.refetch();
-                }}
-              >
-                Retry duties
-              </Button>
-            </View>
-          ) : dutyCount > 0 ? (
-            <Text style={styles.coverageSummary}>
-              Includes {dutyCount} substitution{' '}
-              {dutyCount === 1 ? 'duty' : 'duties'} for {date}
-            </Text>
-          ) : null}
-          {regular.dataUpdatedAt > 0 && (
-            <Text style={styles.detail}>
-              Updated{' '}
-              {new Date(regular.dataUpdatedAt).toLocaleTimeString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-              {regular.isFetching ? ' · Refreshing…' : ''}
-            </Text>
-          )}
-          {entries.length === 0 && (
-            <View style={styles.empty}>
-              <Icon
-                name="timetable"
-                color={theme.colors.primary}
-                size={theme.spacing.xl}
-              />
-              <Text style={styles.sectionTitle}>
-                A little space in your day
-              </Text>
-              <Text style={styles.supporting}>
-                No regular classes
-                {!past && !dutiesUnavailable && duties.isSuccess
-                  ? ' or assigned duties'
-                  : ''}{' '}
-                for this date. Select another day or refresh to check for
-                changes.
+              <Text style={styles.detail}>
+                {view === 'WEEK' &&
+                  `${entries.length} ${entries.length === 1 ? 'slot' : 'slots'} · `}
+                All class times in IST
               </Text>
             </View>
-          )}
-          <View style={styles.timeline}>
-            {entries.map((entry) => {
-              const start = regular.data!.periods.find(
-                (p) => p.number === entry.startPeriod,
-              )!.startTime;
-              const end = regular.data!.periods.find(
-                (p) => p.number === entry.endPeriod,
-              )!.endTime;
-              const status = classStatus(
-                date,
-                parseTimeToMinutes(start),
-                parseTimeToMinutes(end),
-                clock,
-              );
-              const current = status === 'In progress';
-              const completed = status === 'Completed';
-              return (
-                <View key={entry.id} style={styles.timelineRow}>
-                  <View
-                    style={[
-                      styles.timeRail,
-                      {
-                        width:
-                          (theme.sizes.tapTarget + theme.spacing.md) *
-                          Math.max(fontScale, 1),
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.time, current && styles.activeText]}>
-                      {start.slice(0, 5)}
-                    </Text>
-                    <Text style={styles.detail}>{end.slice(0, 5)}</Text>
-                  </View>
-                  <View style={styles.timelineSpine}>
+            {past ? (
+              <Text style={styles.detail}>
+                Regular timetable for this weekday. Past substitution history is
+                not provided by the API.
+              </Text>
+            ) : dutiesUnavailable ? (
+              <Text style={styles.detail}>
+                Regular classes only. Substitution duties are not available for
+                your account.
+              </Text>
+            ) : duties.isPending ? (
+              <Text style={styles.detail}>
+                Checking dated substitution duties…
+              </Text>
+            ) : dutyError ? (
+              <View style={styles.notice}>
+                <Text accessibilityRole="alert" style={styles.error}>
+                  Substitution duties could not be loaded. Regular classes are
+                  shown; coverage may be missing.
+                </Text>
+                <Button
+                  variant="outline"
+                  onPress={() => {
+                    void duties.refetch();
+                  }}
+                >
+                  Retry duties
+                </Button>
+              </View>
+            ) : dutyCount > 0 ? (
+              <Text style={styles.coverageSummary}>
+                Includes {dutyCount} substitution{' '}
+                {dutyCount === 1 ? 'duty' : 'duties'} for {date}
+              </Text>
+            ) : null}
+            {regular.dataUpdatedAt > 0 && (
+              <Text style={styles.detail}>
+                Updated{' '}
+                {new Date(regular.dataUpdatedAt).toLocaleTimeString('en-IN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+                {regular.isFetching ? ' · Refreshing…' : ''}
+              </Text>
+            )}
+            {entries.length === 0 && (
+              <View style={styles.empty}>
+                <Icon
+                  name="timetable"
+                  color={theme.colors.primary}
+                  size={theme.spacing.xl}
+                />
+                <Text style={styles.sectionTitle}>
+                  A little space in your day
+                </Text>
+                <Text style={styles.supporting}>
+                  No regular classes
+                  {!past && !dutiesUnavailable && duties.isSuccess
+                    ? ' or assigned duties'
+                    : ''}{' '}
+                  for this date. Select another day or refresh to check for
+                  changes.
+                </Text>
+              </View>
+            )}
+            <View style={styles.timeline}>
+              {entries.map((entry) => {
+                const start = regular.data!.periods.find(
+                  (p) => p.number === entry.startPeriod,
+                )!.startTime;
+                const end = regular.data!.periods.find(
+                  (p) => p.number === entry.endPeriod,
+                )!.endTime;
+                const status = classStatus(
+                  date,
+                  parseTimeToMinutes(start),
+                  parseTimeToMinutes(end),
+                  clock,
+                );
+                const current = status === 'In progress';
+                const completed = status === 'Completed';
+                return (
+                  <View key={entry.id} style={styles.timelineRow}>
                     <View
                       style={[
-                        styles.timelineDot,
-                        completed && styles.completedDot,
-                        current && styles.currentDot,
+                        styles.timeRail,
+                        {
+                          width:
+                            (theme.sizes.tapTarget + theme.spacing.md) *
+                            Math.max(fontScale, 1),
+                        },
                       ]}
-                    />
-                  </View>
-                  <View style={styles.timelineCopy}>
-                    <Text style={[styles.code, current && styles.activeText]}>
-                      {entry.subject.code}
-                    </Text>
-                    <Text style={styles.subject}>{entry.subject.name}</Text>
-                    <View style={styles.metadata}>
-                      <Icon name="profile" size={theme.spacing.section} />
-                      <Text style={styles.detail}>
-                        Sem {entry.semester}
-                        {entry.section}
-                        {entry.batch ? ` · Batch ${entry.batch}` : ''}
+                    >
+                      <Text style={[styles.time, current && styles.activeText]}>
+                        {start.slice(0, 5)}
                       </Text>
-                      <Icon name="location" size={theme.spacing.section} />
-                      <Text style={styles.detail}>{entry.room.name}</Text>
+                      <Text style={styles.detail}>{end.slice(0, 5)}</Text>
                     </View>
-                    <Text style={styles.detail}>
-                      {entry.subject.kind} ·{' '}
-                      {entry.startPeriod === entry.endPeriod
-                        ? `Period ${entry.startPeriod}`
-                        : `Periods ${entry.startPeriod}–${entry.endPeriod}`}
-                    </Text>
-                    {entry.isSubstitute && (
-                      <View style={styles.coverage}>
-                        <Text style={styles.coverageLabel}>
-                          Substitution · {entry.dutyDate}
-                        </Text>
-                        <Text style={styles.supporting}>
-                          {entry.substituteNote}
-                        </Text>
-                      </View>
-                    )}
-                    {status && (
+                    <View style={styles.timelineSpine}>
                       <View
                         style={[
-                          styles.status,
-                          completed
-                            ? styles.completedStatus
-                            : styles.activeStatus,
+                          styles.timelineDot,
+                          completed && styles.completedDot,
+                          current && styles.currentDot,
                         ]}
-                      >
-                        <Text
+                      />
+                    </View>
+                    <View style={styles.timelineCopy}>
+                      <Text style={[styles.code, current && styles.activeText]}>
+                        {entry.subject.code}
+                      </Text>
+                      <Text style={styles.subject}>{entry.subject.name}</Text>
+                      <View style={styles.metadata}>
+                        <Icon name="profile" size={theme.spacing.section} />
+                        <Text style={styles.detail}>
+                          Sem {entry.semester}
+                          {entry.section}
+                          {entry.batch ? ` · Batch ${entry.batch}` : ''}
+                        </Text>
+                        <Icon name="location" size={theme.spacing.section} />
+                        <Text style={styles.detail}>{entry.room.name}</Text>
+                      </View>
+                      <Text style={styles.detail}>
+                        {entry.subject.kind} ·{' '}
+                        {entry.startPeriod === entry.endPeriod
+                          ? `Period ${entry.startPeriod}`
+                          : `Periods ${entry.startPeriod}–${entry.endPeriod}`}
+                      </Text>
+                      {entry.isSubstitute && (
+                        <View style={styles.coverage}>
+                          <Text style={styles.coverageLabel}>
+                            Substitution · {entry.dutyDate}
+                          </Text>
+                          <Text style={styles.supporting}>
+                            {entry.substituteNote}
+                          </Text>
+                        </View>
+                      )}
+                      {status && (
+                        <View
                           style={[
-                            styles.statusText,
+                            styles.status,
                             completed
-                              ? styles.completedText
-                              : styles.activeText,
+                              ? styles.completedStatus
+                              : styles.activeStatus,
                           ]}
                         >
-                          {status}
-                        </Text>
-                      </View>
-                    )}
+                          <Text
+                            style={[
+                              styles.statusText,
+                              completed
+                                ? styles.completedText
+                                : styles.activeText,
+                            ]}
+                          >
+                            {status}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+          <View style={isTablet ? styles.tabletInspectorColumn : undefined}>
+            <View style={styles.bentoSection}>
+              <View style={styles.bentoHeader}>
+                <View style={styles.heading}>
+                  <Text style={styles.sectionTitle}>Mutual Class Swap</Text>
+                  <Text style={styles.supporting}>
+                    Exchange a lecture period with a departmental peer without
+                    using casual leave.
+                  </Text>
+                </View>
+                <Button
+                  variant="secondary"
+                  accessibilityLabel={
+                    swapRequested
+                      ? 'Withdraw peer period swap proposal'
+                      : 'Propose peer period swap'
+                  }
+                  onPress={() => {
+                    selectionFeedback();
+                    setSwapRequested((prev) => !prev);
+                  }}
+                >
+                  {swapRequested ? 'Swap Proposed' : 'Propose Swap'}
+                </Button>
+              </View>
+              <View style={styles.bentoItem}>
+                <Text style={styles.code}>
+                  Prof. Asha Patil ⇄ Prof. Priya Kulkarni
+                </Text>
+                <Text style={styles.subject}>
+                  BCS501 Mon P2 (10:00) ⇄ BCS502 Wed P4 (12:00) · CSE-5A · Room
+                  204
+                </Text>
+                <Text style={styles.detail}>
+                  {swapRequested
+                    ? 'Your additional Fri P3 ⇄ Tue P2 swap proposal is queued for HOD review'
+                    : 'Approved by HOD · Zero leave balance deduction'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.bentoSection}>
+              <View style={styles.heading}>
+                <Text style={styles.sectionTitle}>VTU Academic Calendar</Text>
+                <Text style={styles.supporting}>
+                  Odd Semester 2026–27 CIE windows and JCET institutional
+                  holidays.
+                </Text>
+              </View>
+              {[
+                {
+                  title: 'CIE-1 Internal Assessment',
+                  window: '28 Sep – 01 Oct',
+                  badge: 'CIE Exam',
+                },
+                {
+                  title: 'Gandhi Jayanti',
+                  window: '02 Oct · Institutional Holiday',
+                  badge: 'Holiday',
+                },
+                {
+                  title: 'CIE-2 Internal Assessment',
+                  window: '02 Nov – 05 Nov',
+                  badge: 'CIE Exam',
+                },
+                {
+                  title: 'CIE-3 & Lab Internals',
+                  window: '07 Dec – 12 Dec',
+                  badge: 'Lab + CIE',
+                },
+              ].map((item) => (
+                <View key={item.title} style={styles.bentoRow}>
+                  <View style={styles.heading}>
+                    <Text style={styles.code}>{item.title}</Text>
+                    <Text style={styles.detail}>{item.window}</Text>
+                  </View>
+                  <View style={[styles.status, styles.activeStatus]}>
+                    <Text style={[styles.statusText, styles.activeText]}>
+                      {item.badge}
+                    </Text>
                   </View>
                 </View>
-              );
-            })}
+              ))}
+            </View>
           </View>
-        </>
+        </View>
       )}
-
-      <View style={styles.bentoSection}>
-        <View style={styles.bentoHeader}>
-          <View style={styles.heading}>
-            <Text style={styles.sectionTitle}>Mutual Class Swap</Text>
-            <Text style={styles.supporting}>
-              Exchange a lecture period with a departmental peer without using
-              casual leave.
-            </Text>
-          </View>
-          <Button
-            variant="secondary"
-            accessibilityLabel={
-              swapRequested
-                ? 'Withdraw peer period swap proposal'
-                : 'Propose peer period swap'
-            }
-            onPress={() => {
-              selectionFeedback();
-              setSwapRequested((prev) => !prev);
-            }}
-          >
-            {swapRequested ? 'Swap Proposed' : 'Propose Swap'}
-          </Button>
-        </View>
-        <View style={styles.bentoItem}>
-          <Text style={styles.code}>
-            Prof. Asha Patil ⇄ Prof. Priya Kulkarni
-          </Text>
-          <Text style={styles.subject}>
-            BCS501 Mon P2 (10:00) ⇄ BCS502 Wed P4 (12:00) · CSE-5A · Room 204
-          </Text>
-          <Text style={styles.detail}>
-            {swapRequested
-              ? 'Your additional Fri P3 ⇄ Tue P2 swap proposal is queued for HOD review'
-              : 'Approved by HOD · Zero leave balance deduction'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.bentoSection}>
-        <View style={styles.heading}>
-          <Text style={styles.sectionTitle}>VTU Academic Calendar</Text>
-          <Text style={styles.supporting}>
-            Odd Semester 2026–27 CIE windows and JCET institutional holidays.
-          </Text>
-        </View>
-        {[
-          {
-            title: 'CIE-1 Internal Assessment',
-            window: '28 Sep – 01 Oct',
-            badge: 'CIE Exam',
-          },
-          {
-            title: 'Gandhi Jayanti',
-            window: '02 Oct · Institutional Holiday',
-            badge: 'Holiday',
-          },
-          {
-            title: 'CIE-2 Internal Assessment',
-            window: '02 Nov – 05 Nov',
-            badge: 'CIE Exam',
-          },
-          {
-            title: 'CIE-3 & Lab Internals',
-            window: '07 Dec – 12 Dec',
-            badge: 'Lab + CIE',
-          },
-        ].map((item) => (
-          <View key={item.title} style={styles.bentoRow}>
-            <View style={styles.heading}>
-              <Text style={styles.code}>{item.title}</Text>
-              <Text style={styles.detail}>{item.window}</Text>
-            </View>
-            <View style={[styles.status, styles.activeStatus]}>
-              <Text style={[styles.statusText, styles.activeText]}>
-                {item.badge}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </View>
     </ScreenContainer>
   );
 }
@@ -533,6 +539,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.page,
     gap: theme.spacing.sm,
     paddingBottom: theme.spacing.xl,
+  },
+  tabletSplit: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.lg,
+  },
+  tabletScheduleColumn: {
+    flex: 1.2,
+    minWidth: 0,
+  },
+  tabletInspectorColumn: {
+    flex: 0.9,
+    minWidth: 0,
+    gap: theme.spacing.md,
   },
   header: {
     flexDirection: 'row',

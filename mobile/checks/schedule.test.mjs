@@ -47,7 +47,7 @@ test('own regular schedule and cookie-free own duties use existing authenticated
     paths.find((path) => path.includes(`facultyId=${scheduleUser.employeeId}`)),
   );
   assert.ok(paths.includes('/substitution/mine'));
-  assert.equal(duties[0].coveringFor.name, 'Absent Faculty');
+  assert.equal(duties[0].coveringFor.name, 'Prof. Asha Patil');
 });
 test('dated coverage appears once on its exact date and never repeats on the same weekday next week', async () => {
   const regular = await getOwnSchedule(
@@ -68,7 +68,7 @@ test('dated coverage appears once on its exact date and never repeats on the sam
   assert.equal(today[1].startPeriod, 2);
   assert.equal(today[1].endPeriod, 3);
   assert.equal(today[1].batch, 'A2');
-  assert.match(today[1].substituteNote, /Absent Faculty/);
+  assert.match(today[1].substituteNote, /Prof. Asha Patil/);
   assert.equal(today[1].subject.name, duty.entry.subject.name);
   assert.equal(
     mergeDatedDuties(regular.entries, [duty], '2026-10-28', schedulePeriods)

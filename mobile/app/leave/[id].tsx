@@ -9,6 +9,9 @@ import {
   ApprovalPath,
   FacultyInitials,
   LeaveStatus,
+  LeaveTypeBadge,
+  OfficialDutyBadge,
+  getLeaveBadgeTheme,
   leaveDates,
 } from '../../components/leave/LeavePresentation';
 import { useAuth } from '../../lib/auth-context';
@@ -62,7 +65,9 @@ export default function LeaveDetail() {
           </View>
           <View style={styles.summary}>
             <View style={styles.summaryTitle}>
-              <Icon name="leave" color={theme.colors.violet} />
+              <LeaveTypeBadge code={request.leaveType.code} />
+              {(request.leaveType.code === 'OOD' ||
+                request.leaveType.code === 'ODE') && <OfficialDutyBadge />}
               <Text style={styles.leaveTitle}>{request.leaveType.name}</Text>
             </View>
             <Text style={styles.body}>
@@ -74,6 +79,54 @@ export default function LeaveDetail() {
             </Text>
             <LeaveStatus status={request.status} />
           </View>
+          {(request.leaveType.code === 'OOD' ||
+            request.leaveType.code === 'ODE') && (
+            <View style={styles.dutySection}>
+              <Text accessibilityRole="header" style={styles.heading}>
+                Official duty details
+              </Text>
+              {!!request.dutyType && (
+                <Text style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Duty type: </Text>
+                  {request.dutyType}
+                </Text>
+              )}
+              {!!request.organisation && (
+                <Text style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Organisation: </Text>
+                  {request.organisation}
+                </Text>
+              )}
+              {!!request.location && (
+                <Text style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Location: </Text>
+                  {request.location}
+                </Text>
+              )}
+              {!!request.referenceNumber && (
+                <Text style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Reference number: </Text>
+                  {request.referenceNumber}
+                </Text>
+              )}
+              {!!request.attachmentName && (
+                <Text style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Official document: </Text>
+                  {request.attachmentName}
+                </Text>
+              )}
+            </View>
+          )}
+          {!!request.attachmentName &&
+            request.leaveType.code !== 'OOD' &&
+            request.leaveType.code !== 'ODE' && (
+              <View style={styles.section}>
+                <Text accessibilityRole="header" style={styles.heading}>
+                  Supporting document
+                </Text>
+                <Text style={styles.body}>{request.attachmentName}</Text>
+              </View>
+            )}
           <View style={styles.section}>
             <Text accessibilityRole="header" style={styles.heading}>
               Reason
@@ -93,9 +146,11 @@ export default function LeaveDetail() {
                 Academic impact & coverage
               </Text>
               <Text style={styles.impactText}>
-                {request.status === 'APPROVED'
-                  ? 'Your department manages dated class coverage for this approved leave.'
-                  : 'Coverage is arranged only after final approval.'}
+                {request.coverageRequired
+                  ? 'Scheduled teaching classes are affected. Class coverage arrangement is required.'
+                  : request.status === 'APPROVED'
+                    ? 'Your department manages dated class coverage for this approved leave.'
+                    : 'Coverage is arranged after final approval.'}
               </Text>
             </View>
           </View>
@@ -149,6 +204,23 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.title,
     fontWeight: '600',
     color: theme.colors.violet,
+  },
+  dutySection: {
+    gap: theme.spacing.sm,
+    padding: theme.spacing.section,
+    backgroundColor: '#CCFBF1',
+    borderRadius: theme.radius.field,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#99F6E4',
+    marginVertical: theme.spacing.sm,
+  },
+  detailItem: {
+    fontSize: theme.typography.caption,
+    color: theme.colors.foreground,
+  },
+  detailLabel: {
+    fontWeight: '600',
+    color: '#0F766E',
   },
   section: {
     gap: theme.spacing.section,

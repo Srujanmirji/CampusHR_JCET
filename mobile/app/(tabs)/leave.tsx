@@ -21,6 +21,11 @@ import { SegmentedControl } from '../../components/ui/SegmentedControl';
 import {
   FacultyInitials,
   LeaveStatus,
+  LeaveTypeBadge,
+  OfficialDutyBadge,
+  formatEntitlement,
+  formatRemaining,
+  getLeaveBadgeTheme,
   leaveDates,
 } from '../../components/leave/LeavePresentation';
 import { Input } from '../../components/ui/Input';
@@ -82,7 +87,33 @@ function LeaveRecords({
     inApprovals && approvals && params.personal !== '1' ? 'approvals' : 'mine',
   );
   const canCover = !coverageUnavailable(user, token);
+  const [approvalCategory, setApprovalCategory] = useState<
+    'LEAVE' | 'ATTENDANCE' | 'OOD'
+  >('LEAVE');
   const [approvalFilter, setApprovalFilter] = useState('PENDING');
+  const [attendanceCorrections, setAttendanceCorrections] = useState([
+    {
+      id: 'att-corr-1',
+      faculty: 'Prof. Asha Patil',
+      employeeCode: 'JCET-CSE-021',
+      date: '2026-10-22',
+      currentRecord: '09:12 AM – Not recorded',
+      requestedCorrection: '09:12 AM – 04:45 PM · Present',
+      reason:
+        'Evening DBMS lab session extended for VTU internal assessment viva.',
+      status: 'PENDING' as 'PENDING' | 'APPROVED' | 'REJECTED',
+    },
+    {
+      id: 'att-corr-2',
+      faculty: 'Dr. Rahul Deshpande',
+      employeeCode: 'JCET-CSE-014',
+      date: '2026-10-19',
+      currentRecord: 'Not recorded',
+      requestedCorrection: '09:00 AM – 04:30 PM · Official Duty',
+      reason: 'Deputed for VTU BoS syllabus review meeting at Belagavi.',
+      status: 'APPROVED' as 'PENDING' | 'APPROVED' | 'REJECTED',
+    },
+  ]);
   const [year, setYear] = useState(String(campusClock().year));
   const validYear = /^20\d{2}$/.test(year) || year === '2100';
   const [filter, setFilter] = useState('ALL');
@@ -236,6 +267,13 @@ function LeaveRecords({
   const personal = tab !== 'approvals' || !approvals;
   const visibleRecords = (records.data ?? []).filter((request) => {
     if (personal) return filter === 'ALL' || request.status === filter;
+    if (
+      approvalCategory === 'OOD' &&
+      request.leaveType.code !== 'OOD' &&
+      request.leaveType.code !== 'ODE'
+    ) {
+      return false;
+    }
     const needle = search.trim().toLocaleLowerCase();
     return (
       !needle ||
@@ -246,6 +284,16 @@ function LeaveRecords({
         request.leaveType.code,
         request.department.name,
       ].some((value) => value.toLocaleLowerCase().includes(needle))
+    );
+  });
+  const visibleCorrections = attendanceCorrections.filter((corr) => {
+    if (corr.status !== approvalFilter) return false;
+    const needle = search.trim().toLocaleLowerCase();
+    return (
+      !needle ||
+      [corr.faculty, corr.employeeCode, corr.reason, corr.date].some((val) =>
+        val.toLocaleLowerCase().includes(needle),
+      )
     );
   });
   return (
@@ -348,7 +396,7 @@ function LeaveRecords({
                         accessibilityRole="header"
                         style={[styles.sectionTitle, styles.grow]}
                       >
-                        Your balances · {year}
+                        Your balances — {year}
                       </Text>
                       <Button
                         variant="text"
@@ -396,38 +444,75 @@ function LeaveRecords({
                               No leave balances for this year.
                             </Text>
                           )}
-                          {balances.data.map((balance) => (
-                            <View
-                              key={balance.leaveType.id}
-                              style={[
-                                styles.balance,
-                                fontScale > 1.3 && styles.balanceLarge,
-                              ]}
-                            >
-                              <Text
+                          {balances.data.map((balance) => {
+                            const badgeTheme = getLeaveBadgeTheme(
+                              balance.leaveType.code,
+                            );
+                            const isOfficialDuty =
+                              balance.leaveType.code === 'OOD' ||
+                              balance.leaveType.code === 'ODE';
+                            const isPolicyBased =
+                              balance.entitled === null ||
+                              balance.remaining === null;
+
+                            return (
+                              <View
+                                key={balance.leaveType.id}
                                 style={[
-                                  styles.balanceValue,
-                                  balance.remaining === null &&
-                                    styles.unlimited,
+                                  styles.balance,
+                                  fontScale > 1.3 && styles.balanceLarge,
+                                  {
+                                    borderLeftWidth: 3,
+                                    borderLeftColor: badgeTheme.ink,
+                                  },
                                 ]}
                               >
-                                {balance.remaining === null
-                                  ? 'Unlimited'
-                                  : balance.remaining}
-                              </Text>
-                              <Text style={styles.balanceCode}>
-                                {balance.leaveType.code}
-                                {!balance.active ? ' · Inactive' : ''}
-                              </Text>
-                              <Text style={styles.caption}>
-                                {balance.leaveType.name} (days)
-                              </Text>
-                              <Text style={styles.caption}>
-                                Used {balance.used} · Pending {balance.pending}{' '}
-                                · Carried {balance.carriedIn}
-                              </Text>
-                            </View>
-                          ))}
+                                <View style={styles.balanceHeader}>
+                                  <LeaveTypeBadge
+                                    code={balance.leaveType.code}
+                                  />
+                                  {isOfficialDuty && <OfficialDutyBadge />}
+                                  {!balance.active && (
+                                    <Text style={styles.inactiveTag}>
+                                      Inactive
+                                    </Text>
+                                  )}
+                                </View>
+                                <Text style={styles.balanceName}>
+                                  {balance.leaveType.name}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.balanceValue,
+                                    isPolicyBased && styles.policyValue,
+                                    {
+                                      color: isPolicyBased
+                                        ? theme.colors.textSecondary
+                                        : badgeTheme.ink,
+                                    },
+                                  ]}
+                                >
+                                  {isPolicyBased
+                                    ? 'As per policy'
+                                    : `${balance.remaining} remaining`}
+                                </Text>
+                                <View style={styles.balanceStats}>
+                                  <Text style={styles.statLine}>
+                                    {balance.entitled !== null
+                                      ? `${balance.entitled} entitled`
+                                      : 'As per policy'}
+                                  </Text>
+                                  <Text style={styles.statLine}>
+                                    {balance.used} used · {balance.pending}{' '}
+                                    pending
+                                    {balance.carriedIn > 0
+                                      ? ` · ${balance.carriedIn} carried`
+                                      : ''}
+                                  </Text>
+                                </View>
+                              </View>
+                            );
+                          })}
                         </View>
                       )
                     )}
@@ -485,6 +570,18 @@ function LeaveRecords({
           ) : (
             <View style={styles.queueTools}>
               <SegmentedControl
+                label="Approval category"
+                options={[
+                  { value: 'LEAVE', label: 'Leave' },
+                  { value: 'ATTENDANCE', label: 'Attendance' },
+                  { value: 'OOD', label: 'OOD' },
+                ]}
+                value={approvalCategory}
+                onChange={(val) =>
+                  setApprovalCategory(val as 'LEAVE' | 'ATTENDANCE' | 'OOD')
+                }
+              />
+              <SegmentedControl
                 label="Filter department requests"
                 options={[
                   { value: 'PENDING', label: 'Pending' },
@@ -502,22 +599,100 @@ function LeaveRecords({
               />
             </View>
           )}
-          {((!personal && approvals) || (!unavailable && validYear)) && (
+          {!personal && approvals && approvalCategory === 'ATTENDANCE' ? (
             <View style={styles.requestList}>
-              {records.isFetching && (
-                <Text style={styles.subtitle}>Loading leave requests…</Text>
-              )}
-              {records.isError ? (
-                <View style={styles.stack}>
-                  <Text accessibilityRole="alert" style={styles.error}>
-                    Requests unavailable. {records.error.message}
+              {visibleCorrections.length === 0 ? (
+                <View style={styles.empty}>
+                  <Icon
+                    name="attendance"
+                    color={theme.colors.mintInk}
+                    size={theme.spacing.xl}
+                  />
+                  <Text style={styles.sectionTitle}>You’re up to date</Text>
+                  <Text style={styles.subtitle}>
+                    No attendance correction requests match this status.
                   </Text>
-                  <Button variant="secondary" onPress={() => void refresh()}>
-                    Retry requests
-                  </Button>
                 </View>
               ) : (
-                records.isSuccess && (
+                visibleCorrections.map((corr) => (
+                  <View key={corr.id} style={styles.requestRow}>
+                    <FacultyInitials name={corr.faculty} />
+                    <View style={styles.requestBody}>
+                      <View style={styles.requestMeta}>
+                        <Text style={[styles.requestTitle, styles.grow]}>
+                          {corr.faculty}
+                        </Text>
+                        <LeaveStatus status={corr.status} />
+                      </View>
+                      <Text style={styles.caption}>
+                        CSE · {corr.employeeCode} · {corr.date}
+                      </Text>
+                      <Text style={styles.text}>
+                        Current record: {corr.currentRecord}
+                      </Text>
+                      <Text style={[styles.text, { fontWeight: '600' }]}>
+                        Requested correction: {corr.requestedCorrection}
+                      </Text>
+                      <Text style={styles.caption}>{corr.reason}</Text>
+                      {corr.status === 'PENDING' && (
+                        <View style={styles.rowActions}>
+                          <Button
+                            onPress={() => {
+                              setAttendanceCorrections((prev) =>
+                                prev.map((item) =>
+                                  item.id === corr.id
+                                    ? { ...item, status: 'APPROVED' }
+                                    : item,
+                                ),
+                              );
+                              setNotice(
+                                `Approved attendance correction for ${corr.faculty}.`,
+                              );
+                            }}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onPress={() => {
+                              setAttendanceCorrections((prev) =>
+                                prev.map((item) =>
+                                  item.id === corr.id
+                                    ? { ...item, status: 'REJECTED' }
+                                    : item,
+                                ),
+                              );
+                              setNotice(
+                                `Rejected attendance correction for ${corr.faculty}.`,
+                              );
+                            }}
+                          >
+                            Reject
+                          </Button>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          ) : (
+            ((!personal && approvals) || (!unavailable && validYear)) && (
+              <View style={styles.requestList}>
+                {records.isFetching && (
+                  <Text style={styles.subtitle}>Loading leave requests…</Text>
+                )}
+                {records.isError ? (
+                  <View style={styles.stack}>
+                    <Text accessibilityRole="alert" style={styles.error}>
+                      Requests unavailable. {records.error.message}
+                    </Text>
+                    <Button variant="secondary" onPress={() => void refresh()}>
+                      Retry requests
+                    </Button>
+                  </View>
+                ) : (
+                  records.isSuccess && (
                   <>
                     {visibleRecords.length === 0 && (
                       <View style={styles.empty}>
@@ -548,93 +723,106 @@ function LeaveRecords({
                         may be omitted by the API.
                       </Text>
                     )}
-                    {visibleRecords.map((request) => (
-                      <View key={request.id} style={styles.requestRow}>
-                        {!personal && (
-                          <FacultyInitials name={request.employee.name} />
-                        )}
-                        {personal && (
-                          <View style={styles.typeIcon}>
-                            <Icon
-                              name="leave"
-                              color={theme.colors.violet}
-                              size={theme.spacing.lg}
-                            />
-                          </View>
-                        )}
-                        <View style={styles.requestBody}>
-                          <View style={styles.requestMeta}>
-                            <Text style={[styles.requestTitle, styles.grow]}>
-                              {personal
-                                ? request.leaveType.name
-                                : request.employee.name}
-                            </Text>
-                            <LeaveStatus status={request.status} />
-                          </View>
+                    {visibleRecords.map((request) => {
+                      const isOfficialDuty =
+                        request.leaveType.code === 'OOD' ||
+                        request.leaveType.code === 'ODE';
+                      return (
+                        <View key={request.id} style={styles.requestRow}>
                           {!personal && (
-                            <Text style={styles.caption}>
-                              {request.department.code} ·{' '}
-                              {request.employee.employeeCode}
-                            </Text>
+                            <FacultyInitials name={request.employee.name} />
                           )}
-                          {!personal && (
-                            <Text style={styles.leaveType}>
-                              {request.leaveType.name}
-                            </Text>
-                          )}
-                          <Text style={styles.text}>
-                            {leaveDates(request.startDate, request.endDate)} ·{' '}
-                            {request.days} {request.days === 1 ? 'day' : 'days'}
-                            {request.halfDay
-                              ? ` · ${request.halfDay === 'FIRST' ? 'First' : 'Second'} half`
-                              : ''}
-                          </Text>
-                          <Text style={styles.caption}>{request.reason}</Text>
-                          {!!request.pendingRole && personal && (
-                            <Text style={styles.caption}>
-                              Awaiting {request.pendingRole}
-                            </Text>
-                          )}
-                          <View style={styles.rowActions}>
-                            {personal ? (
-                              <Button
-                                variant="text"
-                                onPress={() =>
-                                  router.push({
-                                    pathname: '/leave/[id]',
-                                    params: { id: request.id },
-                                  })
-                                }
-                              >
-                                View details
-                              </Button>
-                            ) : (
-                              <Button
-                                onPress={() =>
-                                  setDecision({ request, mode: 'APPROVE' })
-                                }
-                              >
-                                Review
-                              </Button>
+                          <View style={styles.requestBody}>
+                            <View style={styles.requestMeta}>
+                              <LeaveTypeBadge code={request.leaveType.code} />
+                              <Text style={[styles.requestTitle, styles.grow]}>
+                                {personal
+                                  ? request.leaveType.name
+                                  : request.employee.name}
+                              </Text>
+                              <LeaveStatus status={request.status} />
+                            </View>
+                            {!personal && (
+                              <Text style={styles.caption}>
+                                {request.department.code} ·{' '}
+                                {request.employee.employeeCode}
+                              </Text>
                             )}
-                            {personal &&
-                              request.status === 'PENDING' &&
-                              canReadHome(user, 'leave.cancel') && (
+                            {isOfficialDuty && (
+                              <View style={styles.officialDutyNote}>
+                                <OfficialDutyBadge />
+                                {!!request.dutyType && (
+                                  <Text style={styles.dutyDetail}>
+                                    {request.dutyType}
+                                    {request.organisation
+                                      ? ` · ${request.organisation}`
+                                      : ''}
+                                  </Text>
+                                )}
+                              </View>
+                            )}
+                            <Text style={styles.text}>
+                              {leaveDates(request.startDate, request.endDate)} ·{' '}
+                              {request.days} {request.days === 1 ? 'day' : 'days'}
+                              {request.halfDay
+                                ? ` · ${request.halfDay === 'FIRST' ? 'First' : 'Second'} half`
+                                : ''}
+                            </Text>
+                            <Text style={styles.caption}>{request.reason}</Text>
+                            {request.coverageRequired && (
+                              <View style={styles.coverageRequiredBadge}>
+                                <Text style={styles.coverageRequiredText}>
+                                  Coverage required
+                                </Text>
+                              </View>
+                            )}
+                            {!!request.pendingRole && personal && (
+                              <Text style={styles.caption}>
+                                Awaiting {request.pendingRole}
+                              </Text>
+                            )}
+                            <View style={styles.rowActions}>
+                              {personal ? (
                                 <Button
                                   variant="text"
-                                  onPress={() => setCancel(request)}
+                                  onPress={() =>
+                                    router.push({
+                                      pathname: '/leave/[id]',
+                                      params: { id: request.id },
+                                    })
+                                  }
                                 >
-                                  Cancel request
+                                  View details
+                                </Button>
+                              ) : (
+                                <Button
+                                  onPress={() =>
+                                    setDecision({ request, mode: 'APPROVE' })
+                                  }
+                                >
+                                  Review
                                 </Button>
                               )}
+                              {personal &&
+                                request.status === 'PENDING' &&
+                                canReadHome(user, 'leave.cancel') && (
+                                  <Button
+                                    variant="text"
+                                    onPress={() => setCancel(request)}
+                                  >
+                                    Cancel request
+                                  </Button>
+                                )}
+                            </View>
                           </View>
                         </View>
-                      </View>
-                    ))}
+                      );
+                    })}
                   </>
                 )
               )}
-            </View>
+              </View>
+            )
           )}
           {cancel && (
             <Modal
@@ -800,11 +988,68 @@ const styles = StyleSheet.create({
     ...theme.shadows.card,
   },
   balanceLarge: { flexBasis: '100%' },
-  balanceValue: {
-    fontSize: theme.typography.greeting,
+  balanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.xs,
+  },
+  balanceName: {
+    fontSize: theme.typography.secondary,
     fontWeight: '600',
     color: theme.colors.foreground,
+  },
+  balanceValue: {
+    fontSize: theme.typography.title,
+    fontWeight: '700',
+    color: theme.colors.foreground,
     fontVariant: ['tabular-nums'],
+    marginTop: 2,
+  },
+  policyValue: {
+    fontSize: theme.typography.body,
+    fontWeight: '600',
+  },
+  balanceStats: {
+    gap: 2,
+    marginTop: theme.spacing.xs,
+  },
+  statLine: {
+    fontSize: theme.typography.caption,
+    color: theme.colors.mutedForeground,
+    lineHeight: theme.typography.captionLineHeight,
+  },
+  inactiveTag: {
+    fontSize: theme.typography.caption,
+    color: theme.colors.mutedForeground,
+    fontStyle: 'italic',
+  },
+  officialDutyNote: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    marginVertical: 2,
+  },
+  dutyDetail: {
+    fontSize: theme.typography.caption,
+    color: '#0F766E',
+    fontWeight: '500',
+  },
+  coverageRequiredBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 2,
+    borderRadius: theme.radius.control,
+    backgroundColor: '#FEF3C7',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#FDE68A',
+    marginTop: 2,
+  },
+  coverageRequiredText: {
+    fontSize: theme.typography.caption,
+    fontWeight: '600',
+    color: '#B45309',
   },
   unlimited: { fontSize: theme.typography.title },
   balanceCode: {

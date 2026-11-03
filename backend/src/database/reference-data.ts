@@ -106,4 +106,35 @@ export async function seedReferenceData(prisma: PrismaClient) {
       create: { designationId: designation.id, minHours, maxHours },
     });
   }
+
+  // JCET 7 Leave Categories
+  const LEAVE_TYPES = [
+    { code: 'CL', name: 'Casual Leave', yearlyQuota: 12, allowHalfDay: true, carryForwardMax: 0 },
+    { code: 'EL', name: 'Earned Leave', yearlyQuota: 10, allowHalfDay: false, carryForwardMax: 15 },
+    { code: 'SPL_ML', name: 'Special / Medical Leave', yearlyQuota: null, allowHalfDay: false, carryForwardMax: 0 },
+    { code: 'OOD', name: 'On Official Duty', yearlyQuota: 12, allowHalfDay: true, carryForwardMax: 0 },
+    { code: 'ODE', name: 'Official / Examination Duty', yearlyQuota: 12, allowHalfDay: true, carryForwardMax: 0 },
+    { code: 'RH', name: 'Restricted Holiday', yearlyQuota: null, allowHalfDay: false, carryForwardMax: 0 },
+    { code: 'VL', name: 'Vacation Leave', yearlyQuota: null, allowHalfDay: false, carryForwardMax: 0 },
+  ] as const;
+
+  for (const type of LEAVE_TYPES) {
+    await prisma.leaveType.upsert({
+      where: { code: type.code },
+      update: {
+        name: type.name,
+        yearlyQuota: type.yearlyQuota,
+        allowHalfDay: type.allowHalfDay,
+        carryForwardMax: type.carryForwardMax,
+      },
+      create: {
+        code: type.code,
+        name: type.name,
+        yearlyQuota: type.yearlyQuota,
+        allowHalfDay: type.allowHalfDay,
+        carryForwardMax: type.carryForwardMax,
+        active: true,
+      },
+    });
+  }
 }

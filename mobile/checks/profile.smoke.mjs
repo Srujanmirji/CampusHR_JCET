@@ -37,8 +37,8 @@ const api = 'http://[::1]:4011',
   mode = (name) =>
     globalThis.fetch(`${api}/test-mode/${name}`, { method: 'POST' });
 const login = async (
-  email = 'home-check@jcet.test',
-  password = 'home-check-only',
+  email = 'hod.cse@jcethbl.edu.in',
+  password = 'CampusHR@2026',
 ) => {
   await page
     .getByLabel('Employee ID or College Email', { exact: true })
@@ -232,7 +232,7 @@ try {
   }
   await logout();
   requests.length = 0;
-  await login('no-employee@jcet.test');
+  await login('no-employee@jcethbl.edu.in');
   await screen.getByText(/Documents require your own employee link/).waitFor();
   assert.equal(requests.length, 0);
   assert.equal(
@@ -262,7 +262,7 @@ try {
   await screen.getByText(/current password.*not right/i).waitFor();
   await screen
     .getByLabel('Current password', { exact: true })
-    .fill('home-check-only');
+    .fill('CampusHR@2026');
   await screen
     .getByLabel('New password', { exact: true })
     .fill('profile-test-password-only');
@@ -282,7 +282,7 @@ try {
     '',
   );
   await logout();
-  await login('home-check@jcet.test', 'profile-test-password-only');
+  await login('hod.cse@jcethbl.edu.in', 'profile-test-password-only');
   await screen.getByText('My documents', { exact: true }).waitFor();
   await logout();
   assert.deepEqual(errors, []);

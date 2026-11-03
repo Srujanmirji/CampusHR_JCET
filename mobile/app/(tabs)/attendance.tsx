@@ -97,6 +97,12 @@ export default function AttendanceTab() {
   const [page, setPage] = useState(1);
   const [correctionFormOpen, setCorrectionFormOpen] = useState(false);
   const [focusedStatus, setFocusedStatus] = useState<string | null>(null);
+  const [correctionIssue, setCorrectionIssue] = useState<
+    'Missed check-in' | 'Missed check-out' | 'Incorrect time' | 'Other'
+  >('Missed check-in');
+  const [correctionAttachment, setCorrectionAttachment] = useState<
+    string | null
+  >(null);
   const [form, setForm] = useState<CorrectionInput>({
     date: day,
     checkIn: '',
@@ -806,6 +812,42 @@ export default function AttendanceTab() {
                       {fields.date}
                     </Text>
                   )}
+                  <Text style={styles.label}>Issue</Text>
+                  <View style={styles.statuses}>
+                    {(
+                      [
+                        'Missed check-in',
+                        'Missed check-out',
+                        'Incorrect time',
+                        'Other',
+                      ] as const
+                    ).map((issue) => (
+                      <Pressable
+                        key={issue}
+                        accessibilityRole="button"
+                        accessibilityState={{
+                          selected: correctionIssue === issue,
+                          disabled: !!pending || correctionBlocked,
+                        }}
+                        disabled={!!pending || correctionBlocked}
+                        onPress={() => setCorrectionIssue(issue)}
+                        style={({ pressed }) => [
+                          styles.option,
+                          correctionIssue === issue && styles.selected,
+                          pressed && styles.pressedOption,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            correctionIssue === issue && styles.selectedText,
+                          ]}
+                        >
+                          {issue}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
                   <Input
                     label="Requested check-in (UTC)"
                     value={form.checkIn}
@@ -867,6 +909,21 @@ export default function AttendanceTab() {
                     error={fields.reason}
                     disabled={!!pending || correctionBlocked}
                   />
+                  <View style={styles.row}>
+                    <Button
+                      variant="outline"
+                      disabled={!!pending || correctionBlocked}
+                      onPress={() =>
+                        setCorrectionAttachment((prev) =>
+                          prev ? null : 'Attendance_Support_Note.pdf',
+                        )
+                      }
+                    >
+                      {correctionAttachment
+                        ? `Attached: ${correctionAttachment}`
+                        : 'Attach supporting document'}
+                    </Button>
+                  </View>
                   <Button
                     onPress={() => {
                       void submitCorrection();

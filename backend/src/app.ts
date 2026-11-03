@@ -89,7 +89,12 @@ export function createApp(
   // sign-in rate limits count people, not the proxy.
   if (env.NODE_ENV === 'production') app.set('trust proxy', 1);
   app.use(helmet());
-  app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+  app.use(
+    cors({
+      origin: env.NODE_ENV === 'development' ? true : env.CORS_ORIGIN,
+      credentials: true,
+    }),
+  );
   app.use(express.json({ limit: '1mb' }));
   // Liveness stays independent from database readiness.
   app.get('/api/v1/health', (_req, res) => {

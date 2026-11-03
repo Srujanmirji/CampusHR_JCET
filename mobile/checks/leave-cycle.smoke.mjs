@@ -9,17 +9,17 @@ const marker = await (await globalThis.fetch(`${origin}/__demo`)).json();
 assert.equal(marker.kind, 'campushr-persistent-local-demo');
 const sessions = {};
 for (const [key, email] of Object.entries({
-  faculty: 'faculty-check@jcet.test',
-  hod: 'home-check@jcet.test',
+  faculty: 'asha.patil@jcethbl.edu.in',
+  hod: 'hod.cse@jcethbl.edu.in',
   hr: 'hr-check@jcet.test',
-  cover: 'coverage-recipient@jcet.test',
+  cover: 'priya.kulkarni@jcethbl.edu.in',
 })) {
   const response = await globalThis.fetch(
     `${origin}/api/v1/auth/native/login`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: email, password: 'home-check-only' }),
+      body: JSON.stringify({ identifier: email, password: 'CampusHR@2026' }),
     },
   );
   assert.equal(response.status, 200, `Sign in ${key}`);

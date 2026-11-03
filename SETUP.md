@@ -42,6 +42,8 @@ SEED_ADMIN_EMAIL=you@jcethbl.edu.in SEED_ADMIN_PASSWORD='12+ characters' \
 
 The seed is safe to rerun: it adds missing roles, permissions and default
 grants (`product/USER_ROLES.md`) and never changes an existing user's password.
+Add `SEED_DEMO_PASSWORD='12+ characters'` to also create one demo login per
+role (listed in `backend/src/database/seed.ts`); remove them before go-live.
 Rerun it after pulling changes to the permission matrix.
 
 ## Run

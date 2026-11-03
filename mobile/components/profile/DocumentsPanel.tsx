@@ -203,6 +203,33 @@ export function DocumentsPanel() {
   const rows = (query.data?.pages.flatMap((page) => page.data) ?? []).filter(
     (row, index, all) => all.findIndex((item) => item.id === row.id) === index,
   );
+  const verifiedCount = rows.filter((r) => r.status === 'VERIFIED').length;
+  const pendingCount = rows.filter((r) => r.status === 'PENDING').length;
+  const expiringCount = rows.filter((r) => !!r.expiryDate).length;
+  const requiredDossier: {
+    label: string;
+    category: 'IDENTITY' | 'ACADEMIC' | 'EMPLOYMENT' | 'CERTIFICATION' | 'OTHER';
+    type: string;
+  }[] = [
+    { label: 'Appointment Order', category: 'EMPLOYMENT', type: 'Appointment Order' },
+    { label: 'Degree Certificates', category: 'ACADEMIC', type: 'Degree Certificate' },
+    { label: 'Experience Certificates', category: 'EMPLOYMENT', type: 'Experience Certificate' },
+    { label: 'FDP Certificates', category: 'CERTIFICATION', type: 'FDP Certificate' },
+    { label: 'ID Records', category: 'IDENTITY', type: 'ID Record' },
+    { label: 'Academic Documents', category: 'ACADEMIC', type: 'Academic Document' },
+  ];
+  const missingCount = Math.max(
+    0,
+    requiredDossier.filter(
+      (req) =>
+        !rows.some(
+          (r) =>
+            r.title.toLowerCase().includes(req.type.toLowerCase()) ||
+            r.documentType.toLowerCase().includes(req.type.toLowerCase()),
+        ),
+    ).length,
+  );
+
   return (
     <View style={styles.card}>
       <Text accessibilityRole="header" style={styles.heading}>
@@ -214,6 +241,136 @@ export function DocumentsPanel() {
         </Text>
       ) : (
         <>
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: theme.spacing.sm,
+            }}
+          >
+            {[
+              {
+                label: 'Verified',
+                count: verifiedCount,
+                ink: theme.colors.mintInk,
+                bg: theme.colors.mintContainer,
+              },
+              {
+                label: 'Pending',
+                count: pendingCount,
+                ink: theme.colors.amberInk,
+                bg: theme.colors.amberContainer,
+              },
+              {
+                label: 'Missing',
+                count: missingCount,
+                ink: theme.colors.coralInk,
+                bg: theme.colors.coralContainer,
+              },
+              {
+                label: 'Expiring',
+                count: expiringCount,
+                ink: theme.colors.violet,
+                bg: theme.colors.violetContainer,
+              },
+            ].map((pill) => (
+              <View
+                key={pill.label}
+                style={{
+                  flex: 1,
+                  minWidth: 72,
+                  paddingVertical: 10,
+                  paddingHorizontal: 10,
+                  borderRadius: theme.radius.control,
+                  backgroundColor: pill.bg,
+                  alignItems: 'center',
+                  gap: 2,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: theme.typography.subheading,
+                    fontWeight: '600',
+                    color: pill.ink,
+                  }}
+                >
+                  {pill.count}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: theme.typography.caption,
+                    fontWeight: '500',
+                    color: pill.ink,
+                  }}
+                >
+                  {pill.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.section}>
+            <Text accessibilityRole="header" style={styles.groupLabel}>
+              Institutional document checklist
+            </Text>
+            <View style={styles.recordGroup}>
+              {requiredDossier.map((req, idx) => {
+                const matched = rows.find(
+                  (r) =>
+                    r.title.toLowerCase().includes(req.type.toLowerCase()) ||
+                    r.documentType.toLowerCase().includes(req.type.toLowerCase()),
+                );
+                return (
+                  <View
+                    key={req.label}
+                    style={[
+                      styles.recordRow,
+                      idx < requiredDossier.length - 1 && styles.divider,
+                      {
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      },
+                    ]}
+                  >
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={[styles.body, { fontWeight: '500' }]}>
+                        {req.label}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: theme.typography.caption,
+                          color: matched
+                            ? matched.status === 'VERIFIED'
+                              ? theme.colors.mintInk
+                              : theme.colors.amberInk
+                            : theme.colors.coralInk,
+                        }}
+                      >
+                        {matched
+                          ? matched.status === 'VERIFIED'
+                            ? 'Verified'
+                            : 'Pending review'
+                          : 'Missing · Upload required'}
+                      </Text>
+                    </View>
+                    <Button
+                      variant="text"
+                      disabled={busy || uncertain}
+                      onPress={() => {
+                        setTitle(req.label);
+                        setType(req.type);
+                        setCategory(req.category);
+                      }}
+                    >
+                      {matched ? 'Replace' : 'Upload'}
+                    </Button>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
           <Button
             variant="outline"
             onPress={() => void query.refetch()}
@@ -255,13 +412,26 @@ export function DocumentsPanel() {
                     Expires: {row.expiryDate.slice(0, 10)}
                   </Text>
                 )}
-                <Button
-                  variant="outline"
-                  onPress={() => void showDocumentPreview(row)}
-                  disabled={busy}
-                >
-                  Preview {row.title}
-                </Button>
+                <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+                  <Button
+                    variant="outline"
+                    onPress={() => void showDocumentPreview(row)}
+                    disabled={busy}
+                  >
+                    Preview {row.title}
+                  </Button>
+                  <Button
+                    variant="text"
+                    disabled={busy || uncertain}
+                    onPress={() => {
+                      setTitle(row.title);
+                      setType(row.documentType);
+                      setCategory(row.category);
+                    }}
+                  >
+                    Replace
+                  </Button>
+                </View>
               </View>
             ))
           )}

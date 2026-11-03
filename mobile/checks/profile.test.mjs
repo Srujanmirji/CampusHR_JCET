@@ -28,9 +28,9 @@ const profile = await import('../lib/profile-api.ts'),
   documents = await import('../lib/documents-api.ts');
 const employee = {
   id: employeeId,
-  employeeCode: 'IOS004',
-  firstName: 'Home',
-  lastName: 'Test',
+  employeeCode: 'JCET-CSE-001',
+  firstName: 'Dr. Ramesh',
+  lastName: 'K',
   email: user.email,
   phone: null,
   department: { id: 1, code: 'CSE', name: 'Computer Science' },

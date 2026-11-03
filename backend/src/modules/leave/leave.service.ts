@@ -40,6 +40,7 @@ const isWriteConflict = (error: unknown) =>
     /could not serialize|40001/.test(String(error)));
 
 export function toRequestDto(request: RequestRecord) {
+  const req = request as any;
   return {
     id: request.id,
     employee: {
@@ -57,6 +58,15 @@ export function toRequestDto(request: RequestRecord) {
     status: request.status,
     approverRoles: request.approverRoles,
     pendingRole: request.pendingRole,
+    dutyType: req.dutyType ?? null,
+    organisation: req.organisation ?? null,
+    location: req.location ?? null,
+    referenceNumber: req.referenceNumber ?? null,
+    attachmentName: req.attachmentName ?? null,
+    attachmentUrl: req.attachmentUrl ?? null,
+    restrictedHolidayId: req.restrictedHolidayId ?? null,
+    vacationPeriodId: req.vacationPeriodId ?? null,
+    coverageRequired: req.coverageRequired ?? true,
     decisions: request.decisions.map((decision) => ({
       step: decision.step,
       role: decision.role,
@@ -233,7 +243,16 @@ export function createLeaveService(repo: LeaveRepository, notifier: Notifier) {
             reason: input.reason,
             approverRoles: chain,
             pendingRole: chain[0]!,
-          },
+            dutyType: input.dutyType,
+            organisation: input.organisation,
+            location: input.location,
+            referenceNumber: input.referenceNumber,
+            attachmentName: input.attachmentName,
+            attachmentUrl: input.attachmentUrl,
+            restrictedHolidayId: input.restrictedHolidayId,
+            vacationPeriodId: input.vacationPeriodId,
+            coverageRequired: input.coverageRequired ?? true,
+          } as any,
           (taken) => {
             const overlap = taken.find(
               (other) => other.startDate <= end && start <= other.endDate,

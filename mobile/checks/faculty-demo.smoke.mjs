@@ -21,8 +21,8 @@ const login = await globalThis.fetch(`${api}/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    identifier: 'faculty-check@jcet.test',
-    password: 'home-check-only',
+    identifier: 'asha.patil@jcethbl.edu.in',
+    password: 'CampusHR@2026',
   }),
 });
 assert.equal(login.status, 200);

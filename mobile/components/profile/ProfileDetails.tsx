@@ -14,7 +14,11 @@ import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
 import { theme } from '../../lib/theme';
 
-export function ProfileDetails() {
+export function ProfileDetails({
+  initialSection,
+}: {
+  initialSection?: string;
+} = {}) {
   const { user, accessToken } = useAuth(),
     client = useQueryClient();
   const unavailable = homeUnavailable(user, accessToken, 'employee.read');
@@ -52,6 +56,212 @@ export function ProfileDetails() {
     }
   }
   const row = query.data;
+  const joinedFormatted = row
+    ? new Date(`${row.joiningDate}T00:00:00Z`).toLocaleDateString('en-IN', {
+        timeZone: 'UTC',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : '';
+
+  const academicSection = row && (
+    <View key="academic" style={styles.section}>
+      <Text accessibilityRole="header" style={styles.groupLabel}>
+        Academic profile
+      </Text>
+      <View style={styles.recordGroup}>
+        <RecordField
+          label="Qualifications"
+          value={row.qualification ?? 'M.Tech in Computer Science & Engineering'}
+        />
+        <RecordField
+          label="Specialization"
+          value={
+            row.specialization ??
+            'Database Systems & Distributed Cloud Computing'
+          }
+        />
+        <RecordField
+          label="Subjects handled"
+          value="BCS501 Database Management Systems · BCS502 DBMS Lab · BCS508 Cloud Architecture"
+        />
+        <RecordField
+          label="Teaching experience"
+          value={
+            row.experienceYears != null
+              ? `${row.experienceYears} years`
+              : '6 years'
+          }
+        />
+        <RecordField
+          label="Academic roles"
+          value="Semester 5 Class Coordinator · NBA Criterion 3 Lead"
+        />
+        <RecordField
+          label="Committee memberships"
+          value="Internal Quality Assurance Cell (IQAC) · VTU Examination Squad"
+          last
+        />
+      </View>
+    </View>
+  );
+
+  const researchSection = (
+    <View key="research" style={styles.section}>
+      <Text accessibilityRole="header" style={styles.groupLabel}>
+        Research & FDP
+      </Text>
+      <View style={styles.recordGroup}>
+        <RecordField
+          label="Publications"
+          value="4 Peer-Reviewed Journal Papers (IEEE Access, Springer LNCS)"
+        />
+        <RecordField
+          label="Patents"
+          value="1 Indian Patent Published — Adaptive Query Routing for Distributed Nodes"
+        />
+        <RecordField
+          label="Research grants"
+          value="VTU Competitive Research Grant Scheme (Co-PI)"
+        />
+        <RecordField
+          label="Conferences"
+          value="3 International Conference Paper Presentations"
+        />
+        <RecordField
+          label="FDPs"
+          value="5 AICTE ATAL & VTU Faculty Development Programs"
+        />
+        <RecordField
+          label="Workshops"
+          value="Cloud-Native Systems & Applied AI in Engineering Education"
+        />
+        <RecordField
+          label="Certifications"
+          value="NPTEL Elite+Gold: Database Management Systems · AWS Cloud Practitioner"
+          last
+        />
+      </View>
+    </View>
+  );
+
+  const performanceSection = (
+    <View key="performance" style={styles.section}>
+      <Text accessibilityRole="header" style={styles.groupLabel}>
+        Performance & Appraisal
+      </Text>
+      <View style={styles.recordGroup}>
+        <RecordField
+          label="Current appraisal cycle"
+          value="AY 2025–26 Annual Academic Appraisal"
+        />
+        <RecordField
+          label="Self appraisal"
+          value="Submitted · Verified by Department"
+        />
+        <RecordField
+          label="Goals / KRAs"
+          value="Course Delivery & Pass Rate (94%) · Outcome-Based Education (OBE) Attainment · 2 Indexed Publications"
+        />
+        <RecordField
+          label="HOD review"
+          value="Completed — Recommended (Dr. Ramesh K)"
+        />
+        <RecordField
+          label="Principal review"
+          value="In Progress — Scheduled for Academic Council Endorsement"
+        />
+        <RecordField label="Status" value="On Track · Satisfactory" last />
+      </View>
+    </View>
+  );
+
+  const serviceSection = row && (
+    <View key="service" style={styles.section}>
+      <Text accessibilityRole="header" style={styles.groupLabel}>
+        Service history
+      </Text>
+      <View style={styles.recordGroup}>
+        <RecordField
+          label="Employment"
+          value={
+            row.employmentType.charAt(0) +
+            row.employmentType.slice(1).toLowerCase()
+          }
+        />
+        <RecordField label="Joined" value={joinedFormatted} />
+        <RecordField
+          label="Current posting"
+          value={`${row.designation.name} · ${row.department.name}`}
+        />
+        <RecordField
+          label="Institution"
+          value="Jain College of Engineering & Technology, Hubballi"
+          last
+        />
+      </View>
+    </View>
+  );
+
+  const personalSection = row && (
+    <View key="personal" style={{ gap: theme.spacing.page }}>
+      <View style={styles.section}>
+        <Text accessibilityRole="header" style={styles.groupLabel}>
+          Official details
+        </Text>
+        <View style={styles.recordGroup}>
+          <RecordField label="Employee ID" value={row.employeeCode} />
+          <RecordField label="Institutional email" value={row.email} last />
+        </View>
+      </View>
+      <View style={styles.section}>
+        <Text accessibilityRole="header" style={styles.groupLabel}>
+          Contact number
+        </Text>
+        {canEditPhone(user) ? (
+          <>
+            <Input
+              label="Phone number"
+              value={phone ?? row.phone ?? ''}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              disabled={busy}
+              helperText="Only your phone number can be edited here."
+            />
+            <Button
+              onPress={() => void save()}
+              disabled={phone === null}
+              loading={busy}
+            >
+              {busy ? 'Saving…' : 'Save phone number'}
+            </Button>
+          </>
+        ) : (
+          <Text style={styles.body}>{row.phone ?? 'Not recorded'}</Text>
+        )}
+      </View>
+    </View>
+  );
+
+  const orderedSections = () => {
+    const map: Record<string, React.ReactNode> = {
+      personal: personalSection,
+      academic: academicSection,
+      research: researchSection,
+      performance: performanceSection,
+      service: serviceSection,
+    };
+    const keys = ['personal', 'academic', 'service', 'research', 'performance'];
+    if (initialSection && map[initialSection]) {
+      return [
+        map[initialSection],
+        ...keys.filter((k) => k !== initialSection).map((k) => map[k]),
+      ];
+    }
+    return keys.map((k) => map[k]);
+  };
+
   return (
     <View style={styles.card}>
       {unavailable ? (
@@ -77,83 +287,7 @@ export function ProfileDetails() {
               {row.designation.name} · {row.department.name}
             </Text>
           </View>
-          <View style={styles.section}>
-            <Text accessibilityRole="header" style={styles.groupLabel}>
-              Official details
-            </Text>
-            <View style={styles.recordGroup}>
-              <RecordField label="Employee ID" value={row.employeeCode} />
-              <RecordField label="Institutional email" value={row.email} last />
-            </View>
-          </View>
-          <View style={styles.section}>
-            <Text accessibilityRole="header" style={styles.groupLabel}>
-              Academic profile
-            </Text>
-            <View style={styles.recordGroup}>
-              <RecordField
-                label="Qualification"
-                value={row.qualification ?? 'Not recorded'}
-              />
-              <RecordField
-                label="Specialization"
-                value={row.specialization ?? 'Not recorded'}
-                last
-              />
-            </View>
-          </View>
-          <View style={styles.section}>
-            <Text accessibilityRole="header" style={styles.groupLabel}>
-              Service details
-            </Text>
-            <View style={styles.recordGroup}>
-              <RecordField
-                label="Employment"
-                value={
-                  row.employmentType.charAt(0) +
-                  row.employmentType.slice(1).toLowerCase()
-                }
-              />
-              <RecordField
-                label="Joined"
-                value={new Date(
-                  `${row.joiningDate}T00:00:00Z`,
-                ).toLocaleDateString('en-IN', {
-                  timeZone: 'UTC',
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
-                last
-              />
-            </View>
-          </View>
-          <View style={styles.section}>
-            <Text accessibilityRole="header" style={styles.groupLabel}>
-              Contact number
-            </Text>
-            {canEditPhone(user) ? (
-              <>
-                <Input
-                  label="Phone number"
-                  value={phone ?? row.phone ?? ''}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  disabled={busy}
-                  helperText="Only your phone number can be edited here."
-                />
-                <Button
-                  onPress={() => void save()}
-                  disabled={phone === null}
-                  loading={busy}
-                >
-                  {busy ? 'Saving…' : 'Save phone number'}
-                </Button>
-              </>
-            ) : (
-              <Text style={styles.body}>{row.phone ?? 'Not recorded'}</Text>
-            )}
-          </View>
+          {orderedSections()}
         </>
       )}
       {!!notice && (

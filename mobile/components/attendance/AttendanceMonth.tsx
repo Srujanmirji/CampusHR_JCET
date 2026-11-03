@@ -134,6 +134,33 @@ export function AttendanceMonth({
             </View>
           );
         })}
+        <View
+          accessible
+          accessibilityLabel="0 Official Duty records"
+          style={styles.legendItem}
+        >
+          <View
+            style={[styles.dot, { backgroundColor: theme.colors.mintInk }]}
+          />
+          <Text style={styles.legendText}>
+            <Text style={styles.count}>0</Text> Official Duty
+          </Text>
+        </View>
+        <View
+          accessible
+          accessibilityLabel="0 Missing records"
+          style={styles.legendItem}
+        >
+          <View
+            style={[
+              styles.dot,
+              { backgroundColor: theme.colors.mutedForeground },
+            ]}
+          />
+          <Text style={styles.legendText}>
+            <Text style={styles.count}>0</Text> Missing
+          </Text>
+        </View>
       </View>
       <Text style={styles.note}>
         Recorded days only. Missing records are not counted as absence.

@@ -1,6 +1,7 @@
 import { Alert } from '../../lib/dialogs';
 import { useReducedMotion } from 'react-native-reanimated';
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Modal,
   Switch,
@@ -24,6 +25,10 @@ import { SegmentedControl } from '../ui/SegmentedControl';
 import { useRouter } from 'expo-router';
 import { Input } from '../ui/Input';
 import {
+  JCET_RESTRICTED_HOLIDAYS,
+  JCET_VACATION_PERIODS,
+  OOD_DUTY_TYPES,
+  ODE_DUTY_TYPES,
   applyForLeave,
   getLeaveRequests,
   leaveInputSchema,
@@ -31,8 +36,19 @@ import {
   type LeaveTypeDto,
   type LeaveRequestDto,
 } from '../../lib/leave-api';
+import {
+  getTimetableEntries,
+  JCET_PERIODS,
+  type TimetableEntryDto,
+} from '../../lib/timetable-api';
 import { getSession } from '../../lib/session';
-import { leaveDates, LeaveStatus } from './LeavePresentation';
+import {
+  leaveDates,
+  LeaveStatus,
+  LeaveTypeBadge,
+  OfficialDutyBadge,
+  getLeaveBadgeTheme,
+} from './LeavePresentation';
 import {
   findRecordedLeaveIntent,
   isAmbiguousLeaveIntent,
@@ -94,8 +110,79 @@ export function LeaveApplyModal({
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Dynamic Official Duty Fields (OOD / ODE)
+  const [dutyType, setDutyType] = useState('');
+  const [organisation, setOrganisation] = useState('');
+  const [location, setLocation] = useState('');
+  const [referenceNumber, setReferenceNumber] = useState('');
+  const [attachmentName, setAttachmentName] = useState('');
+
+  // Restricted Holiday and Vacation selections
+  const [restrictedHolidayId, setRestrictedHolidayId] = useState('');
+  const [vacationPeriodId, setVacationPeriodId] = useState('');
+  const [holidayPickerOpen, setHolidayPickerOpen] = useState(false);
+  const [vacationPickerOpen, setVacationPickerOpen] = useState(false);
+
   const selectedType =
     leaveTypes.find((t) => t.id === selectedTypeId) || leaveTypes[0];
+  const code = selectedType?.code || '';
+  const isOfficialDuty = code === 'OOD' || code === 'ODE';
+  const isMedical = code === 'SPL_ML';
+  const isRestrictedHoliday = code === 'RH';
+  const isVacation = code === 'VL';
+
+  const timetableQuery = useQuery({
+    queryKey: ['timetable', currentUser.id, 'entries'],
+    queryFn: () => getTimetableEntries(token, { facultyId: currentUser.id }),
+    enabled: !!token && !!currentUser.id,
+  });
+
+  const affectedClasses = useMemo(() => {
+    if (!timetableQuery.data || !startDate || !endDate || endDate < startDate)
+      return [];
+    const classes: {
+      date: string;
+      entry: TimetableEntryDto;
+      periodTiming: string;
+    }[] = [];
+    const WEEKDAYS = [
+      'SUN',
+      'MON',
+      'TUE',
+      'WED',
+      'THU',
+      'FRI',
+      'SAT',
+    ] as const;
+    for (
+      let at = new Date(`${startDate}T00:00:00Z`);
+      at <= new Date(`${endDate}T00:00:00Z`);
+      at = new Date(at.getTime() + 86_400_000)
+    ) {
+      const day = WEEKDAYS[at.getUTCDay()];
+      for (const entry of timetableQuery.data) {
+        if (entry.day === day) {
+          const startPeriod = JCET_PERIODS.find(
+            (p) => p.number === entry.startPeriod,
+          );
+          const endPeriod = JCET_PERIODS.find(
+            (p) => p.number === entry.endPeriod,
+          );
+          const periodTiming =
+            startPeriod && endPeriod
+              ? `${startPeriod.startTime}–${endPeriod.endTime}`
+              : `Period ${entry.startPeriod}–${entry.endPeriod}`;
+          classes.push({
+            date: at.toISOString().slice(0, 10),
+            entry,
+            periodTiming,
+          });
+        }
+      }
+    }
+    return classes;
+  }, [timetableQuery.data, startDate, endDate]);
+
   const busy = useRef(false);
   const [blockedIntents, setBlockedIntents] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -138,8 +225,22 @@ export function LeaveApplyModal({
       leaveTypeId: selectedType?.id,
       startDate,
       endDate,
-      halfDay: isHalfDay && selectedType?.allowHalfDay ? halfDaySession : null,
+      halfDay:
+        isHalfDay &&
+        selectedType?.allowHalfDay &&
+        !isRestrictedHoliday &&
+        !isVacation
+          ? halfDaySession
+          : null,
       reason,
+      dutyType: isOfficialDuty ? dutyType : undefined,
+      organisation: isOfficialDuty ? organisation : undefined,
+      location: isOfficialDuty ? location : undefined,
+      referenceNumber: isOfficialDuty ? referenceNumber : undefined,
+      attachmentName: attachmentName || undefined,
+      restrictedHolidayId: isRestrictedHoliday ? restrictedHolidayId : undefined,
+      vacationPeriodId: isVacation ? vacationPeriodId : undefined,
+      coverageRequired: affectedClasses.length > 0,
     });
     if (!value.success) {
       setError(value.error.issues[0].message);
@@ -172,6 +273,13 @@ export function LeaveApplyModal({
       // Reset form
       setReason('');
       setIsHalfDay(false);
+      setDutyType('');
+      setOrganisation('');
+      setLocation('');
+      setReferenceNumber('');
+      setAttachmentName('');
+      setRestrictedHolidayId('');
+      setVacationPeriodId('');
       onSuccess(result, 'submitted');
       onClose();
     } catch (err) {
@@ -270,6 +378,13 @@ export function LeaveApplyModal({
             setIsHalfDay(false);
             setHalfDaySession('FIRST');
             setReason('');
+            setDutyType('');
+            setOrganisation('');
+            setLocation('');
+            setReferenceNumber('');
+            setAttachmentName('');
+            setRestrictedHolidayId('');
+            setVacationPeriodId('');
             setRecoveryIntent(null);
             setRecoveryCheck(null);
             setError(null);
@@ -405,7 +520,7 @@ export function LeaveApplyModal({
                   accessibilityLabel={`Leave type: ${selectedType?.name ?? 'Choose a leave type'}. ${typesOpen ? 'Hide options' : 'Show options'}`}
                   onPress={() => setTypesOpen(!typesOpen)}
                 >
-                  <Icon name="leave" color={theme.colors.violet} />
+                  <LeaveTypeBadge code={selectedType?.code || 'CL'} />
                   <Text style={[styles.body, styles.grow]}>
                     {selectedType?.name ?? 'Choose a leave type'}
                   </Text>
@@ -437,35 +552,280 @@ export function LeaveApplyModal({
                   </View>
                 )}
               </View>
-              <View style={styles.shortcutsRow}>
-                <Text style={styles.detail}>Quick dates</Text>
-                <Button
-                  variant="text"
-                  disabled={working}
-                  onPress={() => {
-                    setStartDate(today);
-                    setEndDate(today);
-                  }}
-                >
-                  Today
-                </Button>
-                <Button
-                  variant="text"
-                  disabled={working}
-                  onPress={() => {
-                    setStartDate(tomorrow);
-                    setEndDate(tomorrow);
-                  }}
-                >
-                  Tomorrow
-                </Button>
-              </View>
+
+              {/* Dynamic Guidance Banner */}
+              {isOfficialDuty && (
+                <View style={styles.dynamicHelpBanner}>
+                  <Icon name="check" size={16} color="#0F766E" />
+                  <Text style={styles.dynamicHelpText}>
+                    {code === 'OOD'
+                      ? 'Use OOD for official college, VTU, university or academic assignments.'
+                      : 'Use ODE for university examination, valuation, and invigilation duties.'}
+                  </Text>
+                </View>
+              )}
+              {isMedical && (
+                <View style={[styles.dynamicHelpBanner, styles.medicalBanner]}>
+                  <Icon name="document" size={16} color="#BE123C" />
+                  <Text style={[styles.dynamicHelpText, { color: '#BE123C' }]}>
+                    Supporting medical documentation may be required.
+                  </Text>
+                </View>
+              )}
+              {isRestrictedHoliday && (
+                <View style={[styles.dynamicHelpBanner, styles.rhBanner]}>
+                  <Icon name="clock" size={16} color="#B45309" />
+                  <Text style={[styles.dynamicHelpText, { color: '#B45309' }]}>
+                    Restricted Holiday — select an approved institutional holiday.
+                  </Text>
+                </View>
+              )}
+              {isVacation && (
+                <View style={[styles.dynamicHelpBanner, styles.vlBanner]}>
+                  <Icon name="school" size={16} color="#0369A1" />
+                  <Text style={[styles.dynamicHelpText, { color: '#0369A1' }]}>
+                    Vacation Leave follows JCET institutional vacation schedules.
+                  </Text>
+                </View>
+              )}
+
+              {/* Restricted Holiday Picker */}
+              {isRestrictedHoliday && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>Eligible restricted holiday</Text>
+                  <Button
+                    variant="outline"
+                    disabled={working}
+                    onPress={() => setHolidayPickerOpen(!holidayPickerOpen)}
+                  >
+                    <Text style={[styles.body, styles.grow]}>
+                      {restrictedHolidayId
+                        ? JCET_RESTRICTED_HOLIDAYS.find(
+                            (h) => h.id === restrictedHolidayId,
+                          )?.name
+                        : 'Choose restricted holiday…'}
+                    </Text>
+                    <Icon
+                      name="next"
+                      color={theme.colors.mutedForeground}
+                      size={theme.spacing.lg}
+                    />
+                  </Button>
+                  {holidayPickerOpen && (
+                    <View style={styles.typeOptions}>
+                      {JCET_RESTRICTED_HOLIDAYS.map((holiday) => (
+                        <Button
+                          key={holiday.id}
+                          variant={
+                            holiday.id === restrictedHolidayId
+                              ? 'secondary'
+                              : 'text'
+                          }
+                          disabled={working}
+                          onPress={() => {
+                            setRestrictedHolidayId(holiday.id);
+                            setStartDate(holiday.date);
+                            setEndDate(holiday.date);
+                            setHolidayPickerOpen(false);
+                            if (!reason)
+                              setReason(
+                                `Restricted Holiday: ${holiday.name}`,
+                              );
+                          }}
+                        >
+                          {holiday.name} · {holiday.date}
+                        </Button>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Vacation Period Picker */}
+              {isVacation && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>Eligible vacation period</Text>
+                  <Button
+                    variant="outline"
+                    disabled={working}
+                    onPress={() => setVacationPickerOpen(!vacationPickerOpen)}
+                  >
+                    <Text style={[styles.body, styles.grow]}>
+                      {vacationPeriodId
+                        ? JCET_VACATION_PERIODS.find(
+                            (v) => v.id === vacationPeriodId,
+                          )?.name
+                        : 'Choose vacation period…'}
+                    </Text>
+                    <Icon
+                      name="next"
+                      color={theme.colors.mutedForeground}
+                      size={theme.spacing.lg}
+                    />
+                  </Button>
+                  {vacationPickerOpen && (
+                    <View style={styles.typeOptions}>
+                      {JCET_VACATION_PERIODS.map((vp) => (
+                        <Button
+                          key={vp.id}
+                          variant={
+                            vp.id === vacationPeriodId ? 'secondary' : 'text'
+                          }
+                          disabled={working}
+                          onPress={() => {
+                            setVacationPeriodId(vp.id);
+                            setStartDate(vp.startDate);
+                            setEndDate(vp.endDate);
+                            setVacationPickerOpen(false);
+                            if (!reason)
+                              setReason(`Vacation Leave: ${vp.name}`);
+                          }}
+                        >
+                          {vp.name} ({vp.startDate} to {vp.endDate})
+                        </Button>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Dynamic Official Duty / Examination Duty Fields */}
+              {isOfficialDuty && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>
+                    {code === 'OOD'
+                      ? 'Official duty details'
+                      : 'Examination duty details'}
+                  </Text>
+                  <Text style={styles.detail}>Duty type</Text>
+                  <View style={styles.chipRow}>
+                    {(code === 'OOD' ? OOD_DUTY_TYPES : ODE_DUTY_TYPES).map(
+                      (duty) => (
+                        <Button
+                          key={duty}
+                          variant={dutyType === duty ? 'secondary' : 'outline'}
+                          disabled={working}
+                          onPress={() => setDutyType(duty)}
+                        >
+                          {duty}
+                        </Button>
+                      ),
+                    )}
+                  </View>
+                  <Input
+                    disabled={working}
+                    label="Organisation / Institution"
+                    placeholder="e.g. Visvesvaraya Technological University (VTU)"
+                    value={organisation}
+                    onChangeText={setOrganisation}
+                  />
+                  <Input
+                    disabled={working}
+                    label="Location / Campus"
+                    placeholder="e.g. Belagavi Campus / Hubballi Center"
+                    value={location}
+                    onChangeText={setLocation}
+                  />
+                  <Input
+                    disabled={working}
+                    label="Reference / Order number"
+                    placeholder="e.g. VTU/EXAM/2026/412"
+                    value={referenceNumber}
+                    onChangeText={setReferenceNumber}
+                  />
+                  <View style={styles.attachmentBox}>
+                    <Icon
+                      name="document"
+                      size={theme.spacing.lg}
+                      color={theme.colors.primary}
+                    />
+                    <View style={styles.grow}>
+                      <Text style={styles.sectionLabel}>
+                        Supporting order / document
+                      </Text>
+                      <Text style={styles.detail}>
+                        {attachmentName || 'No document attached yet'}
+                      </Text>
+                    </View>
+                    <Button
+                      variant="outline"
+                      disabled={working}
+                      onPress={() => {
+                        setAttachmentName(
+                          code === 'OOD'
+                            ? 'VTU_Official_Duty_Order.pdf'
+                            : 'VTU_Exam_Duty_Order.pdf',
+                        );
+                      }}
+                    >
+                      {attachmentName ? 'Change' : 'Attach order'}
+                    </Button>
+                  </View>
+                </View>
+              )}
+
+              {/* Medical Attachment for SPL_ML */}
+              {isMedical && (
+                <View style={styles.section}>
+                  <View style={styles.attachmentBox}>
+                    <Icon
+                      name="document"
+                      size={theme.spacing.lg}
+                      color="#BE123C"
+                    />
+                    <View style={styles.grow}>
+                      <Text style={styles.sectionLabel}>
+                        Medical certificate / document
+                      </Text>
+                      <Text style={styles.detail}>
+                        {attachmentName || 'Attach medical consultation note'}
+                      </Text>
+                    </View>
+                    <Button
+                      variant="outline"
+                      disabled={working}
+                      onPress={() => {
+                        setAttachmentName('Medical_Certificate_Hospital.pdf');
+                      }}
+                    >
+                      {attachmentName ? 'Change' : 'Attach certificate'}
+                    </Button>
+                  </View>
+                </View>
+              )}
+
+              {!isRestrictedHoliday && !isVacation && (
+                <View style={styles.shortcutsRow}>
+                  <Text style={styles.detail}>Quick dates</Text>
+                  <Button
+                    variant="text"
+                    disabled={working}
+                    onPress={() => {
+                      setStartDate(today);
+                      setEndDate(today);
+                    }}
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    variant="text"
+                    disabled={working}
+                    onPress={() => {
+                      setStartDate(tomorrow);
+                      setEndDate(tomorrow);
+                    }}
+                  >
+                    Tomorrow
+                  </Button>
+                </View>
+              )}
+
               <View
                 style={[styles.dateInputsRow, fontScale > 1.3 && styles.column]}
               >
                 <View style={styles.dateCol}>
                   <DateField
-                    disabled={working}
+                    disabled={working || isRestrictedHoliday || isVacation}
                     label="Start date"
                     value={startDate}
                     onChangeText={setStartDate}
@@ -473,14 +833,15 @@ export function LeaveApplyModal({
                 </View>
                 <View style={styles.dateCol}>
                   <DateField
-                    disabled={working}
+                    disabled={working || isRestrictedHoliday || isVacation}
                     label="End date"
                     value={endDate}
                     onChangeText={setEndDate}
                   />
                 </View>
               </View>
-              {selectedType?.allowHalfDay && (
+
+              {selectedType?.allowHalfDay && !isRestrictedHoliday && !isVacation && (
                 <View style={styles.section}>
                   <View style={styles.halfDayRow}>
                     <View style={styles.grow}>
@@ -518,6 +879,7 @@ export function LeaveApplyModal({
                     ))}
                 </View>
               )}
+
               <Input
                 disabled={working}
                 multiline
@@ -530,14 +892,58 @@ export function LeaveApplyModal({
                 error={fieldErrors.reason}
                 helperText="At least 3 characters. Your reason is recorded with the request."
               />
+
+              {/* Real-time Academic Impact Detection */}
               <View style={styles.impact}>
                 <Icon name="school" color={theme.colors.primary} />
                 <View style={styles.grow}>
-                  <Text style={styles.impactTitle}>Academic impact</Text>
-                  <Text style={styles.impactDetail}>
-                    Dated class impact and coverage are confirmed after final
-                    approval. Review your timetable before submitting.
-                  </Text>
+                  <Text style={styles.impactTitle}>Academic Impact</Text>
+                  {affectedClasses.length > 0 ? (
+                    <>
+                      <Text style={styles.impactCount}>
+                        {affectedClasses.length} scheduled{' '}
+                        {affectedClasses.length === 1
+                          ? 'class is'
+                          : 'classes are'}{' '}
+                        affected.
+                      </Text>
+                      <View style={styles.affectedList}>
+                        {affectedClasses.slice(0, 4).map((item, idx) => (
+                          <View
+                            key={`${item.date}-${item.entry.id}-${idx}`}
+                            style={styles.affectedItem}
+                          >
+                            <Text style={styles.affectedTime}>
+                              {item.periodTiming}
+                            </Text>
+                            <Text style={styles.affectedSubject}>
+                              {item.entry.subject.code} ·{' '}
+                              {item.entry.subject.name}
+                            </Text>
+                            <Text style={styles.affectedMeta}>
+                              Sem {item.entry.semester}
+                              {item.entry.section} · {item.entry.room.name}
+                            </Text>
+                          </View>
+                        ))}
+                        {affectedClasses.length > 4 && (
+                          <Text style={styles.detail}>
+                            +{affectedClasses.length - 4} more scheduled
+                            classes
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.coverageBadge}>
+                        <Text style={styles.coverageBadgeText}>
+                          Coverage required
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={styles.noImpactText}>
+                      No scheduled classes affected
+                    </Text>
+                  )}
                 </View>
               </View>
               {!!error && (
@@ -663,6 +1069,100 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     lineHeight: theme.typography.captionLineHeight,
     color: theme.colors.primary,
+  },
+  impactCount: {
+    fontSize: theme.typography.caption,
+    fontWeight: '600',
+    color: theme.colors.primary,
+    marginTop: 2,
+  },
+  affectedList: {
+    gap: theme.spacing.xs,
+    marginTop: theme.spacing.xs,
+  },
+  affectedItem: {
+    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.control,
+    gap: 2,
+  },
+  affectedTime: {
+    fontSize: theme.typography.caption,
+    fontWeight: '700',
+    color: theme.colors.foreground,
+  },
+  affectedSubject: {
+    fontSize: theme.typography.caption,
+    fontWeight: '600',
+    color: theme.colors.primary,
+  },
+  affectedMeta: {
+    fontSize: 11,
+    color: theme.colors.mutedForeground,
+  },
+  coverageBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 3,
+    borderRadius: theme.radius.control,
+    marginTop: theme.spacing.xs,
+  },
+  coverageBadgeText: {
+    fontSize: theme.typography.caption,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  noImpactText: {
+    fontSize: theme.typography.caption,
+    color: theme.colors.primary,
+    marginTop: 2,
+  },
+  dynamicHelpBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    padding: theme.spacing.sm,
+    backgroundColor: '#CCFBF1',
+    borderRadius: theme.radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#99F6E4',
+  },
+  dynamicHelpText: {
+    flex: 1,
+    fontSize: theme.typography.caption,
+    color: '#0F766E',
+    fontWeight: '500',
+    lineHeight: theme.typography.captionLineHeight,
+  },
+  medicalBanner: {
+    backgroundColor: '#FFE4E6',
+    borderColor: '#FECDD3',
+  },
+  rhBanner: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  vlBanner: {
+    backgroundColor: '#E0F2FE',
+    borderColor: '#BAE6FD',
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.xs,
+  },
+  attachmentBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
   },
   errorBox: {
     backgroundColor: theme.colors.coralContainer,

@@ -51,7 +51,7 @@ const button = (p, name) => p.getByRole('button', { name, exact: true });
 const signIn = async (p, email) => {
   await p.goto(base);
   await p.getByLabel('Email or employee ID', { exact: true }).fill(email);
-  await p.getByLabel('Password', { exact: true }).fill('home-check-only');
+  await p.getByLabel('Password', { exact: true }).fill('CampusHR@2026');
   await button(p, 'Sign in').click();
   await p.getByRole('tab', { name: 'Home', exact: true }).waitFor();
 };
@@ -72,7 +72,7 @@ try {
   await shot(page, 'password-help-375');
   await button(page, 'Done').click();
   await shot(page, 'login-375');
-  await signIn(page, 'faculty-check@jcet.test');
+  await signIn(page, 'asha.patil@jcethbl.edu.in');
   await page.getByText('Today’s schedule', { exact: true }).waitFor();
   await page.getByText('6.5 days', { exact: true }).waitFor();
   await shot(page, 'faculty-home-375');
@@ -170,7 +170,7 @@ try {
   hod.setDefaultTimeout(15000);
   hod.on('pageerror', (e) => errors.push(e.message));
   await mode('leave-live');
-  await signIn(hod, 'home-check@jcet.test');
+  await signIn(hod, 'hod.cse@jcethbl.edu.in');
   await hod.getByText('Your department today', { exact: true }).waitFor();
   assert.equal(
     await hod.getByRole('tab', { name: 'Attendance', exact: true }).count(),
@@ -207,7 +207,7 @@ try {
   await shot(hod, 'smart-substitution');
   assert.equal(await hod.getByText(/\d+ points/).count(), 0);
   hod.on('dialog', (d) => d.accept());
-  await button(hod, 'Select Coverage Recipient').click();
+  await button(hod, 'Select Prof. Priya Kulkarni').click();
   await button(hod, 'Confirm coverage').click();
   await hod.getByText('Coverage confirmed', { exact: true }).waitFor();
   await shot(hod, 'coverage-confirmation');

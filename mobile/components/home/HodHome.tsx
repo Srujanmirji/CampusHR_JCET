@@ -90,7 +90,9 @@ export function HodHome() {
           {user?.name}
         </Text>
 
-        <Text style={styles.heroMeta}>{clock.date}</Text>
+        <Text style={styles.heroMeta}>
+          HOD · Computer Science & Engineering · {clock.date}
+        </Text>
       </View>
       <View style={styles.coverageAlert}>
         <Text style={[styles.heading, styles.onHero]}>
@@ -164,6 +166,31 @@ export function HodHome() {
             updatedAt={workload.dataUpdatedAt}
             refreshing={workload.isFetching}
           />
+        </View>
+      </View>
+      <View style={styles.section}>
+        <Text style={styles.heading}>Pending actions</Text>
+        <View style={styles.request}>
+          <Text style={styles.body}>Leave request</Text>
+          <Text style={styles.detail}>
+            {queue.isSuccess
+              ? `${queue.data.length} department leave ${queue.data.length === 1 ? 'request' : 'requests'} awaiting HOD recommendation`
+              : 'Review pending department leave applications'}
+          </Text>
+        </View>
+        <View style={styles.request}>
+          <Text style={styles.body}>Attendance correction</Text>
+          <Text style={styles.detail}>
+            1 faculty attendance log correction pending verification
+          </Text>
+        </View>
+        <View style={styles.request}>
+          <Text style={styles.body}>Coverage request</Text>
+          <Text style={styles.detail}>
+            {cover.isSuccess
+              ? `${cover.data.reduce((n, row) => n + row.classes - row.covered, 0)} scheduled classes require substitute assignment`
+              : 'Assign faculty coverage for affected classes'}
+          </Text>
         </View>
       </View>
       {queue.isSuccess && queue.data.length > 0 && (

@@ -9,20 +9,43 @@ export const LEAVE_STATUS_LABEL = {
 } as const;
 export type LeaveStatus = keyof typeof LEAVE_STATUS_LABEL;
 
-const leaveTypeSchema = z.object({
+export const leaveTypeSchema = z.object({
   id: z.number(),
   code: z.string(),
   name: z.string(),
+  description: z.string().optional(),
   yearlyQuota: z.number().nullable(),
-  allowHalfDay: z.boolean(),
+  annualEntitlement: z.number().nullable().optional(),
+  carryForwardAllowed: z.boolean().optional(),
   carryForwardMax: z.number(),
+  allowHalfDay: z.boolean(),
+  attachmentRequired: z.boolean().optional(),
+  reasonRequired: z.boolean().optional(),
+  minimumNoticeDays: z.number().optional(),
+  maximumConsecutiveDays: z.number().optional(),
+  approvalChain: z.array(z.string()).optional(),
+  attendanceStatus: z.string().optional(),
+  affectsTimetable: z.boolean().optional(),
+  requiresCoverage: z.boolean().optional(),
+  applicableEmployeeTypes: z.array(z.enum(['TEACHING', 'NON_TEACHING'])).optional(),
   active: z.boolean(),
+  displayOrder: z.number().optional(),
+  colorToken: z.enum(['blue', 'violet', 'rose', 'teal', 'cyan', 'amber', 'sky']).optional(),
 });
 export type LeaveType = z.infer<typeof leaveTypeSchema>;
-export type LeaveTypeInput = Omit<LeaveType, 'id'>;
+export type LeaveTypeInput = Partial<Omit<LeaveType, 'id'>> & {
+  code: string;
+  name: string;
+};
 
-const balanceSchema = z.object({
-  leaveType: z.object({ id: z.number(), code: z.string(), name: z.string() }),
+export const balanceSchema = z.object({
+  leaveType: z.object({
+    id: z.number(),
+    code: z.string(),
+    name: z.string(),
+    colorToken: z.string().optional(),
+    attendanceStatus: z.string().optional(),
+  }),
   active: z.boolean(),
   year: z.number(),
   entitled: z.number().nullable(),
@@ -33,7 +56,7 @@ const balanceSchema = z.object({
 });
 export type Balance = z.infer<typeof balanceSchema>;
 
-const requestSchema = z.object({
+export const requestSchema = z.object({
   id: z.string(),
   employee: z.object({
     id: z.string(),
@@ -41,7 +64,13 @@ const requestSchema = z.object({
     name: z.string(),
   }),
   department: z.object({ id: z.number(), code: z.string(), name: z.string() }),
-  leaveType: z.object({ id: z.number(), code: z.string(), name: z.string() }),
+  leaveType: z.object({
+    id: z.number(),
+    code: z.string(),
+    name: z.string(),
+    colorToken: z.string().optional(),
+    attendanceStatus: z.string().optional(),
+  }),
   startDate: z.string(),
   endDate: z.string(),
   halfDay: z.enum(['FIRST', 'SECOND']).nullable(),
@@ -50,6 +79,16 @@ const requestSchema = z.object({
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']),
   approverRoles: z.array(z.string()),
   pendingRole: z.string().nullable(),
+  // Duty & official assignment fields (OOD / ODE)
+  dutyType: z.string().nullable().optional(),
+  organisation: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  referenceNumber: z.string().nullable().optional(),
+  attachmentName: z.string().nullable().optional(),
+  attachmentUrl: z.string().nullable().optional(),
+  restrictedHolidayId: z.string().nullable().optional(),
+  vacationPeriodId: z.string().nullable().optional(),
+  coverageRequired: z.boolean().nullable().optional(),
   decisions: z.array(
     z.object({
       step: z.number(),
@@ -70,6 +109,15 @@ export interface LeaveApplyInput {
   endDate: string;
   halfDay: 'FIRST' | 'SECOND' | null;
   reason: string;
+  dutyType?: string;
+  organisation?: string;
+  location?: string;
+  referenceNumber?: string;
+  attachmentName?: string;
+  attachmentUrl?: string;
+  restrictedHolidayId?: string;
+  vacationPeriodId?: string;
+  coverageRequired?: boolean;
 }
 
 export interface RequestFilters {
@@ -128,13 +176,29 @@ export async function applyLeave(input: LeaveApplyInput) {
 
 export async function decideLeave(
   id: string,
-  action: 'approve' | 'reject' | 'cancel',
+  action: 'approve' | 'reject' | 'cancel' | 'recommend' | 'recommend_coverage',
   note?: string,
 ) {
+  const isApproveType =
+    action === 'approve' || action === 'recommend' || action === 'recommend_coverage';
+  const apiEndpoint =
+    action === 'cancel'
+      ? `/leave/requests/${id}/cancel`
+      : isApproveType
+        ? `/leave/requests/${id}/approve`
+        : `/leave/requests/${id}/reject`;
+
+  const finalNote =
+    action === 'recommend_coverage'
+      ? `Recommended with coverage requirement. ${note ?? ''}`.trim()
+      : action === 'recommend'
+        ? `Recommended. ${note ?? ''}`.trim()
+        : note;
+
   return one(requestSchema).parse(
-    await apiRequest(`/leave/requests/${id}/${action}`, {
+    await apiRequest(apiEndpoint, {
       method: 'PATCH',
-      body: action === 'cancel' ? {} : note ? { note } : {},
+      body: action === 'cancel' ? {} : finalNote ? { note: finalNote } : {},
     }),
   ).data;
 }

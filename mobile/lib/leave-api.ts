@@ -52,6 +52,7 @@ export interface LeaveRequestDto {
     code: string;
     name: string;
     allowHalfDay?: boolean;
+    colorToken?: string;
   };
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
@@ -63,6 +64,15 @@ export interface LeaveRequestDto {
   pendingRole: string | null;
   decisions: LeaveDecisionDto[];
   createdAt?: string;
+  dutyType?: string | null;
+  organisation?: string | null;
+  location?: string | null;
+  referenceNumber?: string | null;
+  attachmentName?: string | null;
+  attachmentUrl?: string | null;
+  restrictedHolidayId?: string | null;
+  vacationPeriodId?: string | null;
+  coverageRequired?: boolean;
 }
 
 export interface LeaveApplyPayload {
@@ -71,6 +81,15 @@ export interface LeaveApplyPayload {
   endDate: string;
   halfDay?: 'FIRST' | 'SECOND' | null;
   reason: string;
+  dutyType?: string;
+  organisation?: string;
+  location?: string;
+  referenceNumber?: string;
+  attachmentName?: string;
+  attachmentUrl?: string;
+  restrictedHolidayId?: string;
+  vacationPeriodId?: string;
+  coverageRequired?: boolean;
 }
 
 const named = z.object({
@@ -122,6 +141,15 @@ export const requestSchema = z.object({
     }),
   ),
   createdAt: z.iso.datetime({ offset: true }).optional(),
+  dutyType: z.string().nullable().optional(),
+  organisation: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  referenceNumber: z.string().nullable().optional(),
+  attachmentName: z.string().nullable().optional(),
+  attachmentUrl: z.string().nullable().optional(),
+  restrictedHolidayId: z.string().nullable().optional(),
+  vacationPeriodId: z.string().nullable().optional(),
+  coverageRequired: z.boolean().optional(),
 });
 export const leaveInputSchema = z
   .object({
@@ -134,6 +162,15 @@ export const leaveInputSchema = z
       .trim()
       .min(3, 'Give a reason with at least 3 characters.')
       .max(500, 'Keep the reason within 500 characters.'),
+    dutyType: z.string().trim().optional(),
+    organisation: z.string().trim().optional(),
+    location: z.string().trim().optional(),
+    referenceNumber: z.string().trim().optional(),
+    attachmentName: z.string().trim().optional(),
+    attachmentUrl: z.string().trim().optional(),
+    restrictedHolidayId: z.string().trim().optional(),
+    vacationPeriodId: z.string().trim().optional(),
+    coverageRequired: z.boolean().optional(),
   })
   .superRefine((value, ctx) => {
     const fail = (message: string) => ctx.addIssue({ code: 'custom', message });
@@ -181,58 +218,131 @@ async function writeLeave(path: string, method: string, body?: unknown) {
 }
 
 // Fixtures are available only to explicitly selected demo sessions.
-const INITIAL_DEMO_TYPES: LeaveTypeDto[] = [
+export const JCET_RESTRICTED_HOLIDAYS = [
+  { id: 'rh-1', name: 'Maha Shivratri', date: '2026-02-15' },
+  { id: 'rh-2', name: 'Good Friday', date: '2026-04-03' },
+  { id: 'rh-3', name: 'Basava Jayanti', date: '2026-04-20' },
+  { id: 'rh-4', name: 'Varamahalakshmi Vrata', date: '2026-08-21' },
+  { id: 'rh-5', name: 'Anant Chaturdashi', date: '2026-09-24' },
+  { id: 'rh-6', name: 'Guru Nanak Jayanti', date: '2026-11-24' },
+];
+
+export const JCET_VACATION_PERIODS = [
+  {
+    id: 'vp-summer',
+    name: 'Summer Vacation 2026 (Even Sem)',
+    startDate: '2026-07-01',
+    endDate: '2026-07-31',
+  },
+  {
+    id: 'vp-winter',
+    name: 'Winter Vacation 2026 (Odd Sem)',
+    startDate: '2026-12-20',
+    endDate: '2027-01-10',
+  },
+];
+
+export const OOD_DUTY_TYPES = [
+  'VTU Academic Committee',
+  'VTU Syllabus Revision',
+  'Institutional Representation',
+  'Official Inspection / LIC',
+  'National Conference / Workshop',
+  'Academic Council Duty',
+  'Institutional MOU / Industrial Visit',
+  'Other Official Duty',
+];
+
+export const ODE_DUTY_TYPES = [
+  'VTU Theory Exam Invigilation',
+  'VTU Practical Exam Examiner',
+  'Central Valuation / Evaluation',
+  'Flying Squad Duty',
+  'Deputy Chief Superintendent (External)',
+  'Room Superintendent (Internal)',
+  'Re-evaluation / Script Review',
+  'Other Examination Duty',
+];
+
+export const INITIAL_DEMO_TYPES: LeaveTypeDto[] = [
   {
     id: 1,
     code: 'CL',
     name: 'Casual Leave',
-    yearlyQuota: 15,
+    yearlyQuota: 12,
     allowHalfDay: true,
     carryForwardMax: 0,
     active: true,
   },
   {
     id: 2,
-    code: 'DL',
-    name: 'Duty Leave (Academic / Conf)',
+    code: 'EL',
+    name: 'Earned Leave',
     yearlyQuota: 10,
     allowHalfDay: false,
-    carryForwardMax: 0,
+    carryForwardMax: 15,
     active: true,
   },
   {
     id: 3,
-    code: 'RH',
-    name: 'Restricted Holiday',
-    yearlyQuota: 2,
+    code: 'SPL_ML',
+    name: 'Special / Medical Leave',
+    yearlyQuota: null,
     allowHalfDay: false,
     carryForwardMax: 0,
     active: true,
   },
   {
     id: 4,
-    code: 'EL',
-    name: 'Earned Leave',
-    yearlyQuota: 30,
+    code: 'OOD',
+    name: 'On Official Duty',
+    yearlyQuota: 12,
+    allowHalfDay: true,
+    carryForwardMax: 0,
+    active: true,
+  },
+  {
+    id: 5,
+    code: 'ODE',
+    name: 'Official / Examination Duty',
+    yearlyQuota: 12,
+    allowHalfDay: true,
+    carryForwardMax: 0,
+    active: true,
+  },
+  {
+    id: 6,
+    code: 'RH',
+    name: 'Restricted Holiday',
+    yearlyQuota: null,
     allowHalfDay: false,
-    carryForwardMax: 15,
+    carryForwardMax: 0,
+    active: true,
+  },
+  {
+    id: 7,
+    code: 'VL',
+    name: 'Vacation Leave',
+    yearlyQuota: null,
+    allowHalfDay: false,
+    carryForwardMax: 0,
     active: true,
   },
 ];
 
-const INITIAL_DEMO_BALANCES: LeaveBalanceDto[] = [
+export const INITIAL_DEMO_BALANCES: LeaveBalanceDto[] = [
   {
     leaveType: { id: 1, code: 'CL', name: 'Casual Leave' },
     active: true,
     year: 2026,
-    entitled: 15,
+    entitled: 12,
     carriedIn: 0,
-    used: 5.5,
+    used: 3,
     pending: 1,
-    remaining: 8.5,
+    remaining: 8,
   },
   {
-    leaveType: { id: 2, code: 'DL', name: 'Duty Leave' },
+    leaveType: { id: 2, code: 'EL', name: 'Earned Leave' },
     active: true,
     year: 2026,
     entitled: 10,
@@ -242,14 +352,54 @@ const INITIAL_DEMO_BALANCES: LeaveBalanceDto[] = [
     remaining: 8,
   },
   {
-    leaveType: { id: 3, code: 'RH', name: 'Restricted Holiday' },
+    leaveType: { id: 3, code: 'SPL_ML', name: 'Special / Medical Leave' },
     active: true,
     year: 2026,
-    entitled: 2,
+    entitled: null,
+    carriedIn: 0,
+    used: 0,
+    pending: 0,
+    remaining: null,
+  },
+  {
+    leaveType: { id: 4, code: 'OOD', name: 'On Official Duty' },
+    active: true,
+    year: 2026,
+    entitled: 12,
+    carriedIn: 0,
+    used: 2,
+    pending: 0,
+    remaining: 10,
+  },
+  {
+    leaveType: { id: 5, code: 'ODE', name: 'Official / Examination Duty' },
+    active: true,
+    year: 2026,
+    entitled: 12,
     carriedIn: 0,
     used: 1,
     pending: 0,
-    remaining: 1,
+    remaining: 11,
+  },
+  {
+    leaveType: { id: 6, code: 'RH', name: 'Restricted Holiday' },
+    active: true,
+    year: 2026,
+    entitled: null,
+    carriedIn: 0,
+    used: 1,
+    pending: 0,
+    remaining: null,
+  },
+  {
+    leaveType: { id: 7, code: 'VL', name: 'Vacation Leave' },
+    active: true,
+    year: 2026,
+    entitled: null,
+    carriedIn: 0,
+    used: 0,
+    pending: 0,
+    remaining: null,
   },
 ];
 
@@ -267,9 +417,9 @@ let demoRequestsStore: LeaveRequestDto[] = [
       name: 'Computer Science & Engineering',
     },
     leaveType: {
-      id: 1,
-      code: 'CL',
-      name: 'Casual Leave',
+      id: 4,
+      code: 'OOD',
+      name: 'On Official Duty',
       allowHalfDay: true,
     },
     startDate: '2026-10-22',
@@ -278,6 +428,12 @@ let demoRequestsStore: LeaveRequestDto[] = [
     days: 1.0,
     reason:
       'Attending VTU syllabus revision committee meeting at Belagavi campus.',
+    dutyType: 'VTU Syllabus Revision',
+    organisation: 'Visvesvaraya Technological University (VTU)',
+    location: 'Belagavi Campus',
+    referenceNumber: 'VTU/ACA/2026/SYL-REV-04',
+    attachmentName: 'VTU_Meeting_Notice.pdf',
+    coverageRequired: true,
     status: 'PENDING',
     approverRoles: ['HOD', 'HR Admin'],
     pendingRole: 'HOD',
@@ -466,6 +622,15 @@ export async function applyForLeave(
     approverRoles: ['HOD', 'HR Admin'],
     pendingRole: 'HOD',
     decisions: [],
+    dutyType: payload.dutyType || null,
+    organisation: payload.organisation || null,
+    location: payload.location || null,
+    referenceNumber: payload.referenceNumber || null,
+    attachmentName: payload.attachmentName || null,
+    attachmentUrl: payload.attachmentUrl || null,
+    restrictedHolidayId: payload.restrictedHolidayId || null,
+    vacationPeriodId: payload.vacationPeriodId || null,
+    coverageRequired: payload.coverageRequired,
   };
 
   demoRequestsStore = [newRequest, ...demoRequestsStore];
@@ -475,11 +640,27 @@ export async function applyForLeave(
 export async function decideLeaveRequest(
   token: string | null,
   requestId: string,
-  approved: boolean,
+  approvedOrAction:
+    | boolean
+    | 'approve'
+    | 'recommend'
+    | 'recommend_coverage'
+    | 'reject',
   note?: string,
   deciderName?: string,
 ): Promise<LeaveRequestDto> {
-  if (!approved && (!note || note.trim().length < 3)) {
+  const isReject = approvedOrAction === false || approvedOrAction === 'reject';
+  const isRecommend =
+    approvedOrAction === 'recommend' ||
+    approvedOrAction === 'recommend_coverage';
+  const action =
+    typeof approvedOrAction === 'string'
+      ? approvedOrAction
+      : approvedOrAction
+        ? 'approve'
+        : 'reject';
+
+  if (isReject && (!note || note.trim().length < 3)) {
     throw new Error(
       'Please provide a rejection reason (minimum 3 characters).',
     );
@@ -493,7 +674,6 @@ export async function decideLeaveRequest(
         'INVALID_NOTE',
         'Keep the note within 500 characters.',
       );
-    const action = approved ? 'approve' : 'reject';
     const data = await writeLeave(
       `/leave/requests/${requestId}/${action}`,
       'PATCH',
@@ -502,11 +682,13 @@ export async function decideLeaveRequest(
     if (
       data.id !== requestId ||
       !data.decisions.some(
-        (d) => d.approved === approved && d.note === (note?.trim() || null),
+        (d) => d.approved === !isReject && d.note === (note?.trim() || null),
       ) ||
-      (approved
-        ? !['PENDING', 'APPROVED'].includes(data.status)
-        : data.status !== 'REJECTED')
+      (isReject
+        ? data.status !== 'REJECTED'
+        : isRecommend
+          ? data.status !== 'PENDING'
+          : !['PENDING', 'APPROVED'].includes(data.status))
     )
       throw new Error(
         'The server did not confirm this decision. Refresh requests.',
@@ -522,18 +704,26 @@ export async function decideLeaveRequest(
 
   const req = demoRequestsStore[index];
   const updatedDecision: LeaveDecisionDto = {
-    step: 1,
-    role: 'HOD',
-    approved,
-    note: note?.trim() || (approved ? 'Recommended and approved.' : null),
+    step: isRecommend ? 1 : 2,
+    role: isRecommend ? 'HOD' : 'HR Admin',
+    approved: !isReject,
+    note:
+      note?.trim() ||
+      (isReject
+        ? null
+        : action === 'recommend_coverage'
+          ? 'Recommended with class coverage arranged.'
+          : isRecommend
+            ? 'Recommended for HR approval.'
+            : 'Approved.'),
     decidedAt: new Date().toISOString(),
     decidedBy: deciderName || 'Dr. Ramesh K (HOD)',
   };
 
   const updatedReq: LeaveRequestDto = {
     ...req,
-    status: approved ? 'APPROVED' : 'REJECTED',
-    pendingRole: null,
+    status: isReject ? 'REJECTED' : isRecommend ? 'PENDING' : 'APPROVED',
+    pendingRole: isRecommend ? 'HR Admin' : null,
     decisions: [...req.decisions, updatedDecision],
   };
 

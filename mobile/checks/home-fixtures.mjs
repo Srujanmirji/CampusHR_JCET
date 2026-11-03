@@ -1,8 +1,8 @@
 export const employeeId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 export const homeUser = {
   id: '11111111-1111-4111-8111-111111111111',
-  email: 'home-check@jcet.test',
-  name: 'Home Test',
+  email: 'hod.cse@jcethbl.edu.in',
+  name: 'Dr. Ramesh K',
   role: 'HOD',
   employeeId,
   departmentId: 1,
@@ -86,8 +86,8 @@ export function homeFixtures(date = '2026-10-21', day = 'WED') {
           },
           faculty: {
             id: employeeId,
-            employeeCode: 'IOS004',
-            name: 'Home Test',
+            employeeCode: 'JCET-CSE-001',
+            name: 'Dr. Ramesh K',
           },
           room: { id: 1, name: 'Room 302', kind: 'CLASSROOM' },
           day,

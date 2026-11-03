@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AppState, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import {
+  AppState,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Icon } from '../../components/ui/Icon';
@@ -203,6 +211,9 @@ function FacultyHome() {
     ?.replace(/^(Prof\.?|Dr\.?)\s+/i, '')
     .split(' ')[0];
   const honorific = user?.name?.match(/^(Prof\.?|Dr\.?)\s+/i)?.[0] || '';
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
+  const displayName = user?.name?.trim() || (firstName ? `${honorific}${firstName}` : 'welcome back');
   const nextEnd =
     upcoming &&
     schedule.data?.periods.find((p) => p.number === upcoming.endPeriod)
@@ -231,7 +242,7 @@ function FacultyHome() {
           ,
           <Text style={styles.name}>
             {'\n'}
-            {firstName ? `${honorific}${firstName}` : 'welcome back'}
+            {displayName}
           </Text>
         </Text>
         <Text style={styles.detail}>
@@ -525,6 +536,81 @@ function FacultyHome() {
             );
           })}
         </HomeState>
+      </View>
+      <View style={styles.section}>
+        <View style={styles.header}>
+          <Text accessibilityRole="header" style={styles.title}>
+            Pending actions
+          </Text>
+          <Text style={styles.detail}>Daily operational items</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/(tabs)/timetable')}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.violetContainer },
+            ]}
+          >
+            <Icon name="coverage" color={theme.colors.violet} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Substitution duty</Text>
+            <Text style={styles.detail}>
+              {duties.data?.length
+                ? `${duties.data.length} dated cover ${duties.data.length === 1 ? 'assignment' : 'assignments'} scheduled`
+                : 'No cover assignments today · Tap to review week'}
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/(tabs)/leave')}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.blueContainer },
+            ]}
+          >
+            <Icon name="leave" color={theme.colors.primary} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Leave status</Text>
+            <Text style={styles.detail}>
+              {balances.data?.some((b) => b.pending > 0)
+                ? `${balances.data.reduce((s, b) => s + b.pending, 0)} pending leave days awaiting approval`
+                : 'All leave balances & requests up to date'}
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/documents')}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.amberContainer },
+            ]}
+          >
+            <Icon name="document" color={theme.colors.amberInk} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Document expiry</Text>
+            <Text style={styles.detail}>
+              Review FDP certificates & compliance records in Document Center
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
       </View>
       <View style={styles.section}>
         <View style={styles.header}>

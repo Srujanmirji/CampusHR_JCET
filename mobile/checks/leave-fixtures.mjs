@@ -18,8 +18,8 @@ export const leaveRequest = {
   id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   employee: {
     id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-    employeeCode: 'IOS007F',
-    name: 'Leave Faculty',
+    employeeCode: 'JCET-CSE-021',
+    name: 'Prof. Asha Patil',
   },
   department: { id: 1, code: 'CSE', name: 'Computer Science' },
   leaveType: { id: 1, code: 'CL', name: 'Casual Leave' },
@@ -56,14 +56,19 @@ function matches(row, where) {
 }
 export function createLeavePreviewRepository(users = [homeUser]) {
   const department = leaveRequest.department;
-  const person = (id, code, name) => ({
+  const person = (id, code, firstName, lastName) => ({
     id,
     employeeCode: code,
-    firstName: name,
-    lastName: 'Test',
+    firstName,
+    lastName,
   });
-  const owner = person(homeUser.employeeId, 'IOS004', 'Home');
-  const faculty = person(leaveRequest.employee.id, 'IOS007F', 'Leave Faculty');
+  const owner = person(homeUser.employeeId, 'JCET-CSE-001', 'Dr. Ramesh', 'K');
+  const faculty = person(
+    leaveRequest.employee.id,
+    'JCET-CSE-021',
+    'Prof. Asha',
+    'Patil',
+  );
   const record = (employee, reason, day = 22) => ({
     id: randomUUID(),
     employeeId: employee.id,

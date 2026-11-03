@@ -43,12 +43,12 @@ const send = async (target) =>
     ).status,
     201,
   );
-async function login(page, email = 'home-check@jcet.test') {
+async function login(page, email = 'hod.cse@jcethbl.edu.in') {
   await page.goto(base);
   await page
     .getByLabel('Employee ID or College Email', { exact: true })
     .fill(email);
-  await page.getByLabel('Password', { exact: true }).fill('home-check-only');
+  await page.getByLabel('Password', { exact: true }).fill('CampusHR@2026');
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
   await page
     .getByRole('button', { name: 'Open notification inbox', exact: true })
@@ -162,7 +162,7 @@ try {
       viewport: { width: 375, height: 812 },
     }),
     other = await otherContext.newPage();
-  await login(other, 'coverage-recipient@jcet.test');
+  await login(other, 'priya.kulkarni@jcethbl.edu.in');
   const otherInbox = other.getByTestId('notifications-screen');
   await otherInbox
     .getByText('Recipient only notice', { exact: true })
@@ -224,13 +224,13 @@ try {
     const r = await globalThis.fetch(`${api}/api/v1/auth/native/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier, password: 'home-check-only' }),
+      body: JSON.stringify({ identifier, password: 'CampusHR@2026' }),
     });
     assert.equal(r.status, 200);
     return (await r.json()).accessToken;
   };
-  const recipientToken = await tokenFor('coverage-recipient@jcet.test'),
-    hodToken = await tokenFor('home-check@jcet.test');
+  const recipientToken = await tokenFor('priya.kulkarni@jcethbl.edu.in'),
+    hodToken = await tokenFor('hod.cse@jcethbl.edu.in');
   const owned = await (
     await globalThis.fetch(`${api}/api/v1/notifications`, {
       headers: { Authorization: `Bearer ${recipientToken}` },
@@ -256,7 +256,7 @@ try {
   );
   const adminContext = await browser.newContext(),
     admin = await adminContext.newPage();
-  await login(admin, 'no-employee@jcet.test');
+  await login(admin, 'no-employee@jcethbl.edu.in');
   await admin
     .getByTestId('notifications-screen')
     .getByText('Administrator notice', { exact: true })

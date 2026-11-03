@@ -6,8 +6,8 @@ export function scheduleFixture(date = '2026-10-21', day = 'WED') {
   entry.id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   entry.faculty = {
     id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-    employeeCode: 'ABSENT001',
-    name: 'Absent Faculty',
+    employeeCode: 'JCET-CSE-021',
+    name: 'Prof. Asha Patil',
   };
   entry.subject.name =
     'Advanced Distributed Database Management Systems and Applications Laboratory';
@@ -20,7 +20,11 @@ export function scheduleFixture(date = '2026-10-21', day = 'WED') {
     id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
     kind: 'SUBSTITUTE',
     date,
-    substitute: { id: employeeId, employeeCode: 'IOS004', name: 'Home Test' },
+    substitute: {
+      id: employeeId,
+      employeeCode: 'JCET-CSE-001',
+      name: 'Dr. Ramesh K',
+    },
     coveringFor: entry.faculty,
     note: 'Supervise the scheduled lab batch.',
     assignedAt: `${date}T02:00:00.000Z`,

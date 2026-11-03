@@ -37,6 +37,7 @@ export function CoveragePanel({
   const [leaveId, setLeaveId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<string | null>(null);
+  const [candidateSearch, setCandidateSearch] = useState('');
   const [noSubstitute, setNoSubstitute] = useState(false);
   const [note, setNote] = useState('');
   const [saved, setSaved] = useState<{
@@ -682,6 +683,32 @@ export function CoveragePanel({
                   department and workload. Eligibility is checked again when you
                   confirm.
                 </Text>
+                <Input
+                  label="Manual search"
+                  placeholder="Search faculty by name or department"
+                  value={candidateSearch}
+                  onChangeText={setCandidateSearch}
+                  disabled={sending}
+                />
+                {candidates.isSuccess &&
+                  candidates.data.filter((c) => c.eligible).length > 1 && (
+                    <Button
+                      variant="text"
+                      disabled={sending || uncertain}
+                      onPress={() => {
+                        const elig = candidates.data.filter((c) => c.eligible);
+                        if (!elig.length) return;
+                        const idx = elig.findIndex(
+                          (c) => c.faculty.id === candidate,
+                        );
+                        const next = elig[(idx + 1) % elig.length];
+                        setCandidate(next.faculty.id);
+                        setNoSubstitute(false);
+                      }}
+                    >
+                      Next candidate
+                    </Button>
+                  )}
               </View>
               {candidates.isFetching && (
                 <Text style={styles.detail}>Loading current candidates…</Text>
@@ -699,102 +726,148 @@ export function CoveragePanel({
                         handling without a substitute.
                       </Text>
                     )}
-                    {candidates.data.map((faculty) => {
-                      const chosen = candidate === faculty.faculty.id;
-                      const subjectFit = faculty.points.subject > 0;
-                      return (
-                        <View
-                          key={faculty.faculty.id}
-                          style={[
-                            styles.candidate,
-                            chosen && styles.candidateSelected,
-                          ]}
-                        >
-                          <View style={styles.person}>
-                            <FacultyInitials name={faculty.faculty.name} />
-                            <View style={styles.grow}>
-                              <Text style={styles.candidateName}>
-                                {faculty.faculty.name}
-                              </Text>
-                              <Text style={styles.detail}>
-                                {faculty.faculty.designation} ·{' '}
-                                {faculty.faculty.department.code}
-                              </Text>
-                              <Text
-                                style={
-                                  faculty.eligible
-                                    ? styles.available
-                                    : styles.unavailable
-                                }
-                              >
-                                {faculty.eligible
-                                  ? 'Available for assignment'
-                                  : 'Unavailable'}
+                    {candidates.data
+                      .filter((faculty) => {
+                        const q = candidateSearch.trim().toLowerCase();
+                        return (
+                          !q ||
+                          faculty.faculty.name.toLowerCase().includes(q) ||
+                          faculty.faculty.department.code
+                            .toLowerCase()
+                            .includes(q)
+                        );
+                      })
+                      .map((faculty) => {
+                        const chosen = candidate === faculty.faculty.id;
+                        const subjectFit = faculty.points.subject > 0;
+                        const isAtCapacity =
+                          !faculty.eligible &&
+                          (Boolean(
+                            faculty.reason?.toLowerCase().includes('limit') ||
+                              faculty.reason
+                                ?.toLowerCase()
+                                .includes('capacity') ||
+                              faculty.reason?.toLowerCase().includes('hour'),
+                          ) ||
+                            (faculty.maxHours !== null &&
+                              faculty.hoursAfter > faculty.maxHours));
+                        const candidateStatus =
+                          subjectFit && faculty.eligible
+                            ? 'Recommended'
+                            : faculty.eligible
+                              ? 'Available'
+                              : isAtCapacity
+                                ? 'At capacity'
+                                : 'Unavailable';
+                        const currentHours = Math.max(
+                          0,
+                          faculty.hoursAfter - slot.hours,
+                        );
+                        return (
+                          <View
+                            key={faculty.faculty.id}
+                            style={[
+                              styles.candidate,
+                              chosen && styles.candidateSelected,
+                            ]}
+                          >
+                            <View style={styles.person}>
+                              <FacultyInitials name={faculty.faculty.name} />
+                              <View style={styles.grow}>
+                                <Text style={styles.candidateName}>
+                                  {faculty.faculty.name}
+                                </Text>
+                                <Text style={styles.detail}>
+                                  {faculty.faculty.designation} ·{' '}
+                                  {faculty.faculty.department.code}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.candidateStatus,
+                                    candidateStatus === 'Recommended' &&
+                                      styles.statusRecommended,
+                                    candidateStatus === 'Available' &&
+                                      styles.statusAvailable,
+                                    candidateStatus === 'At capacity' &&
+                                      styles.statusAtCapacity,
+                                    candidateStatus === 'Unavailable' &&
+                                      styles.statusUnavailable,
+                                  ]}
+                                >
+                                  {candidateStatus}
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={styles.factRow}>
+                              <Icon name="clock" size={theme.spacing.lg} />
+                              <Text style={[styles.detail, styles.grow]}>
+                                Current workload: {currentHours}
+                                {faculty.maxHours === null
+                                  ? ''
+                                  : ` / ${faculty.maxHours}`}{' '}
+                                · After assignment: {faculty.hoursAfter} teaching
+                                hours after assignment
+                                {faculty.maxHours === null
+                                  ? ' · Maximum not set'
+                                  : ` / ${faculty.maxHours} maximum`}
                               </Text>
                             </View>
-                          </View>
-                          <View style={styles.factRow}>
-                            <Icon name="clock" size={theme.spacing.lg} />
-                            <Text style={[styles.detail, styles.grow]}>
-                              {faculty.hoursAfter} teaching hours after
-                              assignment
-                              {faculty.maxHours === null
-                                ? ' · Maximum not set'
-                                : ` / ${faculty.maxHours} maximum`}
-                            </Text>
-                          </View>
-                          <View style={styles.factRow}>
-                            <Icon name="school" size={theme.spacing.lg} />
-                            <Text style={[styles.detail, styles.grow]}>
-                              {subjectFit
-                                ? 'Subject teaching experience recorded'
-                                : 'Subject teaching experience not recorded'}
-                              {faculty.points.experience > 0
-                                ? ' · Faculty experience recorded'
-                                : ' · Review faculty experience'}
-                            </Text>
-                          </View>
-                          {!!faculty.reason && (
-                            <Text style={styles.detail}>{faculty.reason}</Text>
-                          )}
-                          {!faculty.eligible && !faculty.reason && (
-                            <Text style={styles.detail}>
-                              This faculty member is not eligible for this dated
-                              class.
-                            </Text>
-                          )}
-                          <View style={styles.header}>
-                            {subjectFit && faculty.eligible ? (
-                              <Text style={[styles.subjectFit, styles.grow]}>
-                                Strong subject fit
+                            <View style={styles.factRow}>
+                              <Icon name="school" size={theme.spacing.lg} />
+                              <Text style={[styles.detail, styles.grow]}>
+                                Subject experience:{' '}
+                                {subjectFit ? 'Strong' : 'General'} ·{' '}
+                                {subjectFit
+                                  ? 'Subject teaching experience recorded'
+                                  : 'Subject teaching experience not recorded'}
+                                {faculty.points.experience > 0
+                                  ? ' · Faculty experience recorded'
+                                  : ' · Review faculty experience'}
                               </Text>
-                            ) : (
-                              <View style={styles.grow} />
+                            </View>
+                            {!!faculty.reason && (
+                              <Text style={styles.detail}>
+                                {faculty.reason}
+                              </Text>
                             )}
-                            <Button
-                              accessibilityLabel={`${chosen ? 'Selected' : 'Select'} ${faculty.faculty.name}`}
-                              variant={chosen ? 'primary' : 'outline'}
-                              disabled={
-                                !faculty.eligible ||
-                                sending ||
-                                uncertain ||
-                                candidates.isFetching
-                              }
-                              onPress={() => {
-                                setCandidate(faculty.faculty.id);
-                                setNoSubstitute(false);
-                              }}
-                            >
-                              {chosen
-                                ? 'Selected'
-                                : faculty.eligible
-                                  ? 'Select'
-                                  : 'Unavailable'}
-                            </Button>
+                            {!faculty.eligible && !faculty.reason && (
+                              <Text style={styles.detail}>
+                                This faculty member is not eligible for this
+                                dated class.
+                              </Text>
+                            )}
+                            <View style={styles.header}>
+                              {subjectFit && faculty.eligible ? (
+                                <Text style={[styles.subjectFit, styles.grow]}>
+                                  Strong subject fit
+                                </Text>
+                              ) : (
+                                <View style={styles.grow} />
+                              )}
+                              <Button
+                                accessibilityLabel={`${chosen ? 'Selected' : 'Select'} ${faculty.faculty.name}`}
+                                variant={chosen ? 'primary' : 'outline'}
+                                disabled={
+                                  !faculty.eligible ||
+                                  sending ||
+                                  uncertain ||
+                                  candidates.isFetching
+                                }
+                                onPress={() => {
+                                  setCandidate(faculty.faculty.id);
+                                  setNoSubstitute(false);
+                                }}
+                              >
+                                {chosen
+                                  ? 'Selected'
+                                  : faculty.eligible
+                                    ? 'Select'
+                                    : 'Unavailable'}
+                              </Button>
+                            </View>
                           </View>
-                        </View>
-                      );
-                    })}
+                        );
+                      })}
                   </>
                 )
               )}
@@ -989,6 +1062,24 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontWeight: '500',
     color: theme.colors.amberInk,
+  },
+  candidateStatus: {
+    fontSize: theme.typography.caption,
+    fontWeight: '600',
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+  },
+  statusRecommended: {
+    color: theme.colors.mintInk,
+  },
+  statusAvailable: {
+    color: theme.colors.primary,
+  },
+  statusAtCapacity: {
+    color: theme.colors.amberInk,
+  },
+  statusUnavailable: {
+    color: theme.colors.coralInk,
   },
   classContext: {
     padding: theme.spacing.section,
