@@ -10,7 +10,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --allowJs --checkJs --noEmit --target es2023 --module nodenext --moduleResolution nodenext index.js",
+    "typecheck": "tsc --ignoreConfig --allowJs --checkJs --noEmit --target es2023 --module nodenext --moduleResolution nodenext index.js",
     "lint": "eslint index.js"
   }
 }

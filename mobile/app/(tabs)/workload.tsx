@@ -18,8 +18,11 @@ import { ScreenContainer } from '../../components/ui/ScreenContainer';
 import { Button } from '../../components/ui/Button';
 import { Icon } from '../../components/ui/Icon';
 import { FacultyInitials } from '../../components/leave/LeavePresentation';
-import { theme } from '../../lib/theme';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { WebTopbar } from '../../components/layout/WebTopbar';
+import { WebPageHeader } from '../../components/shared/WebPageHeader';
+import { WebMetricCard } from '../../components/shared/WebMetricCard';
+import { theme } from '../../lib/theme';
 
 const WORKLOAD_FILTERS = [
   'All',
@@ -31,7 +34,6 @@ const WORKLOAD_FILTERS = [
 ] as const;
 
 type WorkloadFilter = (typeof WORKLOAD_FILTERS)[number];
-
 type WorkloadItem = Awaited<ReturnType<typeof getDepartmentWorkload>>[number];
 
 function classifyWorkload(r: WorkloadItem): {
@@ -45,39 +47,39 @@ function classifyWorkload(r: WorkloadItem): {
     return {
       band: 'Overloaded',
       label: 'Overloaded',
-      ink: theme.colors.coralInk,
-      bg: theme.colors.coralContainer,
+      ink: '#DC2626',
+      bg: '#FEE2E2',
     };
   }
   if (r.maxHours != null && r.totalHours === max) {
     return {
       band: 'At capacity',
       label: 'At capacity',
-      ink: theme.colors.amberInk,
-      bg: theme.colors.amberContainer,
+      ink: '#D97706',
+      bg: '#FEF3C7',
     };
   }
   if (r.maxHours != null && r.totalHours >= max - 2) {
     return {
       band: 'Near limit',
       label: 'Near limit',
-      ink: theme.colors.amberInk,
-      bg: theme.colors.amberContainer,
+      ink: '#D97706',
+      bg: '#FEF3C7',
     };
   }
   if (r.status === 'UNDERLOADED' || r.totalHours <= max - 4) {
     return {
       band: 'Available',
       label: 'Available',
-      ink: theme.colors.mintInk,
-      bg: theme.colors.mintContainer,
+      ink: '#059669',
+      bg: '#D1FAE5',
     };
   }
   return {
     band: 'Normal',
     label: 'Normal',
-    ink: theme.colors.primary,
-    bg: theme.colors.blueContainer,
+    ink: '#0071E3',
+    bg: '#EFF6FF',
   };
 }
 
@@ -156,14 +158,14 @@ export default function Workload() {
             <Text style={styles.captionText}>Current / Limit</Text>
           </View>
           <View style={styles.metricBox}>
-            <Text style={[styles.metricNumber, { color: theme.colors.mintInk }]}>
+            <Text style={[styles.metricNumber, { color: '#059669' }]}>
               {freePeriods}
             </Text>
             <Text style={styles.captionText}>Free periods / wk</Text>
           </View>
         </View>
 
-        <View style={{ gap: 6 }}>
+        <View style={{ gap: 8, marginTop: 4 }}>
           <Text style={styles.groupHeading}>Weekly allocation breakdown</Text>
           <View style={styles.breakdownRow}>
             <Text style={styles.bodyText}>Theory lectures</Text>
@@ -186,38 +188,71 @@ export default function Workload() {
 
   return (
     <ScreenContainer
-      contentContainerStyle={{ gap: theme.spacing.section }}
+      contentContainerStyle={{ gap: 16, paddingBottom: 40 }}
       refreshControl={
         <RefreshControl
           refreshing={query.isRefetching}
           onRefresh={() => void query.refetch()}
+          tintColor={theme.colors.primary}
+          colors={[theme.colors.primary]}
         />
       }
     >
-      <View style={{ gap: 4 }}>
-        <Text
-          accessibilityRole="header"
-          style={{
-            fontSize: theme.typography.heading,
-            fontWeight: '600',
-            color: theme.colors.foreground,
-          }}
+      <WebTopbar breadcrumb="Faculty Workload" />
+
+      <WebPageHeader
+        title="Faculty workload"
+        subtitle="Weekly teaching hours from the timetable, against each designation's band."
+      >
+        <Button
+          variant="secondary"
+          onPress={() => void query.refetch()}
+          style={styles.refreshButton}
         >
-          Department workload
-        </Text>
-        <Text
-          style={{
-            fontSize: theme.typography.secondary,
-            color: theme.colors.mutedForeground,
-          }}
-        >
-          Scheduled teaching hours · Weekly capacity & free periods
-        </Text>
+          <Icon name="refresh" color={theme.colors.primary} size={16} />
+        </Button>
+      </WebPageHeader>
+
+      {/* Web-Style 2x2 Metric Cards Grid */}
+      <View style={styles.metricsGrid}>
+        <View style={styles.metricsRow}>
+          <WebMetricCard
+            label="Faculty"
+            value={`${allRows.length}`}
+            detail="Total in department"
+            icon="profile"
+            accentColor="#0071E3"
+          />
+          <WebMetricCard
+            label="Normal"
+            value={`${allRows.filter((r) => r.status === 'NORMAL').length}`}
+            detail="Within workload band"
+            icon="attendance"
+            accentColor="#10B981"
+          />
+        </View>
+
+        <View style={styles.metricsRow}>
+          <WebMetricCard
+            label="Underloaded"
+            value={`${allRows.filter((r) => r.status === 'UNDERLOADED').length}`}
+            detail="Headroom available"
+            icon="workload"
+            accentColor="#F59E0B"
+          />
+          <WebMetricCard
+            label="Overloaded"
+            value={`${allRows.filter((r) => r.status === 'OVERLOADED').length}`}
+            detail="Above max capacity"
+            icon="clock"
+            accentColor="#8B5CF6"
+          />
+        </View>
       </View>
 
       {query.isPending && <Skeleton label="Loading department workload" />}
       {query.isError && (
-        <>
+        <View style={styles.card}>
           <Text
             accessibilityRole="alert"
             style={{ color: theme.colors.errorInk }}
@@ -225,51 +260,12 @@ export default function Workload() {
             {query.error.message}
           </Text>
           <Button onPress={() => void query.refetch()}>Retry workload</Button>
-        </>
+        </View>
       )}
+
       {query.isSuccess && (
         <>
-          <View style={styles.summaryRow}>
-            <View style={[styles.summaryCard, { flex: 1 }]}>
-              <Text
-                style={{
-                  fontSize: theme.typography.metric,
-                  fontWeight: '600',
-                  color: theme.colors.primary,
-                }}
-              >
-                {allRows.length
-                  ? (
-                      allRows.reduce((n, row) => n + row.totalHours, 0) /
-                      allRows.length
-                    ).toFixed(1)
-                  : '—'}{' '}
-                hrs/wk
-              </Text>
-              <Text style={styles.secondaryText}>
-                Average scheduled load · {allRows.length} faculty
-              </Text>
-            </View>
-            <View style={styles.alertBadgeCard}>
-              <Text
-                style={{
-                  fontSize: theme.typography.subheading,
-                  fontWeight: '600',
-                  color: theme.colors.warning,
-                }}
-              >
-                {
-                  allRows.filter(
-                    (r) =>
-                      r.status === 'OVERLOADED' || r.status === 'UNDERLOADED',
-                  ).length
-                }{' '}
-                workload alerts
-              </Text>
-              <Text style={styles.captionText}>Capacity band check</Text>
-            </View>
-          </View>
-
+          {/* Filter Strip */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -299,17 +295,17 @@ export default function Workload() {
           </ScrollView>
 
           {!filteredRows.length && (
-            <Text style={styles.secondaryText}>
-              No teaching workload records in your department.
-            </Text>
+            <View style={styles.card}>
+              <Text style={styles.secondaryText}>
+                No teaching workload records in your department.
+              </Text>
+            </View>
           )}
 
           <View style={isTablet ? styles.tabletSplit : styles.stack}>
             <View style={isTablet ? styles.tabletListCol : styles.stack}>
               {filteredRows.map((r) => {
                 const info = classifyWorkload(r);
-                const max = r.maxHours ?? 18;
-                const freePeriods = Math.max(0, 30 - r.totalHours);
                 const isSelected = selectedFaculty?.faculty.id === r.faculty.id;
                 return (
                   <Pressable
@@ -343,12 +339,13 @@ export default function Workload() {
                     <View style={styles.statsInline}>
                       <Text
                         style={{
-                          fontSize: theme.typography.body,
+                          fontSize: 14,
                           color:
                             r.status === 'OVERLOADED'
-                              ? theme.colors.warning
-                              : theme.colors.foreground,
-                          fontWeight: '500',
+                              ? '#DC2626'
+                              : '#0F172A',
+                          fontWeight: '600',
+                          fontVariant: ['tabular-nums'],
                         }}
                       >
                         {r.totalHours}
@@ -358,39 +355,10 @@ export default function Workload() {
                           : r.status === 'UNDERLOADED'
                             ? 'Below workload band'
                             : r.status === 'NORMAL'
-                              ? 'Within workload band'
-                              : 'Band not configured'}
-                      </Text>
-                      <Text style={styles.freePeriodsText}>
-                        {freePeriods} free periods
+                              ? 'Within band'
+                              : r.status}
                       </Text>
                     </View>
-
-                    {r.maxHours != null && r.maxHours > 0 && (
-                      <View
-                        accessibilityRole="progressbar"
-                        accessibilityLabel={`${r.faculty.name} weekly teaching capacity`}
-                        accessibilityValue={{
-                          min: 0,
-                          max: r.maxHours,
-                          now: r.totalHours,
-                          text: `${r.totalHours} of ${r.maxHours} hours`,
-                        }}
-                        style={styles.progressTrack}
-                      >
-                        <View
-                          style={{
-                            width: `${Math.min(100, (r.totalHours / max) * 100)}%`,
-                            height: '100%',
-                            backgroundColor:
-                              r.status === 'OVERLOADED'
-                                ? theme.colors.warning
-                                : theme.colors.primary,
-                            borderRadius: theme.radius.control,
-                          }}
-                        />
-                      </View>
-                    )}
                   </Pressable>
                 );
               })}
@@ -402,214 +370,220 @@ export default function Workload() {
               </View>
             )}
           </View>
-        </>
-      )}
 
-      {!isTablet && (
-        <Modal
-          visible={!!selectedFacultyId && !!selectedFaculty}
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setSelectedFacultyId(null)}
-        >
-          <SafeAreaView style={styles.sheet}>
-            <ScrollView contentContainerStyle={styles.sheetContent}>
-              <View style={styles.rowHeader}>
-                <Text style={styles.detailName}>Workload detail</Text>
-                <Button
-                  variant="text"
-                  accessibilityLabel="Close workload detail"
-                  onPress={() => setSelectedFacultyId(null)}
-                >
-                  <Icon name="close" color={theme.colors.primary} />
-                </Button>
+          {/* Modal for Mobile when tapping a faculty */}
+          {!isTablet && selectedFacultyId && selectedFaculty && (
+            <Modal
+              visible
+              animationType="slide"
+              transparent
+              onRequestClose={() => setSelectedFacultyId(null)}
+            >
+              <View style={styles.modalOverlay}>
+                <SafeAreaView edges={['bottom']} style={styles.modalContent}>
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>Faculty Workload</Text>
+                    <Pressable
+                      onPress={() => setSelectedFacultyId(null)}
+                      style={styles.closeBtn}
+                    >
+                      <Icon name="close" color="#0F172A" size={18} />
+                    </Pressable>
+                  </View>
+                  {renderDetailCard(selectedFaculty)}
+                </SafeAreaView>
               </View>
-              {selectedFaculty && renderDetailCard(selectedFaculty)}
-              <Button fullWidth onPress={() => setSelectedFacultyId(null)}>
-                Done
-              </Button>
-            </ScrollView>
-          </SafeAreaView>
-        </Modal>
+            </Modal>
+          )}
+        </>
       )}
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  stack: { gap: theme.spacing.md },
-  summaryRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.md,
-  },
-  summaryCard: {
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.section,
-    borderRadius: theme.radius.card,
-    gap: theme.spacing.xs,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadows.card,
-  },
-  alertBadgeCard: {
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.section,
-    borderRadius: theme.radius.card,
+  refreshButton: {
+    width: 38,
+    height: 38,
+    paddingHorizontal: 0,
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: theme.spacing.xs,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadows.card,
+    borderRadius: 8,
+  },
+  metricsGrid: { gap: 12 },
+  metricsRow: { flexDirection: 'row', gap: 12 },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
+    padding: 18,
+    gap: 14,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   filterStrip: {
-    gap: theme.spacing.sm,
+    flexDirection: 'row',
+    gap: 8,
     paddingVertical: 2,
   },
   filterChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F7',
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
   },
   filterChipActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
   },
   filterChipText: {
-    fontSize: theme.typography.caption,
+    fontSize: 13,
     fontWeight: '600',
-    color: theme.colors.mutedForeground,
+    color: '#6E6E73',
   },
   filterChipTextActive: {
-    color: theme.colors.surface,
+    color: '#FFFFFF',
   },
+  stack: { gap: 12 },
   facultyCard: {
-    padding: theme.spacing.section,
-    gap: theme.spacing.sm,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadows.card,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
+    padding: 16,
+    gap: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   facultyCardSelected: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.blueContainer,
+    borderColor: '#0071E3',
+    borderWidth: 2,
   },
   rowHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing.md,
+    gap: 12,
+  },
+  bodyStrong: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  secondaryText: {
+    fontSize: 13,
+    color: '#6E6E73',
+  },
+  captionText: {
+    fontSize: 12,
+    color: '#6E6E73',
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   statsInline: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: theme.spacing.xs,
-  },
-  freePeriodsText: {
-    fontSize: theme.typography.caption,
-    fontWeight: '600',
-    color: theme.colors.mintInk,
-  },
-  progressTrack: {
-    height: theme.spacing.sm,
-    backgroundColor: theme.colors.muted,
-    borderRadius: theme.radius.control,
-    overflow: 'hidden',
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: theme.radius.full,
-  },
-  badgeText: {
-    fontSize: theme.typography.caption,
-    fontWeight: '600',
-  },
-  bodyText: {
-    fontSize: theme.typography.body,
-    color: theme.colors.foreground,
-  },
-  bodyStrong: {
-    fontSize: theme.typography.body,
-    fontWeight: '600',
-    color: theme.colors.foreground,
-  },
-  secondaryText: {
-    fontSize: theme.typography.secondary,
-    color: theme.colors.mutedForeground,
-  },
-  captionText: {
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-  },
-  tabletSplit: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: theme.spacing.section,
-  },
-  tabletListCol: {
-    flex: 1.2,
-    gap: theme.spacing.md,
-  },
-  tabletDetailCol: {
-    flex: 1,
+    justifyContent: 'space-between',
+    paddingTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(15, 23, 42, 0.08)',
   },
   detailCard: {
-    padding: theme.spacing.section,
-    gap: theme.spacing.section,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadows.card,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
+    padding: 18,
+    gap: 16,
   },
   detailName: {
-    fontSize: theme.typography.subheading,
-    fontWeight: '600',
-    color: theme.colors.foreground,
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   metricBox: {
     flex: 1,
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.control,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#F5F5F7',
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
     gap: 4,
   },
   metricNumber: {
-    fontSize: theme.typography.subheading,
-    fontWeight: '600',
-    color: theme.colors.primary,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    fontVariant: ['tabular-nums'],
   },
   groupHeading: {
-    fontSize: theme.typography.caption,
-    fontWeight: '600',
-    color: theme.colors.mutedForeground,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   breakdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: 'rgba(15, 23, 42, 0.08)',
   },
-  sheet: {
+  bodyText: {
+    fontSize: 13,
+    color: '#1D1D1F',
+  },
+  tabletSplit: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  tabletListCol: {
+    flex: 3,
+    gap: 12,
+  },
+  tabletDetailCol: {
+    flex: 2,
+  },
+  modalOverlay: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
   },
-  sheetContent: {
-    padding: theme.spacing.page,
-    gap: theme.spacing.section,
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  closeBtn: {
+    padding: 4,
   },
 });

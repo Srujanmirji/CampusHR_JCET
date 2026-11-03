@@ -111,7 +111,7 @@ export default function LoginScreen() {
         <Text accessibilityRole="header" style={styles.title}>
           Welcome back
         </Text>
-        <Text style={styles.secondary}>Your teaching day, in one place.</Text>
+        <Text style={styles.secondary}>Sign in to your campus workspace.</Text>
       </View>
       {!!(error || sessionError) && (
         <Text accessibilityRole="alert" style={styles.error}>
@@ -130,8 +130,8 @@ export default function LoginScreen() {
       <View style={styles.form}>
         <Input
           autoComplete="username"
-          label="Email or employee ID"
-          placeholder="JCET-CSE-021"
+          label="Employee ID or College Email"
+          placeholder="JCET-CSE-021 or name@jcethbl.edu.in"
           value={identifier}
           onChangeText={(value) => {
             setIdentifier(value);
@@ -199,16 +199,16 @@ export default function LoginScreen() {
           </Pressable>
         </View>
         <Button
-          accessibilityLabel="Sign in"
+          accessibilityLabel="Sign In"
           onPress={() => void submit()}
           loading={loading}
           fullWidth
         >
-          {loading ? 'Signing in…' : 'Sign in'}
+          {loading ? 'Signing in…' : 'Sign In'}
         </Button>
       </View>
       <Text style={styles.footer}>
-        Secure access for JCET faculty and staff.
+        Jain College of Engineering and Technology, Hubballi · CampusHR
       </Text>
       {__DEV__ && (
         <View style={styles.demos}>
