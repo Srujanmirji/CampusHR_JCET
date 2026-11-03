@@ -28,6 +28,7 @@ test('staging has its own identity, fixed HTTPS API and project linkage', () => 
   assert.equal(config.owner, staging.EXPO_ACCOUNT_OWNER);
   assert.equal(config.extra.eas.projectId, staging.EXPO_PUBLIC_EXPO_PROJECT_ID);
   assert.equal(config.extra.appVariant, 'staging');
+  assert.equal(config.android.package, 'in.jcet.campushr');
   assert.deepEqual(config.plugins, base.plugins);
   assert.equal(config.updates.enabled, false);
 });
