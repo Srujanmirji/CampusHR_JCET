@@ -82,14 +82,17 @@ export function createPushWorker(
               await request('send', [
                 {
                   to: device.token,
-                  title: 'CampusHR',
-                  body: 'You have a new update. Open CampusHR to view it.',
+                  title: job.notification.title || 'CampusHR',
+                  body:
+                    job.notification.body ||
+                    'You have a new update. Open CampusHR to view it.',
                   sound: 'default',
                   channelId: 'campushr',
                   ttl: 3600,
                   data: {
                     notificationId: job.notificationId,
                     recipientId: job.notification.userId,
+                    link: job.notification.link ?? undefined,
                   },
                 },
               ]),

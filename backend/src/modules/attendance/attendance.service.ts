@@ -1,5 +1,8 @@
 import { HttpError } from '../../common/http-error.js';
-import type { CorrectionStatus } from '../../generated/prisma/enums.js';
+import type {
+  AttendanceStatus,
+  CorrectionStatus,
+} from '../../generated/prisma/enums.js';
 import type { Access } from '../auth/auth.service.js';
 import type { Notifier } from '../notifications/notifications.service.js';
 import type {
@@ -10,6 +13,8 @@ import type {
 } from './attendance.repository.js';
 import type {
   AttendanceSettingsInput,
+  BiometricImportPayload,
+  BiometricSyncPayload,
   CorrectionRequestInput,
   ListAttendanceQuery,
   ManualRecordInput,
@@ -35,6 +40,40 @@ export interface CorrectionListResult {
     limit: number;
     totalPages: number;
   };
+}
+
+export interface BiometricSyncResult {
+  syncedCount: number;
+  unmatchedCount: number;
+  unmatchedCodes: string[];
+  recordsCreatedOrUpdated: number;
+  datesAffected: string[];
+  deviceId: string;
+}
+
+export interface BiometricImportResult {
+  importedCount: number;
+  unmatchedCount: number;
+  unmatchedCodes: string[];
+  recordsCreatedOrUpdated: number;
+}
+
+export interface BiometricDevice {
+  id: string;
+  name: string;
+  location: string;
+  ipAddress?: string;
+  status: 'ONLINE' | 'OFFLINE';
+  lastSyncAt: string | null;
+  model: string;
+}
+
+export interface BiometricStatsResult {
+  todayBiometricCount: number;
+  totalAttendanceToday: number;
+  recentPunches: AttendanceRecord[];
+  activeDevicesCount: number;
+  lastSyncTime: string | null;
 }
 
 export interface AttendanceService {
@@ -71,6 +110,15 @@ export interface AttendanceService {
     access: Access,
     input: AttendanceSettingsInput,
   ): Promise<AttendanceSettingsData>;
+  syncBiometricPunches(
+    payload: BiometricSyncPayload,
+    machineDeviceId?: string,
+  ): Promise<BiometricSyncResult>;
+  importBiometricRows(
+    payload: BiometricImportPayload,
+  ): Promise<BiometricImportResult>;
+  getBiometricStats(): Promise<BiometricStatsResult>;
+  getBiometricDevices(): Promise<BiometricDevice[]>;
 }
 
 function startOfDate(dateStr?: string | Date): Date {
@@ -401,6 +449,341 @@ export function createAttendanceService(
 
     async updateSettings(_access: Access, input: AttendanceSettingsInput) {
       return repo.updateSettings(input);
+    },
+
+    async syncBiometricPunches(
+      payload: BiometricSyncPayload,
+      machineDeviceId?: string,
+    ): Promise<BiometricSyncResult> {
+      const deviceId =
+        machineDeviceId || payload.deviceId || 'TERMINAL_MAIN_GATE';
+      const punches = payload.punches;
+      if (!punches.length) {
+        return {
+          syncedCount: 0,
+          unmatchedCount: 0,
+          unmatchedCodes: [],
+          recordsCreatedOrUpdated: 0,
+          datesAffected: [],
+          deviceId,
+        };
+      }
+
+      // 1. Gather all unique employee codes
+      const rawCodes = [...new Set(punches.map((p) => p.employeeCode.trim()))];
+      const employees = await repo.findEmployeesByCodes(rawCodes);
+      const employeeMap = new Map<
+        string,
+        { id: string; employeeCode: string }
+      >();
+      for (const emp of employees) {
+        employeeMap.set(emp.employeeCode.toUpperCase(), emp);
+      }
+
+      const settings = await repo.getSettings();
+      const [startHour, startMinute] = settings.workDayStart
+        .split(':')
+        .map(Number);
+
+      const unmatchedCodesSet = new Set<string>();
+      const groups = new Map<
+        string,
+        {
+          employeeId: string;
+          dateObj: Date;
+          punches: Array<{ time: Date; type: string }>;
+        }
+      >();
+
+      let matchedPunchesCount = 0;
+
+      for (const p of punches) {
+        const code = p.employeeCode.trim().toUpperCase();
+        const emp = employeeMap.get(code);
+        if (!emp) {
+          unmatchedCodesSet.add(p.employeeCode);
+          continue;
+        }
+
+        matchedPunchesCount++;
+        const punchTime = new Date(p.timestamp);
+        if (isNaN(punchTime.getTime())) continue;
+
+        const dateObj = startOfDate(punchTime);
+        const dateKey = `${emp.id}___${dateObj.toISOString().slice(0, 10)}`;
+
+        let group = groups.get(dateKey);
+        if (!group) {
+          group = { employeeId: emp.id, dateObj, punches: [] };
+          groups.set(dateKey, group);
+        }
+        group.punches.push({ time: punchTime, type: p.punchType });
+      }
+
+      const datesAffectedSet = new Set<string>();
+      let recordsCreatedOrUpdated = 0;
+
+      for (const group of groups.values()) {
+        const { employeeId, dateObj, punches: punchList } = group;
+        punchList.sort((a, b) => a.time.getTime() - b.time.getTime());
+
+        const candidateFirst = punchList[0];
+        const candidateLast =
+          punchList.length > 1 ? punchList[punchList.length - 1] : null;
+
+        const existing = await repo.findByEmployeeAndDate(employeeId, dateObj);
+
+        // Check-In calculation
+        let checkIn = candidateFirst.time;
+        if (existing?.checkIn) {
+          const existingIn = new Date(existing.checkIn);
+          checkIn =
+            existingIn < candidateFirst.time ? existingIn : candidateFirst.time;
+        }
+
+        // Check-Out calculation
+        let checkOut: Date | null = null;
+        if (candidateLast) {
+          checkOut = candidateLast.time;
+          if (existing?.checkOut) {
+            const existingOut = new Date(existing.checkOut);
+            checkOut =
+              existingOut > candidateLast.time
+                ? existingOut
+                : candidateLast.time;
+          }
+        } else if (candidateFirst.type === 'OUT') {
+          checkOut = candidateFirst.time;
+          if (existing?.checkIn) {
+            checkIn = new Date(existing.checkIn);
+          }
+        } else if (existing?.checkOut) {
+          checkOut = new Date(existing.checkOut);
+        }
+
+        // Status calculation
+        let status: AttendanceStatus;
+        if (existing?.status === 'ON_LEAVE') {
+          status = 'ON_LEAVE';
+        } else {
+          const expectedStart = new Date(dateObj);
+          expectedStart.setUTCHours(
+            startHour,
+            startMinute + settings.gracePeriodMinutes,
+            0,
+            0,
+          );
+
+          status = checkIn > expectedStart ? 'LATE' : 'PRESENT';
+
+          if (checkOut) {
+            const diffHours =
+              (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
+            if (diffHours < settings.halfDayHours) {
+              status = 'HALF_DAY';
+            }
+          }
+        }
+
+        const notes = payload.location
+          ? `Biometric terminal ${deviceId} (${payload.location})`
+          : `Biometric terminal ${deviceId}`;
+
+        await repo.upsertBiometricAttendance({
+          employeeId,
+          date: dateObj,
+          checkIn,
+          checkOut,
+          status,
+          source: 'BIOMETRIC',
+          notes,
+        });
+
+        recordsCreatedOrUpdated++;
+        datesAffectedSet.add(dateObj.toISOString().slice(0, 10));
+      }
+
+      return {
+        syncedCount: matchedPunchesCount,
+        unmatchedCount: unmatchedCodesSet.size,
+        unmatchedCodes: Array.from(unmatchedCodesSet),
+        recordsCreatedOrUpdated,
+        datesAffected: Array.from(datesAffectedSet),
+        deviceId,
+      };
+    },
+
+    async importBiometricRows(
+      payload: BiometricImportPayload,
+    ): Promise<BiometricImportResult> {
+      const rows = payload.rows;
+      if (!rows.length) {
+        return {
+          importedCount: 0,
+          unmatchedCount: 0,
+          unmatchedCodes: [],
+          recordsCreatedOrUpdated: 0,
+        };
+      }
+
+      const rawCodes = [...new Set(rows.map((r) => r.employeeCode.trim()))];
+      const employees = await repo.findEmployeesByCodes(rawCodes);
+      const employeeMap = new Map<
+        string,
+        { id: string; employeeCode: string }
+      >();
+      for (const emp of employees) {
+        employeeMap.set(emp.employeeCode.toUpperCase(), emp);
+      }
+
+      const settings = await repo.getSettings();
+      const [startHour, startMinute] = settings.workDayStart
+        .split(':')
+        .map(Number);
+
+      const unmatchedCodesSet = new Set<string>();
+      let recordsCreatedOrUpdated = 0;
+      let importedCount = 0;
+
+      for (const row of rows) {
+        const emp = employeeMap.get(row.employeeCode.trim().toUpperCase());
+        if (!emp) {
+          unmatchedCodesSet.add(row.employeeCode);
+          continue;
+        }
+
+        importedCount++;
+        const dateObj = startOfDate(row.date);
+        const checkIn = row.checkIn
+          ? new Date(row.checkIn)
+          : new Date(
+              Date.UTC(
+                dateObj.getUTCFullYear(),
+                dateObj.getUTCMonth(),
+                dateObj.getUTCDate(),
+                9,
+                0,
+                0,
+              ),
+            );
+        const checkOut = row.checkOut ? new Date(row.checkOut) : null;
+
+        let status: AttendanceStatus =
+          (row.status as AttendanceStatus) || 'PRESENT';
+        if (!row.status) {
+          const expectedStart = new Date(dateObj);
+          expectedStart.setUTCHours(
+            startHour,
+            startMinute + settings.gracePeriodMinutes,
+            0,
+            0,
+          );
+          if (checkIn > expectedStart) {
+            status = 'LATE';
+          } else {
+            status = 'PRESENT';
+          }
+
+          if (checkOut) {
+            const diffHours =
+              (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
+            if (diffHours < settings.halfDayHours) {
+              status = 'HALF_DAY';
+            }
+          }
+        }
+
+        await repo.upsertBiometricAttendance({
+          employeeId: emp.id,
+          date: dateObj,
+          checkIn,
+          checkOut,
+          status,
+          source: 'BIOMETRIC',
+          notes:
+            row.notes ||
+            `Log file import (${payload.deviceId || 'eTimeTrackLite'})`,
+        });
+
+        recordsCreatedOrUpdated++;
+      }
+
+      return {
+        importedCount,
+        unmatchedCount: unmatchedCodesSet.size,
+        unmatchedCodes: Array.from(unmatchedCodesSet),
+        recordsCreatedOrUpdated,
+      };
+    },
+
+    async getBiometricStats(): Promise<BiometricStatsResult> {
+      const today = startOfDate();
+      const stats = await repo.getBiometricStats(today);
+      const devices = await this.getBiometricDevices();
+      const activeDevicesCount = devices.filter(
+        (d) => d.status === 'ONLINE',
+      ).length;
+      const lastSyncTime = stats.recentPunches[0]?.updatedAt
+        ? new Date(stats.recentPunches[0].updatedAt).toISOString()
+        : null;
+
+      return {
+        todayBiometricCount: stats.todayCount,
+        totalAttendanceToday: stats.totalSyncedToday,
+        recentPunches: stats.recentPunches,
+        activeDevicesCount,
+        lastSyncTime,
+      };
+    },
+
+    async getBiometricDevices(): Promise<BiometricDevice[]> {
+      return [
+        {
+          id: 'JCET-BIO-01',
+          name: 'Main Gate Terminal 01',
+          location: 'Campus Main Entrance - Ground Floor',
+          ipAddress: '192.168.1.101',
+          status: 'ONLINE',
+          lastSyncAt: new Date().toISOString(),
+          model: 'eSSL SilkBio-101TC',
+        },
+        {
+          id: 'JCET-BIO-02',
+          name: 'Academic Block A Terminal 02',
+          location: 'Academic Block A - 1st Floor Foyer',
+          ipAddress: '192.168.1.102',
+          status: 'ONLINE',
+          lastSyncAt: new Date().toISOString(),
+          model: 'ZKTeco uFace800 Plus',
+        },
+        {
+          id: 'JCET-BIO-03',
+          name: 'Academic Block B Terminal 03',
+          location: 'Academic Block B - 1st Floor Foyer',
+          ipAddress: '192.168.1.103',
+          status: 'ONLINE',
+          lastSyncAt: new Date().toISOString(),
+          model: 'ZKTeco uFace800 Plus',
+        },
+        {
+          id: 'JCET-BIO-04',
+          name: 'Admin Block Terminal 04',
+          location: 'Administrative Block - Reception',
+          ipAddress: '192.168.1.104',
+          status: 'ONLINE',
+          lastSyncAt: new Date().toISOString(),
+          model: 'eSSL IN01-A',
+        },
+        {
+          id: 'JCET-BIO-05',
+          name: 'Library & Lab Terminal 05',
+          location: 'Central Library & CSE Labs - 2nd Floor',
+          ipAddress: '192.168.1.105',
+          status: 'ONLINE',
+          lastSyncAt: new Date().toISOString(),
+          model: 'eSSL SilkBio-101TC',
+        },
+      ];
     },
   };
 }

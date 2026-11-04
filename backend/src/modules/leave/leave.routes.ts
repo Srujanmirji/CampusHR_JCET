@@ -12,6 +12,8 @@ import {
   leaveTypeInputSchema,
   leaveTypeUpdateSchema,
   rejectSchema,
+  rolloverExecuteSchema,
+  rolloverQuerySchema,
 } from './leave.schema.js';
 import type { LeaveService } from './leave.service.js';
 
@@ -98,5 +100,27 @@ export function createLeaveRouter(auth: AuthService, leave: LeaveService) {
       res.json({
         data: await leave.cancel(access(res), requestId(req), req.ip),
       });
+    })
+    .get('/rollover/preview', ...canRead, async (req, res) => {
+      const query = parse(rolloverQuerySchema, req.query);
+      res.json({ data: await leave.previewRollover(access(res), query) });
+    })
+    .post('/rollover/execute', ...canManageTypes, async (req, res) => {
+      const input = parse(rolloverExecuteSchema, req.body);
+      res.json({
+        data: await leave.executeRollover(access(res), input, req.ip),
+      });
+    })
+    .get('/rollover/export', ...canRead, async (req, res) => {
+      const query = parse(rolloverQuerySchema, req.query);
+      const csv = await leave.exportRolloverCsv(access(res), query);
+      const fromYear = query.year;
+      const toYear = query.targetYear ?? fromYear + 1;
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="JCET_Leave_Rollover_${fromYear}_${toYear}.csv"`,
+      );
+      res.send(csv);
     });
 }

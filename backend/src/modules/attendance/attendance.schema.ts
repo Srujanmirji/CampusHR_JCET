@@ -76,3 +76,49 @@ export const listCorrectionsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
+
+export const biometricPunchItemSchema = z.object({
+  employeeCode: z.string().min(1, 'Employee code is required'),
+  timestamp: z.string().min(1, 'Timestamp is required'),
+  punchType: z.enum(['IN', 'OUT', 'AUTO']).default('AUTO'),
+  deviceId: z.string().optional(),
+  verificationType: z
+    .enum(['FINGERPRINT', 'FACE', 'RFID', 'MANUAL'])
+    .optional(),
+});
+
+export const biometricSyncPayloadSchema = z.object({
+  deviceId: z.string().optional().default('TERMINAL_MAIN_GATE'),
+  location: z.string().optional(),
+  punches: z
+    .array(biometricPunchItemSchema)
+    .min(1, 'At least one punch is required')
+    .max(5000),
+});
+
+export const biometricImportPayloadSchema = z.object({
+  deviceId: z.string().optional().default('CSV_IMPORT'),
+  rows: z
+    .array(
+      z.object({
+        employeeCode: z.string().min(1),
+        date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
+        checkIn: z.string().optional().nullable(),
+        checkOut: z.string().optional().nullable(),
+        status: z
+          .enum(['PRESENT', 'ABSENT', 'HALF_DAY', 'ON_LEAVE', 'LATE'])
+          .optional(),
+        notes: z.string().max(250).optional().nullable(),
+      }),
+    )
+    .min(1)
+    .max(5000),
+});
+
+export type BiometricPunchItem = z.infer<typeof biometricPunchItemSchema>;
+export type BiometricSyncPayload = z.infer<typeof biometricSyncPayloadSchema>;
+export type BiometricImportPayload = z.infer<
+  typeof biometricImportPayloadSchema
+>;

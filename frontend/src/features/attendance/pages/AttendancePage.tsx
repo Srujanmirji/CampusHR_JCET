@@ -34,6 +34,7 @@ import {
   FilterX,
   Building,
   Inbox,
+  Fingerprint,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCan, useScope } from '@/features/auth/hooks/useCan';
@@ -46,6 +47,7 @@ import {
 } from '../api/attendance';
 import { PunchCard } from '../components/PunchCard';
 import { CorrectionsQueueDrawer } from '../components/CorrectionsQueueDrawer';
+import { BiometricSyncModal } from '../components/BiometricSyncModal';
 
 export default function AttendancePage() {
   const can = useCan();
@@ -55,6 +57,7 @@ export default function AttendancePage() {
   const readScope = scopeOf('attendance.read');
   const isDeptScoped = readScope === 'department';
   const canApprove = can('attendance_correction.approve');
+  const canRecord = can('attendance.record');
 
   const { data: departments } = useQuery({
     queryKey: ['departments'],
@@ -71,6 +74,7 @@ export default function AttendancePage() {
   const todayIso = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState<string>(todayIso);
   const [queueOpen, setQueueOpen] = useState(false);
+  const [biometricModalOpen, setBiometricModalOpen] = useState(false);
 
   // 1. Fetch live attendance records
   const { data: attendanceResponse, isLoading } = useQuery({
@@ -234,6 +238,16 @@ export default function AttendancePage() {
         description="Daily biometric verification, punch logs, and departmental attendance monitoring."
         action={
           <div className="flex items-center gap-2">
+            {canRecord && (
+              <Button
+                variant="outline"
+                onClick={() => setBiometricModalOpen(true)}
+                className="border-emerald-600/30 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+              >
+                <Fingerprint className="mr-2 h-4 w-4 text-emerald-600" />
+                Biometric Sync
+              </Button>
+            )}
             {canApprove && (
               <Button
                 variant={pendingCount > 0 ? 'default' : 'outline'}
@@ -603,6 +617,14 @@ export default function AttendancePage() {
       {/* Corrections Queue Drawer for HOD / HR */}
       {canApprove && (
         <CorrectionsQueueDrawer open={queueOpen} onOpenChange={setQueueOpen} />
+      )}
+
+      {/* Biometric Machine Sync & Devices Modal */}
+      {canRecord && (
+        <BiometricSyncModal
+          open={biometricModalOpen}
+          onOpenChange={setBiometricModalOpen}
+        />
       )}
     </PageTransition>
   );

@@ -67,7 +67,9 @@ export function RequestsTable({
                 >
                   {request.leaveType.code}
                 </span>
-                <span className="font-medium text-foreground">{request.leaveType.name}</span>
+                <span className="font-medium text-foreground">
+                  {request.leaveType.name}
+                </span>
               </div>
             </TableCell>
             <TableCell>{leaveDates(request)}</TableCell>

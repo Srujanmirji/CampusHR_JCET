@@ -64,13 +64,48 @@ export interface RestrictedHolidayOption {
 }
 
 export const JCET_RESTRICTED_HOLIDAYS: readonly RestrictedHolidayOption[] = [
-  { id: 'rh-shivaratri', name: 'Maha Shivaratri', date: '2026-02-16', dayOfWeek: 'Monday' },
-  { id: 'rh-ugadi', name: 'Chandramana Ugadi', date: '2026-03-20', dayOfWeek: 'Friday' },
-  { id: 'rh-good-friday', name: 'Good Friday', date: '2026-04-03', dayOfWeek: 'Friday' },
-  { id: 'rh-varamahalakshmi', name: 'Varamahalakshmi Vrata', date: '2026-08-28', dayOfWeek: 'Friday' },
-  { id: 'rh-janmashtami', name: 'Krishna Janmashtami', date: '2026-09-04', dayOfWeek: 'Friday' },
-  { id: 'rh-guru-nanak', name: 'Guru Nanak Jayanti', date: '2026-11-24', dayOfWeek: 'Tuesday' },
-  { id: 'rh-christmas-eve', name: 'Christmas Eve', date: '2026-12-24', dayOfWeek: 'Thursday' },
+  {
+    id: 'rh-shivaratri',
+    name: 'Maha Shivaratri',
+    date: '2026-02-16',
+    dayOfWeek: 'Monday',
+  },
+  {
+    id: 'rh-ugadi',
+    name: 'Chandramana Ugadi',
+    date: '2026-03-20',
+    dayOfWeek: 'Friday',
+  },
+  {
+    id: 'rh-good-friday',
+    name: 'Good Friday',
+    date: '2026-04-03',
+    dayOfWeek: 'Friday',
+  },
+  {
+    id: 'rh-varamahalakshmi',
+    name: 'Varamahalakshmi Vrata',
+    date: '2026-08-28',
+    dayOfWeek: 'Friday',
+  },
+  {
+    id: 'rh-janmashtami',
+    name: 'Krishna Janmashtami',
+    date: '2026-09-04',
+    dayOfWeek: 'Friday',
+  },
+  {
+    id: 'rh-guru-nanak',
+    name: 'Guru Nanak Jayanti',
+    date: '2026-11-24',
+    dayOfWeek: 'Tuesday',
+  },
+  {
+    id: 'rh-christmas-eve',
+    name: 'Christmas Eve',
+    date: '2026-12-24',
+    dayOfWeek: 'Thursday',
+  },
 ];
 
 /**
@@ -90,7 +125,8 @@ export const JCET_VACATION_PERIODS: readonly VacationPeriodOption[] = [
     name: 'Even Semester Summer Vacation 2026',
     startDate: '2026-06-15',
     endDate: '2026-07-15',
-    description: 'Annual summer vacation for eligible teaching faculty upon completion of semester exams.',
+    description:
+      'Annual summer vacation for eligible teaching faculty upon completion of semester exams.',
   },
   {
     id: 'vac-winter-2026',
@@ -139,7 +175,12 @@ export interface JcetLeavePolicy {
   maximumConsecutiveDays: number;
   approvalChain: RoleName[];
   /** Treated attendance status when approved. OOD and ODE map to Official Duty (never absent). */
-  attendanceStatus: 'Leave' | 'Medical / Special Leave' | 'Official Duty' | 'Restricted Holiday' | 'Vacation Leave';
+  attendanceStatus:
+    | 'Leave'
+    | 'Medical / Special Leave'
+    | 'Official Duty'
+    | 'Restricted Holiday'
+    | 'Vacation Leave';
   affectsTimetable: boolean;
   requiresCoverage: boolean;
   applicableEmployeeTypes: ('TEACHING' | 'NON_TEACHING')[];
@@ -183,7 +224,8 @@ export const JCET_LEAVE_TYPES: readonly JcetLeavePolicy[] = [
   {
     code: 'EL',
     name: 'Earned Leave',
-    description: 'Earned through continuous service periods as per university norms.',
+    description:
+      'Earned through continuous service periods as per university norms.',
     annualEntitlement: 10,
     carryForwardAllowed: true,
     carryForwardLimit: 15,
@@ -204,7 +246,8 @@ export const JCET_LEAVE_TYPES: readonly JcetLeavePolicy[] = [
   {
     code: 'SPL_ML',
     name: 'Special / Medical Leave',
-    description: 'Medical exigencies or special institutional approvals. Supporting medical certificate required.',
+    description:
+      'Medical exigencies or special institutional approvals. Supporting medical certificate required.',
     annualEntitlement: null, // "As per policy"
     carryForwardAllowed: false,
     carryForwardLimit: 0,
@@ -225,7 +268,8 @@ export const JCET_LEAVE_TYPES: readonly JcetLeavePolicy[] = [
   {
     code: 'OOD',
     name: 'On Official Duty',
-    description: 'Official institutional or academic assignments (VTU work, meetings, conferences, committee duty).',
+    description:
+      'Official institutional or academic assignments (VTU work, meetings, conferences, committee duty).',
     annualEntitlement: 12,
     carryForwardAllowed: false,
     carryForwardLimit: 0,
@@ -246,7 +290,8 @@ export const JCET_LEAVE_TYPES: readonly JcetLeavePolicy[] = [
   {
     code: 'ODE',
     name: 'Official / Examination Duty',
-    description: 'Examination and valuation assignments (VTU invigilation, valuation center assignment, flying squad).',
+    description:
+      'Examination and valuation assignments (VTU invigilation, valuation center assignment, flying squad).',
     annualEntitlement: 12,
     carryForwardAllowed: false,
     carryForwardLimit: 0,
@@ -267,7 +312,8 @@ export const JCET_LEAVE_TYPES: readonly JcetLeavePolicy[] = [
   {
     code: 'RH',
     name: 'Restricted Holiday',
-    description: 'Institutional optional holidays selected from the approved JCET restricted holiday calendar.',
+    description:
+      'Institutional optional holidays selected from the approved JCET restricted holiday calendar.',
     annualEntitlement: null, // "As per policy"
     carryForwardAllowed: false,
     carryForwardLimit: 0,
@@ -288,7 +334,8 @@ export const JCET_LEAVE_TYPES: readonly JcetLeavePolicy[] = [
   {
     code: 'VL',
     name: 'Vacation Leave',
-    description: 'Semester-break vacation for eligible faculty as declared by the Principal / VTU calendar.',
+    description:
+      'Semester-break vacation for eligible faculty as declared by the Principal / VTU calendar.',
     annualEntitlement: null, // "As per policy"
     carryForwardAllowed: false,
     carryForwardLimit: 0,

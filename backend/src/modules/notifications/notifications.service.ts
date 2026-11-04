@@ -100,6 +100,10 @@ export function createNotificationService(
   return {
     notifier,
 
+    async sendDirect(userId: string, notification: NewNotification) {
+      await send([userId], notification);
+    },
+
     async list(access: Access, query: ListQuery) {
       const rows = await repo.list(access.userId, query.after, query.limit + 1);
       return {

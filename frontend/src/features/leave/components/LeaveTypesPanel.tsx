@@ -22,11 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -122,7 +118,8 @@ export function LeaveTypesPanel() {
               {types.data.map((type) => {
                 const theme = getLeaveTheme(type.code);
                 const isPolicyBased = type.yearlyQuota === null;
-                const isOfficialDuty = type.code === 'OOD' || type.code === 'ODE';
+                const isOfficialDuty =
+                  type.code === 'OOD' || type.code === 'ODE';
 
                 return (
                   <TableRow key={type.id}>
@@ -134,7 +131,9 @@ export function LeaveTypesPanel() {
                           {type.code}
                         </span>
                         <div>
-                          <span className="font-medium text-foreground">{type.name}</span>
+                          <span className="font-medium text-foreground">
+                            {type.name}
+                          </span>
                           {type.description && (
                             <span className="block text-xs text-muted-foreground line-clamp-1">
                               {type.description}
@@ -162,7 +161,12 @@ export function LeaveTypesPanel() {
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          {type.attendanceStatus || (type.code === 'RH' ? 'Restricted Holiday' : type.code === 'VL' ? 'Vacation Leave' : 'Leave')}
+                          {type.attendanceStatus ||
+                            (type.code === 'RH'
+                              ? 'Restricted Holiday'
+                              : type.code === 'VL'
+                                ? 'Vacation Leave'
+                                : 'Leave')}
                         </span>
                       )}
                     </TableCell>
@@ -176,7 +180,9 @@ export function LeaveTypesPanel() {
                     </TableCell>
 
                     <TableCell className="text-xs">
-                      {type.affectsTimetable !== false ? 'Smart Substitution' : 'None'}
+                      {type.affectsTimetable !== false
+                        ? 'Smart Substitution'
+                        : 'None'}
                     </TableCell>
 
                     <TableCell>
@@ -311,14 +317,21 @@ function EditLeaveTypeDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <SlidersHorizontal className="size-5" />
-            {type ? `Configure ${type.name} (${type.code})` : 'Add Leave Category'}
+            {type
+              ? `Configure ${type.name} (${type.code})`
+              : 'Add Leave Category'}
           </DialogTitle>
           <DialogDescription>
-            Configure JCET institutional rules, attendance treatment, and quotas.
+            Configure JCET institutional rules, attendance treatment, and
+            quotas.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={submit} className="flex flex-col gap-4 text-xs" noValidate>
+        <form
+          onSubmit={submit}
+          className="flex flex-col gap-4 text-xs"
+          noValidate
+        >
           <div className="grid grid-cols-[6rem_1fr] gap-3">
             <Field>
               <FieldLabel htmlFor="type-code">Code</FieldLabel>
@@ -356,18 +369,24 @@ function EditLeaveTypeDialog({
           {/* Quota and As per policy toggle */}
           <div className="rounded-xl border bg-muted/30 p-3 flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-foreground">Annual Entitlement</span>
+              <span className="font-semibold text-foreground">
+                Annual Entitlement
+              </span>
               <label className="flex items-center gap-2 cursor-pointer font-medium text-foreground">
                 <Checkbox
                   checked={asPerPolicy}
-                  onCheckedChange={(checked) => setAsPerPolicy(checked === true)}
+                  onCheckedChange={(checked) =>
+                    setAsPerPolicy(checked === true)
+                  }
                 />
                 As per policy (no fixed quota)
               </label>
             </div>
             {!asPerPolicy && (
               <Field>
-                <FieldLabel htmlFor="type-quota">Days per calendar year</FieldLabel>
+                <FieldLabel htmlFor="type-quota">
+                  Days per calendar year
+                </FieldLabel>
                 <Input
                   id="type-quota"
                   inputMode="decimal"
@@ -380,28 +399,44 @@ function EditLeaveTypeDialog({
 
           {/* Attendance Status Treatment */}
           <Field>
-            <FieldLabel htmlFor="type-attendance">Attendance Treatment</FieldLabel>
-            <Select value={attendanceStatus} onValueChange={setAttendanceStatus}>
+            <FieldLabel htmlFor="type-attendance">
+              Attendance Treatment
+            </FieldLabel>
+            <Select
+              value={attendanceStatus}
+              onValueChange={setAttendanceStatus}
+            >
               <SelectTrigger id="type-attendance">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Leave">Leave (Normal personal absence)</SelectItem>
-                <SelectItem value="Official Duty">Official Duty (OOD / ODE — NOT absent)</SelectItem>
-                <SelectItem value="Medical / Special Leave">Medical / Special Leave</SelectItem>
-                <SelectItem value="Restricted Holiday">Restricted Holiday</SelectItem>
+                <SelectItem value="Leave">
+                  Leave (Normal personal absence)
+                </SelectItem>
+                <SelectItem value="Official Duty">
+                  Official Duty (OOD / ODE — NOT absent)
+                </SelectItem>
+                <SelectItem value="Medical / Special Leave">
+                  Medical / Special Leave
+                </SelectItem>
+                <SelectItem value="Restricted Holiday">
+                  Restricted Holiday
+                </SelectItem>
                 <SelectItem value="Vacation Leave">Vacation Leave</SelectItem>
               </SelectContent>
             </Select>
             <FieldDescription>
-              Determines how approved records reflect in biometric logs and executive attendance rate.
+              Determines how approved records reflect in biometric logs and
+              executive attendance rate.
             </FieldDescription>
           </Field>
 
           {/* Operational Rules */}
           <div className="grid grid-cols-2 gap-3">
             <Field>
-              <FieldLabel htmlFor="type-min-notice">Minimum Notice (days)</FieldLabel>
+              <FieldLabel htmlFor="type-min-notice">
+                Minimum Notice (days)
+              </FieldLabel>
               <Input
                 id="type-min-notice"
                 type="number"
@@ -410,7 +445,9 @@ function EditLeaveTypeDialog({
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="type-max-days">Max Consecutive Days</FieldLabel>
+              <FieldLabel htmlFor="type-max-days">
+                Max Consecutive Days
+              </FieldLabel>
               <Input
                 id="type-max-days"
                 type="number"
@@ -422,7 +459,9 @@ function EditLeaveTypeDialog({
 
           {/* Carry forward rules */}
           <Field>
-            <FieldLabel htmlFor="type-carry">Carry-forward limit (days)</FieldLabel>
+            <FieldLabel htmlFor="type-carry">
+              Carry-forward limit (days)
+            </FieldLabel>
             <Input
               id="type-carry"
               inputMode="decimal"
@@ -446,21 +485,27 @@ function EditLeaveTypeDialog({
             <label className="flex items-center gap-2 cursor-pointer">
               <Checkbox
                 checked={attachmentRequired}
-                onCheckedChange={(checked) => setAttachmentRequired(checked === true)}
+                onCheckedChange={(checked) =>
+                  setAttachmentRequired(checked === true)
+                }
               />
               Require supporting document / allotment order
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <Checkbox
                 checked={reasonRequired}
-                onCheckedChange={(checked) => setReasonRequired(checked === true)}
+                onCheckedChange={(checked) =>
+                  setReasonRequired(checked === true)
+                }
               />
               Require application reason
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <Checkbox
                 checked={affectsTimetable}
-                onCheckedChange={(checked) => setAffectsTimetable(checked === true)}
+                onCheckedChange={(checked) =>
+                  setAffectsTimetable(checked === true)
+                }
               />
               Triggers academic impact detection & smart substitution
             </label>
@@ -484,7 +529,9 @@ function EditLeaveTypeDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={save.isPending}>
-              {save.isPending && <LoaderCircle className="animate-spin size-4" />}
+              {save.isPending && (
+                <LoaderCircle className="animate-spin size-4" />
+              )}
               Save Policy
             </Button>
           </DialogFooter>

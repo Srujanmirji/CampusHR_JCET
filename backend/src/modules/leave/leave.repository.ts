@@ -227,6 +227,40 @@ export function createLeaveRepository(prisma: PrismaClient) {
         return after;
       });
     },
+    activeEmployees(departmentId?: number) {
+      return prisma.employee.findMany({
+        where: {
+          status: 'ACTIVE',
+          ...(departmentId ? { departmentId } : {}),
+        },
+        select: {
+          id: true,
+          employeeCode: true,
+          firstName: true,
+          lastName: true,
+          joiningDate: true,
+          departmentId: true,
+          department: { select: { id: true, code: true, name: true } },
+        },
+        orderBy: [{ departmentId: 'asc' }, { employeeCode: 'asc' }],
+      });
+    },
+    allTaken(employeeIds: string[]) {
+      return prisma.leaveRequest.findMany({
+        where: {
+          employeeId: { in: employeeIds },
+          status: { in: ['PENDING' as const, 'APPROVED' as const] },
+        },
+        select: {
+          employeeId: true,
+          leaveTypeId: true,
+          startDate: true,
+          endDate: true,
+          days: true,
+          status: true,
+        },
+      });
+    },
   };
 }
 
