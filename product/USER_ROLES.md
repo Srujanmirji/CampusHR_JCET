@@ -81,6 +81,9 @@ The key is `resource.action.<scope>`, e.g. `leave.approve.department`.
 | **Smart substitution**                          |             |          |           |     |         |                    |
 | `substitution.read`                             |      A      |    —     |     A     |  D  |    O    |         —          |
 | `substitution.assign`                           |      A      |    —     |     —     |  D  |    —    |         —          |
+| **Exam duty**                                    |             |          |           |     |         |                    |
+| `exam_duty.read`                                 |      A      |    A     |     A     |  D  |    O    |         —          |
+| `exam_duty.manage`                               |      A      |    A     |     A     |  D  |    —    |         —          |
 | **Documents**                                   |             |          |           |     |         |                    |
 | `document.upload`                               |      —      |    O     |     O     |  O  |    O    |         O          |
 | `document.read` ³                               |      A      |    A     |     —     |  O  |    O    |         O          |
@@ -91,6 +94,9 @@ The key is `resource.action.<scope>`, e.g. `leave.approve.department`.
 | **Notifications**                               |             |          |           |     |         |                    |
 | `notification.read`                             |      O      |    O     |     O     |  O  |    O    |         O          |
 | `announcement.send`                             |      A      |    A     |     A     |  D  |    —    |         —          |
+| **Digital circulars**                            |             |          |           |     |         |                    |
+| `circular.read`                                  |      A      |    A     |     A     |  A  |    A    |         A          |
+| `circular.manage`                                |      A      |    A     |     A     |  D  |    —    |         —          |
 | **Reports**                                     |             |          |           |     |         |                    |
 | `report.read` (includes export)                 |      A      |    A     |     A     |  D  |    —    |         —          |
 | **Recruitment** (Phase 6)                       |             |          |           |     |         |                    |

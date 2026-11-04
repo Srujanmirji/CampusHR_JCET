@@ -54,6 +54,12 @@ import { createUserService } from './modules/users/users.service.js';
 import { createWorkloadRepository } from './modules/workload/workload.repository.js';
 import { createWorkloadRouter } from './modules/workload/workload.routes.js';
 import { createWorkloadService } from './modules/workload/workload.service.js';
+import { createExamDutyRepository } from './modules/exam-duty/exam-duty.repository.js';
+import { createExamDutyService } from './modules/exam-duty/exam-duty.service.js';
+import { createExamDutyRouter } from './modules/exam-duty/exam-duty.routes.js';
+import { createCircularRepository } from './modules/circulars/circulars.repository.js';
+import { createCircularService } from './modules/circulars/circulars.service.js';
+import { createCircularRouter } from './modules/circulars/circulars.routes.js';
 
 // The built web app (`npm run build --workspace @campushr/web`). In production
 // the API serves it from the same address, so the SameSite=Strict refresh
@@ -230,6 +236,26 @@ export function createApp(
     createWorkloadRouter(
       auth,
       createWorkloadService(createWorkloadRepository(prisma)),
+    ),
+  );
+  app.use(
+    '/api/v1/exam-duty',
+    createExamDutyRouter(
+      auth,
+      createExamDutyService(
+        createExamDutyRepository(prisma),
+        notifications.notifier,
+      ),
+    ),
+  );
+  app.use(
+    '/api/v1/circulars',
+    createCircularRouter(
+      auth,
+      createCircularService(
+        createCircularRepository(prisma),
+        notifications.notifier,
+      ),
     ),
   );
   if (env.NODE_ENV === 'production' && existsSync(webDir)) {

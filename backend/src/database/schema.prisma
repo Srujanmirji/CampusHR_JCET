@@ -63,6 +63,8 @@ model User {
   notifications         Notification[]
   attendanceReviewed    AttendanceCorrection[] @relation("AttendanceReviewed")
   documentsReviewed     Document[]             @relation("DocumentReviewed")
+  circularsAuthored     Circular[]             @relation("CircularAuthor")
+  circularReceipts      CircularReadReceipt[]
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt             DateTime         @updatedAt @map("updated_at")
   passwordResets        PasswordResetChallenge[]
@@ -129,6 +131,7 @@ model Department {
   subjects      Subject[]
   timetable     TimetableEntry[]
   leaveRequests LeaveRequest[]
+  circulars     Circular[]       @relation("DepartmentCirculars")
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
@@ -176,6 +179,8 @@ model Employee {
   attendance            Attendance[]
   attendanceCorrections AttendanceCorrection[]
   documents             Document[]
+  examDuties            ExamDuty[]             @relation("ExamDutyFaculty")
+  examDutySwapTarget    ExamDuty[]             @relation("ExamDutySwapTarget")
 
   @@index([departmentId])
   @@index([status])
@@ -254,8 +259,9 @@ model Subject {
 model Room {
   id      Int              @id @default(autoincrement())
   name    String           @unique
-  kind    RoomKind
-  entries TimetableEntry[]
+  kind       RoomKind
+  entries    TimetableEntry[]
+  examDuties ExamDuty[]
 
   @@map("rooms")
 }
@@ -644,3 +650,163 @@ model PasswordResetThrottle {
 
   @@map("password_reset_throttles")
 }
+
+// ----------------------------------------------------
+// Exam Duty & Invigilation Allotment Module
+// ----------------------------------------------------
+
+enum ExamType {
+  VTU_SEMESTER
+  INTERNAL_ASSESSMENT
+  LAB_EXAM
+}
+
+enum ExamSessionStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum ExamDutySession {
+  MORNING
+  AFTERNOON
+}
+
+enum ExamDutyRole {
+  CHIEF_SUPERINTENDENT
+  DEPUTY_CHIEF
+  INVIGILATOR
+  RELIEVER
+  SQUAD
+}
+
+enum ExamDutyStatus {
+  ASSIGNED
+  CONFIRMED
+  SWAP_REQUESTED
+  SWAPPED
+  ABSENT
+  COMPLETED
+}
+
+enum ExamDutySwapStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ExamSession {
+  id           String            @id @default(uuid()) @db.Uuid
+  name         String
+  academicYear String            @map("academic_year")
+  examType     ExamType          @default(VTU_SEMESTER) @map("exam_type")
+  startDate    DateTime          @map("start_date") @db.Date
+  endDate      DateTime          @map("end_date") @db.Date
+  status       ExamSessionStatus @default(ACTIVE)
+  notes        String?
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  duties       ExamDuty[]
+
+  @@map("exam_sessions")
+}
+
+model ExamDuty {
+  id                String              @id @default(uuid()) @db.Uuid
+  sessionId         String              @map("session_id") @db.Uuid
+  session           ExamSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  date              DateTime            @db.Date
+  sessionTime       ExamDutySession     @default(MORNING) @map("session_time")
+  reportingTime     String              @default("09:00 AM") @map("reporting_time")
+  roomId            Int?                @map("room_id")
+  room              Room?               @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  facultyId         String              @map("faculty_id") @db.Uuid
+  faculty           Employee            @relation("ExamDutyFaculty", fields: [facultyId], references: [id], onDelete: Restrict)
+  role              ExamDutyRole        @default(INVIGILATOR)
+  status            ExamDutyStatus      @default(ASSIGNED)
+  swapWithFacultyId String?             @map("swap_with_faculty_id") @db.Uuid
+  swapWithFaculty   Employee?           @relation("ExamDutySwapTarget", fields: [swapWithFacultyId], references: [id], onDelete: SetNull)
+  swapReason        String?             @map("swap_reason")
+  swapStatus        ExamDutySwapStatus? @map("swap_status")
+  remarks           String?
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  @@unique([facultyId, date, sessionTime])
+  @@index([sessionId])
+  @@index([date])
+  @@index([facultyId])
+  @@map("exam_duties")
+}
+
+// ----------------------------------------------------
+// Digital Circulars & Institutional Notice Board Module
+// ----------------------------------------------------
+
+enum CircularCategory {
+  ACADEMIC
+  ADMINISTRATIVE
+  HOLIDAY
+  VTU_NOTIFICATION
+  EXAMINATION
+  EVENT
+  URGENT
+}
+
+enum CircularPriority {
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum CircularAudience {
+  ALL
+  TEACHING_ONLY
+  NON_TEACHING_ONLY
+  DEPARTMENT
+}
+
+model Circular {
+  id                 String                @id @default(uuid()) @db.Uuid
+  circularNumber     String                @unique @map("circular_number")
+  title              String
+  content            String                @db.Text
+  category           CircularCategory      @default(ADMINISTRATIVE)
+  priority           CircularPriority      @default(NORMAL)
+  targetAudience     CircularAudience      @default(ALL) @map("target_audience")
+  targetDepartmentId Int?                  @map("target_department_id")
+  targetDepartment   Department?           @relation("DepartmentCirculars", fields: [targetDepartmentId], references: [id], onDelete: SetNull)
+  attachmentUrl      String?               @map("attachment_url")
+  attachmentName     String?               @map("attachment_name")
+  isPublished        Boolean               @default(true) @map("is_published")
+  publishedAt        DateTime              @default(now()) @map("published_at")
+  expiresAt          DateTime?             @map("expires_at")
+  createdById        String                @map("created_by_id") @db.Uuid
+  createdBy          User                  @relation("CircularAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+  receipts           CircularReadReceipt[]
+
+  @@index([publishedAt])
+  @@index([category])
+  @@index([targetAudience])
+  @@map("circulars")
+}
+
+model CircularReadReceipt {
+  id         String   @id @default(uuid()) @db.Uuid
+  circularId String   @map("circular_id") @db.Uuid
+  circular   Circular @relation(fields: [circularId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id") @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt     DateTime @default(now()) @map("read_at")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+
+  @@unique([circularId, userId])
+  @@index([circularId])
+  @@index([userId])
+  @@map("circular_read_receipts")
+}
+

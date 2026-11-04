@@ -11,6 +11,8 @@ import {
   Bell,
   Settings,
   Files,
+  GraduationCap,
+  ScrollText,
 } from 'lucide-react';
 
 // `permission` (product/USER_ROLES.md) decides who sees each page; the
@@ -85,6 +87,20 @@ export const navigation: {
     group: 'People & academics',
   },
   {
+    path: '/exam-duty',
+    permission: 'exam_duty.read',
+    label: 'Exam Duty Allotment',
+    icon: GraduationCap,
+    group: 'People & academics',
+  },
+  {
+    path: '/circulars',
+    permission: 'circular.read',
+    label: 'Digital Circulars',
+    icon: ScrollText,
+    group: 'Administration',
+  },
+  {
     path: '/reports',
     permission: 'report.read',
     label: 'Reports',
@@ -135,6 +151,13 @@ export const facultyNavigation: {
     group: 'My Academics',
   },
   {
+    path: '/exam-duty',
+    permission: 'exam_duty.read',
+    label: 'My Exam Duties',
+    icon: GraduationCap,
+    group: 'My Academics',
+  },
+  {
     path: '/attendance',
     permission: 'attendance.read',
     label: 'My Attendance',
@@ -154,6 +177,13 @@ export const facultyNavigation: {
     label: 'My Documents',
     icon: Files,
     group: 'My Services',
+  },
+  {
+    path: '/circulars',
+    permission: 'circular.read',
+    label: 'Notice Board',
+    icon: ScrollText,
+    group: 'Communication',
   },
   {
     path: '/notifications',
@@ -199,6 +229,13 @@ export const hodNavigation: {
     group: 'Academic Operations',
   },
   {
+    path: '/exam-duty',
+    permission: 'exam_duty.read',
+    label: 'Exam Duty & Swaps',
+    icon: GraduationCap,
+    group: 'Academic Operations',
+  },
+  {
     path: '/employees',
     permission: 'employee.read',
     label: 'Faculty Directory',
@@ -231,6 +268,13 @@ export const hodNavigation: {
     permission: 'report.read',
     label: 'Department Reports',
     icon: ChartColumn,
+    group: 'Administration',
+  },
+  {
+    path: '/circulars',
+    permission: 'circular.read',
+    label: 'Circulars & Notices',
+    icon: ScrollText,
     group: 'Administration',
   },
   {
@@ -270,6 +314,13 @@ export const principalNavigation: {
     group: 'Academic Governance',
   },
   {
+    path: '/exam-duty',
+    permission: 'exam_duty.read',
+    label: 'Exam Duty Allotments',
+    icon: GraduationCap,
+    group: 'Academic Governance',
+  },
+  {
     path: '/departments',
     permission: 'department.read',
     label: 'Academic Departments',
@@ -302,6 +353,13 @@ export const principalNavigation: {
     permission: 'report.read',
     label: 'Executive Reports',
     icon: ChartColumn,
+    group: 'Executive & Reports',
+  },
+  {
+    path: '/circulars',
+    permission: 'circular.read',
+    label: 'Institutional Circulars',
+    icon: ScrollText,
     group: 'Executive & Reports',
   },
   {
@@ -346,6 +404,13 @@ export const nonTeachingNavigation: {
     label: 'My Documents',
     icon: Files,
     group: 'My Services & Duties',
+  },
+  {
+    path: '/circulars',
+    permission: 'circular.read',
+    label: 'Campus Circulars',
+    icon: ScrollText,
+    group: 'Communication',
   },
   {
     path: '/notifications',

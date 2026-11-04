@@ -59,6 +59,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: '/exam-duty',
+        lazy: page(() => import('@/features/exam-duty/pages/ExamDutyPage')),
+      },
+      {
+        path: '/circulars',
+        lazy: page(() => import('@/features/circulars/pages/CircularsPage')),
+      },
+      {
         path: '/reports',
         lazy: page(() => import('@/features/reports/pages/ReportsPage')),
       },
