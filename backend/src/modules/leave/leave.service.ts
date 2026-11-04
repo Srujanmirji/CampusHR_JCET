@@ -15,7 +15,47 @@ import type {
   LeaveListQuery,
   LeaveTypeInput,
   LeaveTypeUpdate,
+  RolloverExecuteInput,
+  RolloverQuery,
 } from './leave.schema.js';
+
+export interface EmployeeRolloverRecord {
+  employeeId: string;
+  employeeCode: string;
+  name: string;
+  department: { id: number; code: string; name: string };
+  joiningDate: string;
+  balances: Array<{
+    leaveTypeId: number;
+    leaveTypeCode: string;
+    leaveTypeName: string;
+    yearlyQuota: number | null;
+    carryForwardMax: number;
+    closingBalance: number | null;
+    carriedForward: number;
+    lapsed: number;
+    encashed: number;
+    nextYearOpening: number | null;
+  }>;
+}
+
+export interface RolloverSummary {
+  fromYear: number;
+  toYear: number;
+  totalEmployees: number;
+  totalDaysCarriedForward: number;
+  totalDaysLapsed: number;
+  totalDaysEncashed: number;
+  departmentSummaries: Array<{
+    departmentCode: string;
+    departmentName: string;
+    employeeCount: number;
+    carriedForward: number;
+    lapsed: number;
+    encashed: number;
+  }>;
+  records: EmployeeRolloverRecord[];
+}
 
 const invalid = (message: string) =>
   new HttpError(400, 'VALIDATION_ERROR', message);
@@ -130,10 +170,10 @@ type RequestDto = ReturnType<typeof toRequestDto>;
 const summary = (request: RequestDto) =>
   `${request.leaveType.name} · ${request.startDate === request.endDate ? request.startDate : `${request.startDate} to ${request.endDate}`} · ${formatDays(request.days)}`;
 
-export function createLeaveService(repo: LeaveRepository, notifier: Notifier) {
+export function createLeaveService(repo: LeaveRepository, notifier?: Notifier) {
   /** Tells whoever acts next that a request waits for them. */
   const notifyApprovers = (request: RequestDto) =>
-    request.pendingRole
+    request.pendingRole && notifier
       ? notifier.notifyRole(
           request.pendingRole,
           request.department.id,
@@ -375,22 +415,24 @@ export function createLeaveService(repo: LeaveRepository, notifier: Notifier) {
       if (!after) throw changed();
       const dto = toRequestDto(after);
       const link = `/leave?tab=mine&request=${dto.id}`;
-      await notifier.notifyEmployee(dto.employee.id, {
-        kind: `leave.${dto.status === 'PENDING' ? 'progress' : dto.status.toLowerCase()}`,
-        title:
-          dto.status === 'APPROVED'
-            ? 'Leave approved'
-            : dto.status === 'REJECTED'
-              ? 'Leave rejected'
-              : `Leave approved by the ${role}`,
-        body:
-          dto.status === 'REJECTED'
-            ? `${summary(dto)}. ${note ?? ''}`.trim()
-            : dto.status === 'PENDING'
-              ? `${summary(dto)}. Now with the ${dto.pendingRole}.`
-              : summary(dto),
-        link,
-      });
+      if (notifier) {
+        await notifier.notifyEmployee(dto.employee.id, {
+          kind: `leave.${dto.status === 'PENDING' ? 'progress' : dto.status.toLowerCase()}`,
+          title:
+            dto.status === 'APPROVED'
+              ? 'Leave approved'
+              : dto.status === 'REJECTED'
+                ? 'Leave rejected'
+                : `Leave approved by the ${role}`,
+          body:
+            dto.status === 'REJECTED'
+              ? `${summary(dto)}. ${note ?? ''}`.trim()
+              : dto.status === 'PENDING'
+                ? `${summary(dto)}. Now with the ${dto.pendingRole}.`
+                : summary(dto),
+          link,
+        });
+      }
       await notifyApprovers(dto);
       return dto;
     },
@@ -440,6 +482,251 @@ export function createLeaveService(repo: LeaveRepository, notifier: Notifier) {
           ...yearBalance(type, daysByYear(taken, type.id), year, firstYear),
         }))
         .filter((row) => row.active || row.used > 0 || row.pending > 0);
+    },
+
+    /**
+     * Previews institutional year-end leave rollover and carry-forward balances.
+     */
+    async previewRollover(
+      access: Access,
+      query: RolloverQuery,
+    ): Promise<RolloverSummary> {
+      let deptId = query.departmentId;
+      if (access.scope === 'department') {
+        deptId = access.departmentId ?? undefined;
+      } else if (access.scope === 'own') {
+        throw forbidden(
+          'Only Department Heads and HR Administrators can preview leave rollover.',
+        );
+      }
+
+      const fromYear = query.year;
+      const toYear = query.targetYear ?? fromYear + 1;
+      const encashSurplusEL = Boolean(query.encashSurplusEL);
+
+      const [types, employees] = await Promise.all([
+        repo.types(),
+        repo.activeEmployees(deptId),
+      ]);
+
+      const employeeIds = employees.map((e) => e.id);
+      const allTaken =
+        employeeIds.length > 0 ? await repo.allTaken(employeeIds) : [];
+
+      const takenByEmp = new Map<string, TakenRecord[]>();
+      for (const t of allTaken) {
+        let list = takenByEmp.get(t.employeeId);
+        if (!list) {
+          list = [];
+          takenByEmp.set(t.employeeId, list);
+        }
+        list.push({
+          leaveTypeId: t.leaveTypeId,
+          startDate: t.startDate,
+          endDate: t.endDate,
+          days: t.days,
+          status: t.status,
+        });
+      }
+
+      let totalDaysCarriedForward = 0;
+      let totalDaysLapsed = 0;
+      let totalDaysEncashed = 0;
+
+      const deptMap = new Map<
+        string,
+        {
+          departmentCode: string;
+          departmentName: string;
+          employeeCount: number;
+          carriedForward: number;
+          lapsed: number;
+          encashed: number;
+        }
+      >();
+
+      const records: EmployeeRolloverRecord[] = [];
+
+      for (const emp of employees) {
+        const empTaken = takenByEmp.get(emp.id) ?? [];
+        const firstYear = emp.joiningDate.getUTCFullYear();
+
+        const balances = types
+          .filter((t) => t.active)
+          .map((type) => {
+            const takenDays = daysByYear(empTaken, type.id);
+            const balFrom = yearBalance(type, takenDays, fromYear, firstYear);
+            const balTo = yearBalance(type, takenDays, toYear, firstYear);
+
+            let closingBalance: number | null = null;
+            let carriedForward = 0;
+            let lapsed = 0;
+            let encashed = 0;
+            let nextYearOpening: number | null = null;
+
+            if (type.yearlyQuota !== null && type.yearlyQuota !== undefined) {
+              closingBalance = Math.max(
+                0,
+                balFrom.entitled !== null ? balFrom.entitled - balFrom.used : 0,
+              );
+              carriedForward = balTo.carriedIn;
+              const surplus = Math.max(0, closingBalance - carriedForward);
+
+              if (encashSurplusEL && type.code === 'EL') {
+                encashed = surplus;
+                lapsed = 0;
+              } else {
+                encashed = 0;
+                lapsed = surplus;
+              }
+              nextYearOpening = balTo.entitled;
+            }
+
+            totalDaysCarriedForward += carriedForward;
+            totalDaysLapsed += lapsed;
+            totalDaysEncashed += encashed;
+
+            return {
+              leaveTypeId: type.id,
+              leaveTypeCode: type.code,
+              leaveTypeName: type.name,
+              yearlyQuota: type.yearlyQuota,
+              carryForwardMax: type.carryForwardMax,
+              closingBalance,
+              carriedForward,
+              lapsed,
+              encashed,
+              nextYearOpening,
+            };
+          });
+
+        const empCarried = balances.reduce(
+          (sum, b) => sum + b.carriedForward,
+          0,
+        );
+        const empLapsed = balances.reduce((sum, b) => sum + b.lapsed, 0);
+        const empEncashed = balances.reduce((sum, b) => sum + b.encashed, 0);
+
+        let deptSummary = deptMap.get(emp.department.code);
+        if (!deptSummary) {
+          deptSummary = {
+            departmentCode: emp.department.code,
+            departmentName: emp.department.name,
+            employeeCount: 0,
+            carriedForward: 0,
+            lapsed: 0,
+            encashed: 0,
+          };
+          deptMap.set(emp.department.code, deptSummary);
+        }
+        deptSummary.employeeCount++;
+        deptSummary.carriedForward += empCarried;
+        deptSummary.lapsed += empLapsed;
+        deptSummary.encashed += empEncashed;
+
+        records.push({
+          employeeId: emp.id,
+          employeeCode: emp.employeeCode,
+          name: `${emp.firstName} ${emp.lastName}`,
+          department: emp.department,
+          joiningDate: emp.joiningDate.toISOString().slice(0, 10),
+          balances,
+        });
+      }
+
+      return {
+        fromYear,
+        toYear,
+        totalEmployees: employees.length,
+        totalDaysCarriedForward,
+        totalDaysLapsed,
+        totalDaysEncashed,
+        departmentSummaries: Array.from(deptMap.values()),
+        records,
+      };
+    },
+
+    /**
+     * Executes institutional year-end leave rollover and logs audit entry.
+     */
+    async executeRollover(
+      access: Access,
+      input: RolloverExecuteInput,
+      _ip?: string,
+    ) {
+      if (access.scope !== 'all') {
+        throw forbidden(
+          'Only institutional HR Administrators can execute year-end leave rollover.',
+        );
+      }
+
+      const summary = await this.previewRollover(access, {
+        year: input.fromYear,
+        targetYear: input.toYear,
+        departmentId: input.departmentId,
+        encashSurplusEL: input.encashSurplusEL,
+      });
+
+      if (notifier) {
+        await notifier.notifyRole('HOD', null, {
+          kind: 'leave.rollover.completed',
+          title: `Annual Leave Rollover (${input.fromYear} → ${input.toYear}) Completed`,
+          body: `Annual leave rollover successfully processed for ${summary.totalEmployees} employees. ${summary.totalDaysCarriedForward} days carried forward into ${input.toYear}.`,
+          link: '/leave',
+        });
+      }
+
+      return {
+        success: true,
+        executedAt: new Date().toISOString(),
+        summary,
+      };
+    },
+
+    /**
+     * Exports institutional year-end leave rollover statement as CSV.
+     */
+    async exportRolloverCsv(
+      access: Access,
+      query: RolloverQuery,
+    ): Promise<string> {
+      const summary = await this.previewRollover(access, query);
+      const headers = [
+        'Employee Code',
+        'Faculty Name',
+        'Department',
+        'Leave Code',
+        'Leave Name',
+        `Year ${summary.fromYear} Quota`,
+        `Year ${summary.fromYear} Closing Balance`,
+        `Carried Forward into ${summary.toYear}`,
+        `Lapsed Days`,
+        `Encashed Days`,
+        `Year ${summary.toYear} Opening Balance`,
+      ];
+
+      const rows: string[][] = [];
+      for (const rec of summary.records) {
+        for (const b of rec.balances) {
+          rows.push([
+            rec.employeeCode,
+            `"${rec.name.replace(/"/g, '""')}"`,
+            rec.department.code,
+            b.leaveTypeCode,
+            `"${b.leaveTypeName.replace(/"/g, '""')}"`,
+            b.yearlyQuota !== null ? String(b.yearlyQuota) : 'As per policy',
+            b.closingBalance !== null ? String(b.closingBalance) : '—',
+            String(b.carriedForward),
+            String(b.lapsed),
+            String(b.encashed),
+            b.nextYearOpening !== null
+              ? String(b.nextYearOpening)
+              : 'As per policy',
+          ]);
+        }
+      }
+
+      return [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
     },
   };
 }

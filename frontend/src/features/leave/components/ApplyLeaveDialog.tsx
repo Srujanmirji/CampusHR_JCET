@@ -21,11 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -74,7 +70,9 @@ export function ApplyLeaveDialog({
   const queryClient = useQueryClient();
   const session = useSession();
   const employeeId =
-    session.status === 'signedIn' ? session.user.employeeId ?? undefined : undefined;
+    session.status === 'signedIn'
+      ? (session.user.employeeId ?? undefined)
+      : undefined;
 
   const [typeId, setTypeId] = useState(types[0] ? String(types[0].id) : '');
   const [start, setStart] = useState('');
@@ -103,7 +101,8 @@ export function ApplyLeaveDialog({
   const isVacation = code === 'VL';
 
   const oneDate = Boolean(start) && start === end;
-  const allowHalfDay = Boolean(type?.allowHalfDay) && !isRestrictedHoliday && !isVacation;
+  const allowHalfDay =
+    Boolean(type?.allowHalfDay) && !isRestrictedHoliday && !isVacation;
   const halfDay = allowHalfDay && oneDate && sessionChoice !== 'FULL';
   const days = previewDays(start, end, halfDay);
 
@@ -153,7 +152,10 @@ export function ApplyLeaveDialog({
 
   const affectedClasses = useMemo(() => {
     if (!timetableQuery.data || !start || !end || end < start) return [];
-    const classes: { date: string; entry: (typeof timetableQuery.data)[number] }[] = [];
+    const classes: {
+      date: string;
+      entry: (typeof timetableQuery.data)[number];
+    }[] = [];
     for (
       let at = new Date(`${start}T00:00:00Z`);
       at <= new Date(`${end}T00:00:00Z`);
@@ -182,7 +184,9 @@ export function ApplyLeaveDialog({
         location: isOfficialDuty ? location : undefined,
         referenceNumber: isOfficialDuty ? referenceNumber : undefined,
         attachmentName: attachmentName || undefined,
-        restrictedHolidayId: isRestrictedHoliday ? restrictedHolidayId : undefined,
+        restrictedHolidayId: isRestrictedHoliday
+          ? restrictedHolidayId
+          : undefined,
         vacationPeriodId: isVacation ? vacationPeriodId : undefined,
         coverageRequired: affectedClasses.length > 0,
       }),
@@ -222,17 +226,26 @@ export function ApplyLeaveDialog({
       return;
     }
     if (days === 0) {
-      setProblem('Those dates are Sundays or institutional holidays; no leave needed.');
+      setProblem(
+        'Those dates are Sundays or institutional holidays; no leave needed.',
+      );
       return;
     }
-    if (!isPolicyBased && remaining !== null && remaining !== undefined && days > remaining) {
+    if (
+      !isPolicyBased &&
+      remaining !== null &&
+      remaining !== undefined &&
+      days > remaining
+    ) {
       setProblem(
         `Only ${formatDays(remaining)} of ${type.name} remaining; this request needs ${formatDays(days)}.`,
       );
       return;
     }
     if (isMedical && !reason.trim() && !attachmentName) {
-      setProblem('Please provide a reason or medical certificate for Special / Medical Leave.');
+      setProblem(
+        'Please provide a reason or medical certificate for Special / Medical Leave.',
+      );
       return;
     }
     if (isOfficialDuty && !dutyType && !reason.trim()) {
@@ -265,7 +278,8 @@ export function ApplyLeaveDialog({
             )}
           </DialogTitle>
           <DialogDescription>
-            Submit leave or official duty. Sundays and college holidays are automatically excluded.
+            Submit leave or official duty. Sundays and college holidays are
+            automatically excluded.
           </DialogDescription>
         </DialogHeader>
 
@@ -273,14 +287,21 @@ export function ApplyLeaveDialog({
           {/* Leave Type Selector */}
           <Field>
             <FieldLabel htmlFor="leave-type">Leave type</FieldLabel>
-            <Select value={typeId} onValueChange={(val) => { setTypeId(val); setProblem(''); }}>
+            <Select
+              value={typeId}
+              onValueChange={(val) => {
+                setTypeId(val);
+                setProblem('');
+              }}
+            >
               <SelectTrigger id="leave-type" className="w-full">
                 <SelectValue placeholder="Choose a leave type" />
               </SelectTrigger>
               <SelectContent>
                 {types.map((item) => (
                   <SelectItem key={item.id} value={String(item.id)}>
-                    <span className="font-semibold">{item.code}</span> — {item.name}
+                    <span className="font-semibold">{item.code}</span> —{' '}
+                    {item.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -316,10 +337,16 @@ export function ApplyLeaveDialog({
           {/* Restricted Holiday Picker (RH) */}
           {isRestrictedHoliday && (
             <Field className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
-              <FieldLabel htmlFor="rh-select" className="text-amber-900 dark:text-amber-200">
+              <FieldLabel
+                htmlFor="rh-select"
+                className="text-amber-900 dark:text-amber-200"
+              >
                 Select Restricted Holiday
               </FieldLabel>
-              <Select value={restrictedHolidayId} onValueChange={handleRestrictedHolidaySelect}>
+              <Select
+                value={restrictedHolidayId}
+                onValueChange={handleRestrictedHolidaySelect}
+              >
                 <SelectTrigger id="rh-select">
                   <SelectValue placeholder="Choose from JCET RH calendar" />
                 </SelectTrigger>
@@ -332,7 +359,8 @@ export function ApplyLeaveDialog({
                 </SelectContent>
               </Select>
               <FieldDescription className="text-amber-800/80 dark:text-amber-300/80">
-                Restricted holidays are fixed institutional occasions. Date is set automatically.
+                Restricted holidays are fixed institutional occasions. Date is
+                set automatically.
               </FieldDescription>
             </Field>
           )}
@@ -340,23 +368,31 @@ export function ApplyLeaveDialog({
           {/* Vacation Period Picker (VL) */}
           {isVacation && (
             <Field className="rounded-lg border border-sky-200 bg-sky-50/50 p-3 dark:border-sky-900/50 dark:bg-sky-950/20">
-              <FieldLabel htmlFor="vac-select" className="text-sky-900 dark:text-sky-200">
+              <FieldLabel
+                htmlFor="vac-select"
+                className="text-sky-900 dark:text-sky-200"
+              >
                 Select Vacation Window
               </FieldLabel>
-              <Select value={vacationPeriodId} onValueChange={handleVacationPeriodSelect}>
+              <Select
+                value={vacationPeriodId}
+                onValueChange={handleVacationPeriodSelect}
+              >
                 <SelectTrigger id="vac-select">
                   <SelectValue placeholder="Choose vacation period" />
                 </SelectTrigger>
                 <SelectContent>
                   {JCET_VACATION_PERIODS.map((vac) => (
                     <SelectItem key={vac.id} value={vac.id}>
-                      {vac.name} ({formatLeaveDate(vac.startDate)} – {formatLeaveDate(vac.endDate)})
+                      {vac.name} ({formatLeaveDate(vac.startDate)} –{' '}
+                      {formatLeaveDate(vac.endDate)})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <FieldDescription className="text-sky-800/80 dark:text-sky-300/80">
-                Vacation periods follow the VTU / JCET declared semester break calendar.
+                Vacation periods follow the VTU / JCET declared semester break
+                calendar.
               </FieldDescription>
             </Field>
           )}
@@ -408,7 +444,9 @@ export function ApplyLeaveDialog({
                 <SelectContent>
                   <SelectItem value="FULL">Full day (1 day)</SelectItem>
                   <SelectItem value="FIRST">First half (morning)</SelectItem>
-                  <SelectItem value="SECOND">Second half (afternoon)</SelectItem>
+                  <SelectItem value="SECOND">
+                    Second half (afternoon)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -422,7 +460,8 @@ export function ApplyLeaveDialog({
                 Official Duty Details
               </div>
               <p className="text-xs text-muted-foreground">
-                Use OOD for official college, VTU, university or academic assignments.
+                Use OOD for official college, VTU, university or academic
+                assignments.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field>
@@ -441,7 +480,9 @@ export function ApplyLeaveDialog({
                   </Select>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="ood-org">Organisation / Institution</FieldLabel>
+                  <FieldLabel htmlFor="ood-org">
+                    Organisation / Institution
+                  </FieldLabel>
                   <Input
                     id="ood-org"
                     placeholder="e.g. VTU Belagavi, AICTE"
@@ -459,7 +500,9 @@ export function ApplyLeaveDialog({
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="ood-ref">Reference / Order number</FieldLabel>
+                  <FieldLabel htmlFor="ood-ref">
+                    Reference / Order number
+                  </FieldLabel>
                   <Input
                     id="ood-ref"
                     placeholder="e.g. VTU/ACA/2026/410"
@@ -479,11 +522,14 @@ export function ApplyLeaveDialog({
                 Official / Examination Duty Details
               </div>
               <p className="text-xs text-muted-foreground">
-                Official university examination or evaluation assignment. Display label is configurable.
+                Official university examination or evaluation assignment.
+                Display label is configurable.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field>
-                  <FieldLabel htmlFor="ode-duty-type">Exam duty type</FieldLabel>
+                  <FieldLabel htmlFor="ode-duty-type">
+                    Exam duty type
+                  </FieldLabel>
                   <Select value={dutyType} onValueChange={setDutyType}>
                     <SelectTrigger id="ode-duty-type">
                       <SelectValue placeholder="Select exam duty" />
@@ -498,7 +544,9 @@ export function ApplyLeaveDialog({
                   </Select>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="ode-location">Exam Center / Valuation Center</FieldLabel>
+                  <FieldLabel htmlFor="ode-location">
+                    Exam Center / Valuation Center
+                  </FieldLabel>
                   <Input
                     id="ode-location"
                     placeholder="e.g. Valuation Center Hubballi"
@@ -507,7 +555,9 @@ export function ApplyLeaveDialog({
                   />
                 </Field>
                 <Field className="sm:col-span-2">
-                  <FieldLabel htmlFor="ode-ref">Allotment / Appointment order #</FieldLabel>
+                  <FieldLabel htmlFor="ode-ref">
+                    Allotment / Appointment order #
+                  </FieldLabel>
                   <Input
                     id="ode-ref"
                     placeholder="e.g. VTU/EXAM/VAL/2026/89"
@@ -524,7 +574,9 @@ export function ApplyLeaveDialog({
             <Field className="rounded-xl border border-dashed p-3 bg-muted/20">
               <FieldLabel className="flex items-center gap-1.5 text-xs font-semibold">
                 <Paperclip className="size-3.5" />
-                {isMedical ? 'Medical Certificate / Document' : 'Official Order / Letter Attachment'}
+                {isMedical
+                  ? 'Medical Certificate / Document'
+                  : 'Official Order / Letter Attachment'}
               </FieldLabel>
               <div className="mt-1.5 flex items-center gap-3">
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted">
@@ -583,15 +635,23 @@ export function ApplyLeaveDialog({
               {affectedClasses.length > 0 ? (
                 <div className="flex flex-col gap-1.5 mt-1">
                   <p className="text-xs font-medium text-foreground">
-                    {affectedClasses.length} scheduled {affectedClasses.length === 1 ? 'class is' : 'classes are'} affected:
+                    {affectedClasses.length} scheduled{' '}
+                    {affectedClasses.length === 1 ? 'class is' : 'classes are'}{' '}
+                    affected:
                   </p>
                   <ul className="flex flex-col divide-y rounded-md border text-xs">
                     {affectedClasses.slice(0, 3).map(({ date, entry }) => (
-                      <li key={`${date}-${entry.id}`} className="flex items-center justify-between p-2">
+                      <li
+                        key={`${date}-${entry.id}`}
+                        className="flex items-center justify-between p-2"
+                      >
                         <div>
-                          <span className="font-medium text-foreground">{entry.subject.name}</span>
+                          <span className="font-medium text-foreground">
+                            {entry.subject.name}
+                          </span>
                           <span className="text-muted-foreground block text-[11px]">
-                            {entry.subject.code} · Sem {entry.semester}{entry.section} · Room {entry.room.name}
+                            {entry.subject.code} · Sem {entry.semester}
+                            {entry.section} · Room {entry.room.name}
                           </span>
                         </div>
                         <span className="font-mono text-[11px] text-muted-foreground">
@@ -627,7 +687,9 @@ export function ApplyLeaveDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={apply.isPending}>
-              {apply.isPending && <LoaderCircle className="animate-spin size-4" />}
+              {apply.isPending && (
+                <LoaderCircle className="animate-spin size-4" />
+              )}
               {isOfficialDuty ? 'Submit Official Duty' : 'Submit Leave Request'}
             </Button>
           </DialogFooter>

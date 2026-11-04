@@ -63,12 +63,22 @@ export function MyLeave({
   return (
     <div className="flex flex-col gap-6">
       {/* Faculty Leave Header & Balances */}
-      <section aria-labelledby="balances-heading" className="flex flex-col gap-4">
+      <section
+        aria-labelledby="balances-heading"
+        className="flex flex-col gap-4"
+      >
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Leave</h1>
-            <p className="text-sm font-medium text-muted-foreground">Time for what matters.</p>
-            <h2 id="balances-heading" className="mt-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Leave
+            </h1>
+            <p className="text-sm font-medium text-muted-foreground">
+              Time for what matters.
+            </p>
+            <h2
+              id="balances-heading"
+              className="mt-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Your balances — {currentYear}
             </h2>
           </div>
@@ -96,8 +106,11 @@ export function MyLeave({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {balances.data.map((balance) => {
               const theme = getLeaveTheme(balance.leaveType.code);
-              const isPolicyBased = balance.entitled === null || balance.remaining === null;
-              const isOfficialDuty = balance.leaveType.code === 'OOD' || balance.leaveType.code === 'ODE';
+              const isPolicyBased =
+                balance.entitled === null || balance.remaining === null;
+              const isOfficialDuty =
+                balance.leaveType.code === 'OOD' ||
+                balance.leaveType.code === 'ODE';
 
               return (
                 <div
@@ -164,7 +177,13 @@ export function MyLeave({
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                         <span>{balance.used} used</span>
                         <span>·</span>
-                        <span className={balance.pending > 0 ? 'text-amber-600 dark:text-amber-400 font-medium' : ''}>
+                        <span
+                          className={
+                            balance.pending > 0
+                              ? 'text-amber-600 dark:text-amber-400 font-medium'
+                              : ''
+                          }
+                        >
                           {balance.pending} pending
                         </span>
                         {balance.carriedIn > 0 && (

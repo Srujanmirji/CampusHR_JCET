@@ -32,8 +32,16 @@ export function formatEntitlement(quota: number | null | undefined): string {
 }
 
 /** Format remaining balance: returns "As per policy" for unmetered/rule-based categories. */
-export function formatRemaining(remaining: number | null | undefined, entitled: number | null | undefined): string {
-  if (remaining === null || remaining === undefined || entitled === null || entitled === undefined) {
+export function formatRemaining(
+  remaining: number | null | undefined,
+  entitled: number | null | undefined,
+): string {
+  if (
+    remaining === null ||
+    remaining === undefined ||
+    entitled === null ||
+    entitled === undefined
+  ) {
     return 'As per policy';
   }
   return `${remaining} remaining`;
@@ -63,13 +71,48 @@ export interface RestrictedHolidayOption {
 }
 
 export const JCET_RESTRICTED_HOLIDAYS: readonly RestrictedHolidayOption[] = [
-  { id: 'rh-shivaratri', name: 'Maha Shivaratri', date: '2026-02-16', dayOfWeek: 'Monday' },
-  { id: 'rh-ugadi', name: 'Chandramana Ugadi', date: '2026-03-20', dayOfWeek: 'Friday' },
-  { id: 'rh-good-friday', name: 'Good Friday', date: '2026-04-03', dayOfWeek: 'Friday' },
-  { id: 'rh-varamahalakshmi', name: 'Varamahalakshmi Vrata', date: '2026-08-28', dayOfWeek: 'Friday' },
-  { id: 'rh-janmashtami', name: 'Krishna Janmashtami', date: '2026-09-04', dayOfWeek: 'Friday' },
-  { id: 'rh-guru-nanak', name: 'Guru Nanak Jayanti', date: '2026-11-24', dayOfWeek: 'Tuesday' },
-  { id: 'rh-christmas-eve', name: 'Christmas Eve', date: '2026-12-24', dayOfWeek: 'Thursday' },
+  {
+    id: 'rh-shivaratri',
+    name: 'Maha Shivaratri',
+    date: '2026-02-16',
+    dayOfWeek: 'Monday',
+  },
+  {
+    id: 'rh-ugadi',
+    name: 'Chandramana Ugadi',
+    date: '2026-03-20',
+    dayOfWeek: 'Friday',
+  },
+  {
+    id: 'rh-good-friday',
+    name: 'Good Friday',
+    date: '2026-04-03',
+    dayOfWeek: 'Friday',
+  },
+  {
+    id: 'rh-varamahalakshmi',
+    name: 'Varamahalakshmi Vrata',
+    date: '2026-08-28',
+    dayOfWeek: 'Friday',
+  },
+  {
+    id: 'rh-janmashtami',
+    name: 'Krishna Janmashtami',
+    date: '2026-09-04',
+    dayOfWeek: 'Friday',
+  },
+  {
+    id: 'rh-guru-nanak',
+    name: 'Guru Nanak Jayanti',
+    date: '2026-11-24',
+    dayOfWeek: 'Tuesday',
+  },
+  {
+    id: 'rh-christmas-eve',
+    name: 'Christmas Eve',
+    date: '2026-12-24',
+    dayOfWeek: 'Thursday',
+  },
 ];
 
 /**
@@ -89,7 +132,8 @@ export const JCET_VACATION_PERIODS: readonly VacationPeriodOption[] = [
     name: 'Even Semester Summer Vacation 2026',
     startDate: '2026-06-15',
     endDate: '2026-07-15',
-    description: 'Annual summer vacation for eligible teaching faculty upon completion of semester exams.',
+    description:
+      'Annual summer vacation for eligible teaching faculty upon completion of semester exams.',
   },
   {
     id: 'vac-winter-2026',

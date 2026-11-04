@@ -45,5 +45,15 @@ export function createNotificationRouter(
       res.status(201).json({
         data: await notifications.announce(access(res), input, req.ip),
       });
+    })
+    .post('/test', ...canRead, async (_req, res) => {
+      const userId = access(res).userId;
+      await notifications.sendDirect(userId, {
+        kind: 'system.test',
+        title: 'CampusHR Notification Test',
+        body: 'Real-time alert delivery is active on your device.',
+        link: '/notifications',
+      });
+      res.status(200).json({ data: { sent: true, userId } });
     });
 }

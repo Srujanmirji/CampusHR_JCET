@@ -88,7 +88,8 @@ export function LeaveRequestDrawer({
         <SheetHeader>
           <SheetTitle>Leave request details</SheetTitle>
           <SheetDescription id="leave-details-desc">
-            Review request information, supporting evidence, academic continuity, and approval status.
+            Review request information, supporting evidence, academic
+            continuity, and approval status.
           </SheetDescription>
         </SheetHeader>
         <div className="px-4 pb-6">
@@ -169,8 +170,10 @@ function RequestDetails({
   );
 
   const act = useMutation({
-    mutationFn: (action: 'approve' | 'reject' | 'cancel' | 'recommend' | 'recommend_coverage') =>
-      decideLeave(request.id, action, note.trim() || undefined),
+    mutationFn: (
+      action:
+        'approve' | 'reject' | 'cancel' | 'recommend' | 'recommend_coverage',
+    ) => decideLeave(request.id, action, note.trim() || undefined),
     onSuccess: (saved, action) => {
       void queryClient.invalidateQueries({ queryKey: ['leave'] });
       toast.success(
@@ -193,7 +196,9 @@ function RequestDetails({
 
   function reject() {
     if (note.trim().length < 3) {
-      setProblem('Please provide a reason for rejection (at least 3 characters).');
+      setProblem(
+        'Please provide a reason for rejection (at least 3 characters).',
+      );
       return;
     }
     setProblem('');
@@ -213,7 +218,8 @@ function RequestDetails({
               {request.employee.name}
             </h3>
             <p className="text-xs text-muted-foreground">
-              {request.employee.employeeCode} · {request.department.name} ({request.department.code})
+              {request.employee.employeeCode} · {request.department.name} (
+              {request.department.code})
             </p>
           </div>
         </div>
@@ -265,7 +271,10 @@ function RequestDetails({
 
       {/* Official Duty (OOD / ODE) Metadata */}
       {isOfficialDuty && (
-        <section aria-label="Official Duty Particulars" className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20 text-xs">
+        <section
+          aria-label="Official Duty Particulars"
+          className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20 text-xs"
+        >
           <div className="flex items-center gap-2 font-semibold text-emerald-900 dark:text-emerald-200">
             <ShieldCheck className="size-4" />
             Official Duty Particulars
@@ -274,25 +283,33 @@ function RequestDetails({
             {request.dutyType && (
               <div>
                 <dt className="text-muted-foreground">Duty Type</dt>
-                <dd className="font-medium text-foreground">{request.dutyType}</dd>
+                <dd className="font-medium text-foreground">
+                  {request.dutyType}
+                </dd>
               </div>
             )}
             {request.organisation && (
               <div>
                 <dt className="text-muted-foreground">Organisation</dt>
-                <dd className="font-medium text-foreground">{request.organisation}</dd>
+                <dd className="font-medium text-foreground">
+                  {request.organisation}
+                </dd>
               </div>
             )}
             {request.location && (
               <div>
                 <dt className="text-muted-foreground">Location / Center</dt>
-                <dd className="font-medium text-foreground">{request.location}</dd>
+                <dd className="font-medium text-foreground">
+                  {request.location}
+                </dd>
               </div>
             )}
             {request.referenceNumber && (
               <div>
                 <dt className="text-muted-foreground">Order Reference #</dt>
-                <dd className="font-mono font-medium text-foreground">{request.referenceNumber}</dd>
+                <dd className="font-mono font-medium text-foreground">
+                  {request.referenceNumber}
+                </dd>
               </div>
             )}
           </dl>
@@ -301,18 +318,25 @@ function RequestDetails({
 
       {/* Supporting Document / Attachment */}
       {(request.attachmentName || request.attachmentUrl) && (
-        <section aria-label="Supporting Documents" className="flex flex-col gap-2 rounded-xl border p-3.5 bg-muted/20">
+        <section
+          aria-label="Supporting Documents"
+          className="flex flex-col gap-2 rounded-xl border p-3.5 bg-muted/20"
+        >
           <div className="flex items-center justify-between text-xs font-semibold">
             <span className="flex items-center gap-1.5">
               <Paperclip className="size-3.5" />
               Supporting Attachment
             </span>
-            <span className="text-[11px] text-muted-foreground">Verified Document</span>
+            <span className="text-[11px] text-muted-foreground">
+              Verified Document
+            </span>
           </div>
           <div className="flex items-center justify-between rounded-lg border bg-background p-2.5 text-xs">
             <div className="flex items-center gap-2 truncate">
               <FileText className="size-4 text-primary shrink-0" />
-              <span className="truncate font-medium">{request.attachmentName || 'supporting_document.pdf'}</span>
+              <span className="truncate font-medium">
+                {request.attachmentName || 'supporting_document.pdf'}
+              </span>
             </div>
             <Button
               variant="ghost"
@@ -328,32 +352,49 @@ function RequestDetails({
       )}
 
       {/* Leave Balance Snapshot */}
-      <section aria-label="Applicant Leave Balance" className="flex flex-col gap-2 rounded-xl border bg-card p-3.5 text-xs">
+      <section
+        aria-label="Applicant Leave Balance"
+        className="flex flex-col gap-2 rounded-xl border bg-card p-3.5 text-xs"
+      >
         <h4 className="font-semibold text-muted-foreground uppercase tracking-wider text-[11px]">
           Applicant Balance Snapshot ({new Date().getFullYear()})
         </h4>
         {matchingBalance ? (
           <div className="grid grid-cols-4 gap-2 pt-1 text-center">
             <div className="rounded-md bg-muted/50 p-2">
-              <span className="text-muted-foreground block text-[10px]">Entitled</span>
+              <span className="text-muted-foreground block text-[10px]">
+                Entitled
+              </span>
               <span className="font-semibold text-foreground text-sm">
-                {matchingBalance.entitled !== null ? matchingBalance.entitled : 'Rule'}
+                {matchingBalance.entitled !== null
+                  ? matchingBalance.entitled
+                  : 'Rule'}
               </span>
             </div>
             <div className="rounded-md bg-muted/50 p-2">
-              <span className="text-muted-foreground block text-[10px]">Used</span>
-              <span className="font-semibold text-foreground text-sm">{matchingBalance.used}</span>
+              <span className="text-muted-foreground block text-[10px]">
+                Used
+              </span>
+              <span className="font-semibold text-foreground text-sm">
+                {matchingBalance.used}
+              </span>
             </div>
             <div className="rounded-md bg-muted/50 p-2">
-              <span className="text-muted-foreground block text-[10px]">Pending</span>
+              <span className="text-muted-foreground block text-[10px]">
+                Pending
+              </span>
               <span className="font-semibold text-foreground text-sm text-amber-600 dark:text-amber-400">
                 {matchingBalance.pending}
               </span>
             </div>
             <div className="rounded-md bg-muted/50 p-2">
-              <span className="text-muted-foreground block text-[10px]">Remaining</span>
+              <span className="text-muted-foreground block text-[10px]">
+                Remaining
+              </span>
               <span className="font-semibold text-foreground text-sm">
-                {matchingBalance.remaining !== null ? matchingBalance.remaining : 'Policy'}
+                {matchingBalance.remaining !== null
+                  ? matchingBalance.remaining
+                  : 'Policy'}
               </span>
             </div>
           </div>
@@ -369,17 +410,24 @@ function RequestDetails({
 
       {/* Previous Leave History */}
       {previousRequests.length > 0 && (
-        <section aria-label="Previous Leave History" className="flex flex-col gap-2">
+        <section
+          aria-label="Previous Leave History"
+          className="flex flex-col gap-2"
+        >
           <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <History className="size-3.5" />
             Previous Requests This Year
           </div>
           <ul className="flex flex-col divide-y rounded-xl border bg-card text-xs">
             {previousRequests.slice(0, 3).map((prev) => (
-              <li key={prev.id} className="flex items-center justify-between p-3">
+              <li
+                key={prev.id}
+                className="flex items-center justify-between p-3"
+              >
                 <div>
                   <span className="font-medium text-foreground">
-                    {prev.leaveType.name} ({prev.days} {prev.days === 1 ? 'day' : 'days'})
+                    {prev.leaveType.name} ({prev.days}{' '}
+                    {prev.days === 1 ? 'day' : 'days'})
                   </span>
                   <span className="block text-muted-foreground text-[11px]">
                     {formatLeaveDate(prev.startDate)}
@@ -394,7 +442,10 @@ function RequestDetails({
 
       {/* Approval Steps Timeline */}
       <section aria-labelledby="leave-steps">
-        <h3 id="leave-steps" className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <h3
+          id="leave-steps"
+          className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+        >
           Approval Timeline
         </h3>
         <ol className="flex flex-col gap-3 rounded-xl border bg-card p-4">
@@ -439,7 +490,11 @@ function RequestDetails({
                       {dateTime.format(new Date(decision.decidedAt))}
                     </p>
                   )}
-                  {decision?.note && <p className="mt-1 text-foreground italic">“{decision.note}”</p>}
+                  {decision?.note && (
+                    <p className="mt-1 text-foreground italic">
+                      “{decision.note}”
+                    </p>
+                  )}
                 </div>
               </li>
             );

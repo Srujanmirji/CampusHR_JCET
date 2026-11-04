@@ -14,7 +14,10 @@ export const leaveTypeInputSchema = z
       .string()
       .trim()
       .toUpperCase()
-      .regex(/^[A-Z_]{1,10}$/, 'Use 1–10 letters/underscores, e.g. CL, SPL_ML.'),
+      .regex(
+        /^[A-Z_]{1,10}$/,
+        'Use 1–10 letters/underscores, e.g. CL, SPL_ML.',
+      ),
     name: z.string().trim().min(2).max(100),
     description: z.string().trim().max(300).optional(),
     yearlyQuota: days(366).nullable().optional(),
@@ -130,3 +133,27 @@ export const rejectSchema = z
     note: z.string().trim().min(3, 'Say why, in a few words.').max(500),
   })
   .strict();
+
+export const rolloverQuerySchema = z.object({
+  year: z.coerce
+    .number()
+    .int()
+    .min(2020)
+    .max(2100)
+    .default(new Date().getUTCFullYear()),
+  targetYear: z.coerce.number().int().min(2020).max(2100).optional(),
+  departmentId: z.coerce.number().int().positive().optional(),
+  encashSurplusEL: z.coerce.boolean().default(false),
+});
+export type RolloverQuery = z.infer<typeof rolloverQuerySchema>;
+
+export const rolloverExecuteSchema = z
+  .object({
+    fromYear: z.number().int().min(2020).max(2100),
+    toYear: z.number().int().min(2020).max(2100),
+    departmentId: z.number().int().positive().optional(),
+    encashSurplusEL: z.boolean().default(false),
+    notes: z.string().trim().max(500).optional(),
+  })
+  .strict();
+export type RolloverExecuteInput = z.infer<typeof rolloverExecuteSchema>;

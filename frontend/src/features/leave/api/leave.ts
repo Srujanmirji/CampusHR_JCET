@@ -27,10 +27,14 @@ export const leaveTypeSchema = z.object({
   attendanceStatus: z.string().optional(),
   affectsTimetable: z.boolean().optional(),
   requiresCoverage: z.boolean().optional(),
-  applicableEmployeeTypes: z.array(z.enum(['TEACHING', 'NON_TEACHING'])).optional(),
+  applicableEmployeeTypes: z
+    .array(z.enum(['TEACHING', 'NON_TEACHING']))
+    .optional(),
   active: z.boolean(),
   displayOrder: z.number().optional(),
-  colorToken: z.enum(['blue', 'violet', 'rose', 'teal', 'cyan', 'amber', 'sky']).optional(),
+  colorToken: z
+    .enum(['blue', 'violet', 'rose', 'teal', 'cyan', 'amber', 'sky'])
+    .optional(),
 });
 export type LeaveType = z.infer<typeof leaveTypeSchema>;
 export type LeaveTypeInput = Partial<Omit<LeaveType, 'id'>> & {
@@ -180,7 +184,9 @@ export async function decideLeave(
   note?: string,
 ) {
   const isApproveType =
-    action === 'approve' || action === 'recommend' || action === 'recommend_coverage';
+    action === 'approve' ||
+    action === 'recommend' ||
+    action === 'recommend_coverage';
   const apiEndpoint =
     action === 'cancel'
       ? `/leave/requests/${id}/cancel`
@@ -201,4 +207,85 @@ export async function decideLeave(
       body: action === 'cancel' ? {} : finalNote ? { note: finalNote } : {},
     }),
   ).data;
+}
+
+export interface EmployeeRolloverRecord {
+  employeeId: string;
+  employeeCode: string;
+  name: string;
+  department: { id: number; code: string; name: string };
+  joiningDate: string;
+  balances: Array<{
+    leaveTypeId: number;
+    leaveTypeCode: string;
+    leaveTypeName: string;
+    yearlyQuota: number | null;
+    carryForwardMax: number;
+    closingBalance: number | null;
+    carriedForward: number;
+    lapsed: number;
+    encashed: number;
+    nextYearOpening: number | null;
+  }>;
+}
+
+export interface RolloverSummary {
+  fromYear: number;
+  toYear: number;
+  totalEmployees: number;
+  totalDaysCarriedForward: number;
+  totalDaysLapsed: number;
+  totalDaysEncashed: number;
+  departmentSummaries: Array<{
+    departmentCode: string;
+    departmentName: string;
+    employeeCount: number;
+    carriedForward: number;
+    lapsed: number;
+    encashed: number;
+  }>;
+  records: EmployeeRolloverRecord[];
+}
+
+export interface RolloverQuery {
+  year?: number;
+  targetYear?: number;
+  departmentId?: number;
+  encashSurplusEL?: boolean;
+}
+
+export interface RolloverExecuteInput {
+  fromYear: number;
+  toYear: number;
+  departmentId?: number;
+  encashSurplusEL?: boolean;
+  notes?: string;
+}
+
+export async function previewLeaveRollover(
+  query: RolloverQuery = {},
+): Promise<RolloverSummary> {
+  const search = new URLSearchParams();
+  if (query.year) search.set('year', String(query.year));
+  if (query.targetYear) search.set('targetYear', String(query.targetYear));
+  if (query.departmentId)
+    search.set('departmentId', String(query.departmentId));
+  if (query.encashSurplusEL) search.set('encashSurplusEL', 'true');
+
+  const res = await apiRequest(`/leave/rollover/preview?${search}`);
+  return (res as { data: RolloverSummary }).data;
+}
+
+export async function executeLeaveRollover(
+  input: RolloverExecuteInput,
+): Promise<{ success: boolean; executedAt: string; summary: RolloverSummary }> {
+  const res = await apiRequest('/leave/rollover/execute', {
+    method: 'POST',
+    body: input,
+  });
+  return res as {
+    success: boolean;
+    executedAt: string;
+    summary: RolloverSummary;
+  };
 }
