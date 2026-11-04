@@ -140,6 +140,30 @@ export interface AttendanceRepository {
     checkOut?: Date | null;
     status: AttendanceStatus;
   }): Promise<AttendanceRecord>;
+  findEmployeesByCodes(codes: string[]): Promise<
+    Array<{
+      id: string;
+      employeeCode: string;
+      firstName: string;
+      lastName: string;
+      status: string;
+      departmentId: number;
+    }>
+  >;
+  upsertBiometricAttendance(params: {
+    employeeId: string;
+    date: Date;
+    checkIn: Date;
+    checkOut?: Date | null;
+    status: AttendanceStatus;
+    source: AttendanceSource;
+    notes?: string | null;
+  }): Promise<AttendanceRecord>;
+  getBiometricStats(today: Date): Promise<{
+    todayCount: number;
+    totalSyncedToday: number;
+    recentPunches: AttendanceRecord[];
+  }>;
 }
 
 export function createAttendanceRepository(
@@ -390,6 +414,78 @@ export function createAttendanceRepository(
         },
         select: attendanceSelect,
       });
+    },
+
+    async findEmployeesByCodes(codes: string[]) {
+      const upperCodes = [...new Set(codes.map((c) => c.trim().toUpperCase()))];
+      return prisma.employee.findMany({
+        where: {
+          employeeCode: { in: upperCodes },
+          status: 'ACTIVE',
+        },
+        select: {
+          id: true,
+          employeeCode: true,
+          firstName: true,
+          lastName: true,
+          status: true,
+          departmentId: true,
+        },
+      });
+    },
+
+    async upsertBiometricAttendance(params: {
+      employeeId: string;
+      date: Date;
+      checkIn: Date;
+      checkOut?: Date | null;
+      status: AttendanceStatus;
+      source: AttendanceSource;
+      notes?: string | null;
+    }) {
+      return prisma.attendance.upsert({
+        where: {
+          employeeId_date: {
+            employeeId: params.employeeId,
+            date: params.date,
+          },
+        },
+        create: {
+          employeeId: params.employeeId,
+          date: params.date,
+          checkIn: params.checkIn,
+          checkOut: params.checkOut ?? null,
+          status: params.status,
+          source: params.source,
+          notes: params.notes ?? null,
+        },
+        update: {
+          checkIn: params.checkIn,
+          checkOut: params.checkOut ?? undefined,
+          status: params.status,
+          source: params.source,
+          notes: params.notes ?? undefined,
+        },
+        select: attendanceSelect,
+      });
+    },
+
+    async getBiometricStats(today: Date) {
+      const [todayCount, totalSyncedToday, recentPunches] = await Promise.all([
+        prisma.attendance.count({
+          where: { date: today, source: 'BIOMETRIC' },
+        }),
+        prisma.attendance.count({
+          where: { date: today },
+        }),
+        prisma.attendance.findMany({
+          where: { date: today, source: 'BIOMETRIC' },
+          select: attendanceSelect,
+          orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+          take: 10,
+        }),
+      ]);
+      return { todayCount, totalSyncedToday, recentPunches };
     },
   };
 }

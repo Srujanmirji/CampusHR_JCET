@@ -40,7 +40,7 @@ const isWriteConflict = (error: unknown) =>
     /could not serialize|40001/.test(String(error)));
 
 export function toRequestDto(request: RequestRecord) {
-  const req = request as any;
+  const req = request as Record<string, unknown>;
   return {
     id: request.id,
     employee: {
@@ -252,7 +252,7 @@ export function createLeaveService(repo: LeaveRepository, notifier: Notifier) {
             restrictedHolidayId: input.restrictedHolidayId,
             vacationPeriodId: input.vacationPeriodId,
             coverageRequired: input.coverageRequired ?? true,
-          } as any,
+          } as Parameters<typeof repo.submit>[0],
           (taken) => {
             const overlap = taken.find(
               (other) => other.startDate <= end && start <= other.endDate,

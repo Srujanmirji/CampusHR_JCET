@@ -155,6 +155,7 @@ export function createApp(
         createAttendanceRepository(prisma),
         notifications.notifier,
       ),
+      env.BIOMETRIC_SYNC_SECRET,
     ),
   );
   app.use(

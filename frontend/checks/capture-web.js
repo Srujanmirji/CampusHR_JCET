@@ -1,10 +1,8 @@
-import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  apiUrl,
   checkPassword,
   checkUser,
   mockAuthApi,
@@ -34,7 +32,7 @@ mkdirSync(outDir, { recursive: true });
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
 
-const api = await mockAuthApi(page, base);
+await mockAuthApi(page, base);
 
 try {
   console.log('Capturing 01-web-login.png...');

@@ -178,5 +178,71 @@ export function createMemoryAttendanceRepository(): AttendanceRepository {
         source: 'MANUAL',
       });
     },
+    async findEmployeesByCodes(codes: string[]) {
+      const upperCodes = new Set(codes.map((c) => c.trim().toUpperCase()));
+      const mock = mockEmployee();
+      if (upperCodes.has(mock.employeeCode.toUpperCase())) {
+        return [
+          {
+            id: mock.id,
+            employeeCode: mock.employeeCode,
+            firstName: mock.firstName,
+            lastName: mock.lastName,
+            status: 'ACTIVE',
+            departmentId: mock.departmentId,
+          },
+        ];
+      }
+      return [];
+    },
+    async upsertBiometricAttendance(params) {
+      const dStr = params.date.toISOString().split('T')[0];
+      const idx = attendanceRecords.findIndex(
+        (r) =>
+          r.employeeId === params.employeeId &&
+          new Date(r.date).toISOString().split('T')[0] === dStr,
+      );
+      if (idx >= 0) {
+        attendanceRecords[idx] = {
+          ...attendanceRecords[idx],
+          checkIn: params.checkIn,
+          checkOut: params.checkOut ?? attendanceRecords[idx].checkOut,
+          status: params.status,
+          source: params.source,
+          notes: params.notes ?? attendanceRecords[idx].notes,
+          updatedAt: new Date(),
+        };
+        return attendanceRecords[idx];
+      }
+      const newRec: AttendanceRecord = {
+        id: randomUUID(),
+        employeeId: params.employeeId,
+        date: params.date,
+        checkIn: params.checkIn,
+        checkOut: params.checkOut ?? null,
+        status: params.status,
+        source: params.source,
+        notes: params.notes ?? null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        employee: mockEmployee(),
+      };
+      attendanceRecords.push(newRec);
+      return newRec;
+    },
+    async getBiometricStats(today: Date) {
+      const dStr = today.toISOString().split('T')[0];
+      const todayRecords = attendanceRecords.filter(
+        (r) => new Date(r.date).toISOString().split('T')[0] === dStr,
+      );
+      const biometricRecords = todayRecords.filter(
+        (r) => r.source === 'BIOMETRIC',
+      );
+      return {
+        todayCount: biometricRecords.length,
+        totalSyncedToday: todayRecords.length,
+        recentPunches: biometricRecords.slice(0, 10),
+      };
+    },
   };
 }

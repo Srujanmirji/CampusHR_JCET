@@ -57,6 +57,11 @@ export const envSchema = z
       .transform((value) => value === 'true'),
     EXPO_PROJECT_ID: z.uuid().optional(),
     EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
+    BIOMETRIC_SYNC_SECRET: z
+      .string()
+      .min(8)
+      .optional()
+      .default('jcet-biometric-terminal-secret-2026'),
   })
   .refine(
     (env) =>
