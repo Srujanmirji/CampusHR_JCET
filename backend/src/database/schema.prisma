@@ -66,6 +66,7 @@ model User {
   circularsAuthored     Circular[]             @relation("CircularAuthor")
   circularReceipts      CircularReadReceipt[]
   workAssignedBy        WorkAssignment[]       @relation("WorkAssignedBy")
+  issuedAppointmentLetters OnboardingCandidate[] @relation("AppointmentLetterIssuer")
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt             DateTime         @updatedAt @map("updated_at")
   passwordResets        PasswordResetChallenge[]
@@ -133,6 +134,7 @@ model Department {
   timetable     TimetableEntry[]
   leaveRequests LeaveRequest[]
   circulars     Circular[]       @relation("DepartmentCirculars")
+  onboardingCandidates OnboardingCandidate[]
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
@@ -147,6 +149,7 @@ model Designation {
   category  StaffCategory
   employees Employee[]
   workload  WorkloadThreshold?
+  onboardingCandidates OnboardingCandidate[]
 
   @@map("designations")
 }
@@ -183,6 +186,7 @@ model Employee {
   examDuties            ExamDuty[]             @relation("ExamDutyFaculty")
   examDutySwapTarget    ExamDuty[]             @relation("ExamDutySwapTarget")
   workAssignedTo        WorkAssignment[]       @relation("WorkAssignedTo")
+  onboardingRecord      OnboardingCandidate?   @relation("OnboardedCandidate")
 
   @@index([departmentId])
   @@index([status])
@@ -870,4 +874,73 @@ model WorkAssignment {
   @@index([priority])
   @@map("work_assignments")
 }
+
+// ----------------------------------------------------
+// Recruitment & Onboarding Module
+// ----------------------------------------------------
+
+enum CandidateStatus {
+  OFFER_PENDING
+  OFFER_ISSUED
+  OFFER_ACCEPTED
+  DOCUMENTS_SUBMITTED
+  ONBOARDED
+  REJECTED
+  WITHDRAWN
+
+  @@map("candidate_status")
+}
+
+model OnboardingCandidate {
+  id                  String          @id @default(uuid()) @db.Uuid
+  appointmentRefNo    String          @unique @map("appointment_ref_no")
+  firstName           String          @map("first_name")
+  lastName            String          @map("last_name")
+  email               String          @unique
+  phone               String
+  departmentId        Int             @map("department_id")
+  department          Department      @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  designationId       Int             @map("designation_id")
+  designation         Designation     @relation(fields: [designationId], references: [id], onDelete: Restrict)
+  employmentType      EmploymentType  @map("employment_type")
+  qualification       String
+  specialization      String?
+  experienceYears     Int             @default(0) @map("experience_years")
+  expectedJoiningDate DateTime        @map("expected_joining_date") @db.Date
+  status              CandidateStatus @default(OFFER_PENDING)
+
+  // Salary & compensation structure
+  payScale            String          @map("pay_scale")
+  basicPay            Float           @map("basic_pay")
+  agp                 Float           @default(0)
+  daPercent           Float           @default(50) @map("da_percent")
+  hraPercent          Float           @default(18) @map("hra_percent")
+  grossSalary         Float           @map("gross_salary")
+  probationMonths     Int             @default(12) @map("probation_months")
+  noticePeriodMonths  Int             @default(3) @map("notice_period_months")
+
+  // Documents checklist (JSON object)
+  documentsChecklist  Json?           @map("documents_checklist")
+
+  // When onboarded: links to created Employee
+  employeeId          String?         @unique @map("employee_id") @db.Uuid
+  employee            Employee?       @relation("OnboardedCandidate", fields: [employeeId], references: [id], onDelete: SetNull)
+
+  // Appointment letter generation metadata
+  issuedById          String?         @map("issued_by_id") @db.Uuid
+  issuedBy            User?           @relation("AppointmentLetterIssuer", fields: [issuedById], references: [id], onDelete: SetNull)
+  issuedAt            DateTime?       @map("issued_at")
+  joinedAt            DateTime?       @map("joined_at")
+  notes               String?         @db.Text
+
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  @@index([departmentId])
+  @@index([designationId])
+  @@index([status])
+  @@index([appointmentRefNo])
+  @@map("onboarding_candidates")
+}
+
 

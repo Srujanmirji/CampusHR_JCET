@@ -14,6 +14,7 @@ import {
   GraduationCap,
   ScrollText,
   ClipboardList,
+  UserPlus,
 } from 'lucide-react';
 
 // `permission` (product/USER_ROLES.md) decides who sees each page; the
@@ -36,6 +37,13 @@ export const navigation: {
     permission: 'employee.read',
     label: 'Employees',
     icon: UsersRound,
+    group: 'People & academics',
+  },
+  {
+    path: '/onboarding',
+    permission: 'recruitment.read',
+    label: 'Recruitment & Onboarding',
+    icon: UserPlus,
     group: 'People & academics',
   },
   {
@@ -258,6 +266,13 @@ export const hodNavigation: {
     group: 'Department Staff',
   },
   {
+    path: '/onboarding',
+    permission: 'recruitment.read',
+    label: 'Dept. Recruits',
+    icon: UserPlus,
+    group: 'Department Staff',
+  },
+  {
     path: '/attendance',
     permission: 'attendance.read',
     label: 'Attendance & Corrections',
@@ -361,6 +376,13 @@ export const principalNavigation: {
     permission: 'employee.read',
     label: 'Faculty & Staff',
     icon: UsersRound,
+    group: 'Institutional People',
+  },
+  {
+    path: '/onboarding',
+    permission: 'recruitment.read',
+    label: 'Recruitment & Offers',
+    icon: UserPlus,
     group: 'Institutional People',
   },
   {

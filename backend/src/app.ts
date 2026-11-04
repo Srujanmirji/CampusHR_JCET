@@ -63,6 +63,9 @@ import { createCircularRouter } from './modules/circulars/circulars.routes.js';
 import { createWorkAssignmentRepository } from './modules/work-assignments/work-assignments.repository.js';
 import { createWorkAssignmentService } from './modules/work-assignments/work-assignments.service.js';
 import { createWorkAssignmentRouter } from './modules/work-assignments/work-assignments.routes.js';
+import { createOnboardingRepository } from './modules/onboarding/onboarding.repository.js';
+import { createOnboardingService } from './modules/onboarding/onboarding.service.js';
+import { createOnboardingRouter } from './modules/onboarding/onboarding.routes.js';
 
 // The built web app (`npm run build --workspace @campushr/web`). In production
 // the API serves it from the same address, so the SameSite=Strict refresh
@@ -267,6 +270,16 @@ export function createApp(
       auth,
       createWorkAssignmentService(
         createWorkAssignmentRepository(prisma),
+        notifications.notifier,
+      ),
+    ),
+  );
+  app.use(
+    '/api/v1/onboarding',
+    createOnboardingRouter(
+      auth,
+      createOnboardingService(
+        createOnboardingRepository(prisma),
         notifications.notifier,
       ),
     ),
