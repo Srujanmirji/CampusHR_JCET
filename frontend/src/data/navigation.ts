@@ -13,6 +13,7 @@ import {
   Files,
   GraduationCap,
   ScrollText,
+  ClipboardList,
 } from 'lucide-react';
 
 // `permission` (product/USER_ROLES.md) decides who sees each page; the
@@ -101,6 +102,13 @@ export const navigation: {
     group: 'Administration',
   },
   {
+    path: '/work-assignments',
+    permission: 'work_assignment.read',
+    label: 'Work Delegation',
+    icon: ClipboardList,
+    group: 'Administration',
+  },
+  {
     path: '/reports',
     permission: 'report.read',
     label: 'Reports',
@@ -176,6 +184,13 @@ export const facultyNavigation: {
     permission: 'document.read',
     label: 'My Documents',
     icon: Files,
+    group: 'My Services',
+  },
+  {
+    path: '/work-assignments',
+    permission: 'work_assignment.read',
+    label: 'My Assigned Work',
+    icon: ClipboardList,
     group: 'My Services',
   },
   {
@@ -264,6 +279,13 @@ export const hodNavigation: {
     group: 'Department Staff',
   },
   {
+    path: '/work-assignments',
+    permission: 'work_assignment.read',
+    label: 'Assign & Track Work',
+    icon: ClipboardList,
+    group: 'Department Staff',
+  },
+  {
     path: '/reports',
     permission: 'report.read',
     label: 'Department Reports',
@@ -318,6 +340,13 @@ export const principalNavigation: {
     permission: 'exam_duty.read',
     label: 'Exam Duty Allotments',
     icon: GraduationCap,
+    group: 'Academic Governance',
+  },
+  {
+    path: '/work-assignments',
+    permission: 'work_assignment.read',
+    label: 'Work & Delegations',
+    icon: ClipboardList,
     group: 'Academic Governance',
   },
   {
@@ -403,6 +432,13 @@ export const nonTeachingNavigation: {
     permission: 'document.read',
     label: 'My Documents',
     icon: Files,
+    group: 'My Services & Duties',
+  },
+  {
+    path: '/work-assignments',
+    permission: 'work_assignment.read',
+    label: 'My Assigned Work',
+    icon: ClipboardList,
     group: 'My Services & Duties',
   },
   {

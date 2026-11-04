@@ -50,6 +50,8 @@ export const MATRIX: Record<string, [Cell, Cell, Cell, Cell, Cell, Cell]> = {
   'announcement.send': ['A', 'A', 'A', 'D', '-', '-'],
   'circular.read': ['A', 'A', 'A', 'A', 'A', 'A'],
   'circular.manage': ['A', 'A', 'A', 'D', '-', '-'],
+  'work_assignment.read': ['A', 'A', 'A', 'D', 'O', 'O'],
+  'work_assignment.assign': ['A', 'A', 'A', 'D', '-', '-'],
   'report.read': ['A', 'A', 'A', 'D', '-', '-'],
   'recruitment.read': ['A', 'A', 'A', 'D', '-', '-'],
   'recruitment.manage': ['A', 'A', '-', '-', '-', '-'],

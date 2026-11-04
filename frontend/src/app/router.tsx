@@ -67,6 +67,13 @@ export const router = createBrowserRouter([
         lazy: page(() => import('@/features/circulars/pages/CircularsPage')),
       },
       {
+        path: '/work-assignments',
+        lazy: page(
+          () =>
+            import('@/features/work-assignments/pages/WorkAssignmentsPage'),
+        ),
+      },
+      {
         path: '/reports',
         lazy: page(() => import('@/features/reports/pages/ReportsPage')),
       },

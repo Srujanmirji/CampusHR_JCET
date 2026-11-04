@@ -97,6 +97,9 @@ The key is `resource.action.<scope>`, e.g. `leave.approve.department`.
 | **Digital circulars**                            |             |          |           |     |         |                    |
 | `circular.read`                                  |      A      |    A     |     A     |  A  |    A    |         A          |
 | `circular.manage`                                |      A      |    A     |     A     |  D  |    —    |         —          |
+| **Work delegation**                             |             |          |           |     |         |                    |
+| `work_assignment.read`                           |      A      |    A     |     A     |  D  |    O    |         O          |
+| `work_assignment.assign`                         |      A      |    A     |     A     |  D  |    —    |         —          |
 | **Reports**                                     |             |          |           |     |         |                    |
 | `report.read` (includes export)                 |      A      |    A     |     A     |  D  |    —    |         —          |
 | **Recruitment** (Phase 6)                       |             |          |           |     |         |                    |
