@@ -45,6 +45,12 @@ export const envSchema = z
       .min(1)
       .max(1000)
       .default(80),
+    RESEND_API_KEY: z.string().min(1).optional(),
+    RESEND_FROM: z
+      .string()
+      .min(1)
+      .optional()
+      .default('CampusHR JCET <onboarding@resend.dev>'),
     PUSH_ENABLED: z
       .enum(['true', 'false'])
       .default('false')
@@ -55,9 +61,10 @@ export const envSchema = z
   .refine(
     (env) =>
       !env.PASSWORD_RESET_ENABLED ||
+      !!env.RESEND_API_KEY ||
       !!(env.PASSWORD_RESET_SCRIPT_URL && env.PASSWORD_RESET_SCRIPT_SECRET),
     {
-      message: 'Email reset needs script URL and secret.',
+      message: 'Email reset needs RESEND_API_KEY or script URL and secret.',
       path: ['PASSWORD_RESET_SCRIPT_SECRET'],
     },
   )
