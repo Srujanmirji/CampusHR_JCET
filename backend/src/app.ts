@@ -1,5 +1,6 @@
 import { createPasswordResetService } from './modules/auth/password-reset.service.js';
 import { createPasswordResetRouter } from './modules/auth/password-reset.routes.js';
+import { createEmailService } from './modules/email/email.service.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,14 +77,17 @@ export function createApp(
   },
 ) {
   const auth = createAuthService(authRepository, env.JWT_ACCESS_SECRET);
+  const emailService = createEmailService(env.RESEND_API_KEY, env.RESEND_FROM);
   const notifications = createNotificationService(
     createNotificationRepository(prisma, env.PUSH_ENABLED),
     realtime,
+    emailService,
   );
   const departments = createDepartmentService(
     createDepartmentRepository(prisma),
   );
   const app = express();
+  app.locals.notifier = notifications.notifier;
   app.disable('x-powered-by');
   // Behind Railway's proxy: take the client address from X-Forwarded-For, so
   // sign-in rate limits count people, not the proxy.

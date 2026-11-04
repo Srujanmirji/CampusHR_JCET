@@ -18,7 +18,7 @@
 - [x] Logout
 - [x] Staff logins: HR creates a login for an employee, changes role, turns it off/on, sets a new password
 - [x] Change own password (keeps this session, ends the others)
-- [ ] Password reset (needs SMTP)
+- [x] Password reset via Resend (or Google relay)
 
 ## BE-003 Employees
 
@@ -72,13 +72,13 @@
 
 - [x] Upload metadata
 - [x] Verification
-- [ ] Expiry jobs
+- [x] Expiry jobs
 
 ## BE-011 Notifications
 
 - [x] Notification service
 - [x] Socket.IO events
-- [ ] Email integration (needs an SMTP provider)
+- [x] Email notifications via Resend
 
 ## BE-012 Reports
 

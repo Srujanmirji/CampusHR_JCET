@@ -7,6 +7,7 @@ import type {
 } from './notifications.repository.js';
 import type { Realtime } from './notifications.realtime.js';
 import type { AnnouncementInput, ListQuery } from './notifications.schema.js';
+import type { EmailService } from '../email/email.service.js';
 
 /** What other modules use to tell people something happened. */
 export interface Notifier {
@@ -27,12 +28,38 @@ export interface Notifier {
 export function createNotificationService(
   repo: NotificationRepository,
   realtime?: Pick<Realtime, 'publish'>,
+  emailService?: EmailService,
 ) {
   async function send(userIds: string[], notification: NewNotification) {
     const unique = [...new Set(userIds)];
     if (unique.length === 0) return;
     await repo.create(unique, notification);
     for (const userId of unique) realtime?.publish(userId);
+
+    if (emailService?.isConfigured() && repo.emailsOfUsers) {
+      try {
+        const users = await repo.emailsOfUsers(unique);
+        for (const user of users) {
+          if (user.email) {
+            emailService
+              .sendNotification(
+                user.email,
+                notification.title,
+                notification.body,
+                notification.link,
+              )
+              .catch((err) => {
+                console.warn(
+                  'Failed to send notification email:',
+                  err?.message,
+                );
+              });
+          }
+        }
+      } catch {
+        // email notification failure is logged and never breaks in-app notifications
+      }
+    }
   }
 
   // A failed notification must never undo the leave decision or

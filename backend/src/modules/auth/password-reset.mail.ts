@@ -1,5 +1,23 @@
 import { createHmac } from 'node:crypto';
 import type { ResetMail } from './password-reset.crypto.js';
+import { createEmailService } from '../email/email.service.js';
+
+export async function sendResendResetMail(
+  apiKey: string,
+  from: string | undefined,
+  mail: ResetMail,
+) {
+  try {
+    const service = createEmailService(apiKey, from);
+    await service.sendPasswordReset(mail.to, mail.otp);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(
+      `Password-reset email delivery via Resend failed: ${message}`,
+      { cause: error },
+    );
+  }
+}
 
 export async function sendResetMail(
   url: string,

@@ -23,6 +23,7 @@
     "test:db": "tsx test/db/run.ts"
   },
   "dependencies": {
+    "@campushr/password-policy": "*",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "bcrypt": "^6.0.0",
@@ -33,9 +34,9 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.4.0",
     "pg": "^8.23.1",
+    "resend": "^6.37.0",
     "socket.io": "^4.8.4",
-    "zod": "^4.6.5",
-    "@campushr/password-policy": "*"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.4.3",
