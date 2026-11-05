@@ -96,8 +96,8 @@ try {
   );
   await page
     .getByLabel('Employee ID or College Email', { exact: true })
-    .fill('faculty-check@jcet.test');
-  await page.getByLabel('Password', { exact: true }).fill('home-check-only');
+    .fill('asha.patil@jcethbl.edu.in');
+  await page.getByLabel('Password', { exact: true }).fill('CampusHR@2026');
   await page.getByLabel('Password', { exact: true }).press('Enter');
   await page.getByText("Today's Schedule", { exact: true }).waitFor();
   await shot('faculty-home-375');
@@ -188,8 +188,8 @@ try {
   await hod.goto(base);
   await hod
     .getByLabel('Employee ID or College Email', { exact: true })
-    .fill('home-check@jcet.test');
-  await hod.getByLabel('Password', { exact: true }).fill('home-check-only');
+    .fill('hod.cse@jcethbl.edu.in');
+  await hod.getByLabel('Password', { exact: true }).fill('CampusHR@2026');
   await hod.getByRole('button', { name: 'Sign In', exact: true }).click();
   await hod.getByText('Your department today', { exact: true }).waitFor();
   await hod.screenshot({ path: out + '/hod-home.png', fullPage: true });
@@ -222,7 +222,7 @@ try {
   await hod.getByRole('button', { name: 'Close leave decision' }).click();
   await hod.getByRole('tab', { name: 'Workload', exact: true }).click();
   await hod.getByText('Department workload', { exact: true }).waitFor();
-  await hod.getByText('Home Test', { exact: true }).waitFor();
+  await hod.getByText('Dr. Ramesh K', { exact: true }).waitFor();
   await hod.screenshot({ path: out + '/hod-workload.png', fullPage: true });
   await mode('notifications-live');
   await hod.goto(base + '/notifications');
@@ -244,7 +244,7 @@ try {
   assert.equal(await hod.getByText(/\d+ points/).count(), 0);
   hod.on('dialog', (dialog) => dialog.accept());
   await hod
-    .getByRole('button', { name: 'Select Coverage Recipient', exact: true })
+    .getByRole('button', { name: 'Select Prof. Priya Kulkarni', exact: true })
     .click();
   await hod
     .getByRole('button', { name: 'Confirm coverage', exact: true })
@@ -266,7 +266,7 @@ try {
     .first()
     .click();
   await hod
-    .getByRole('button', { name: 'Select Coverage Recipient', exact: true })
+    .getByRole('button', { name: 'Select Prof. Priya Kulkarni', exact: true })
     .click();
   await mode('coverage-uncertain');
   await hod
@@ -288,7 +288,7 @@ try {
   await hod
     .getByRole('button', { name: 'Check recorded coverage', exact: true })
     .click();
-  await hod.getByText(/Recorded coverage: Coverage Recipient/).waitFor();
+  await hod.getByText(/Recorded coverage: Prof. Priya Kulkarni/).waitFor();
   assert.deepEqual(errors, []);
   await hodContext.close();
   globalThis.console.log(

@@ -45,6 +45,16 @@ export const router = createBrowserRouter([
         lazy: page(() => import('@/features/leave/pages/LeavePage')),
       },
       {
+        path: '/on-duty',
+        lazy: page(() => import('@/features/on-duty/pages/OnDutyPage')),
+      },
+      {
+        path: '/academic-calendar',
+        lazy: page(
+          () => import('@/features/academic-calendar/pages/AcademicCalendarPage'),
+        ),
+      },
+      {
         path: '/timetable',
         lazy: page(() => import('@/features/timetable/pages/TimetablePage')),
       },
@@ -57,6 +67,25 @@ export const router = createBrowserRouter([
         lazy: page(
           () => import('@/features/substitution/pages/SubstitutionPage'),
         ),
+      },
+      {
+        path: '/exam-duty',
+        lazy: page(() => import('@/features/exam-duty/pages/ExamDutyPage')),
+      },
+      {
+        path: '/circulars',
+        lazy: page(() => import('@/features/circulars/pages/CircularsPage')),
+      },
+      {
+        path: '/work-assignments',
+        lazy: page(
+          () =>
+            import('@/features/work-assignments/pages/WorkAssignmentsPage'),
+        ),
+      },
+      {
+        path: '/onboarding',
+        lazy: page(() => import('@/features/onboarding/pages/OnboardingPage')),
       },
       {
         path: '/reports',

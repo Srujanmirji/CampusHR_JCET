@@ -246,3 +246,93 @@ export async function updateAttendanceSettings(
   });
   return (res as { data: AttendanceSettings }).data;
 }
+
+export interface BiometricPunchItem {
+  employeeCode: string;
+  timestamp: string;
+  punchType?: 'IN' | 'OUT' | 'AUTO';
+  deviceId?: string;
+  verificationType?: 'FINGERPRINT' | 'FACE' | 'RFID' | 'MANUAL';
+}
+
+export interface BiometricSyncPayload {
+  deviceId?: string;
+  location?: string;
+  punches: BiometricPunchItem[];
+}
+
+export interface BiometricSyncResult {
+  syncedCount: number;
+  unmatchedCount: number;
+  unmatchedCodes: string[];
+  recordsCreatedOrUpdated: number;
+  datesAffected: string[];
+  deviceId: string;
+}
+
+export interface BiometricImportPayload {
+  deviceId?: string;
+  rows: Array<{
+    employeeCode: string;
+    date: string;
+    checkIn?: string | null;
+    checkOut?: string | null;
+    status?: 'PRESENT' | 'ABSENT' | 'HALF_DAY' | 'ON_LEAVE' | 'LATE';
+    notes?: string | null;
+  }>;
+}
+
+export interface BiometricImportResult {
+  importedCount: number;
+  unmatchedCount: number;
+  unmatchedCodes: string[];
+  recordsCreatedOrUpdated: number;
+}
+
+export interface BiometricDevice {
+  id: string;
+  name: string;
+  location: string;
+  ipAddress?: string;
+  status: 'ONLINE' | 'OFFLINE';
+  lastSyncAt: string | null;
+  model: string;
+}
+
+export interface BiometricStatsResult {
+  todayBiometricCount: number;
+  totalAttendanceToday: number;
+  recentPunches: AttendanceRecord[];
+  activeDevicesCount: number;
+  lastSyncTime: string | null;
+}
+
+export async function syncBiometricPunches(
+  payload: BiometricSyncPayload,
+): Promise<BiometricSyncResult> {
+  const res = await apiRequest('/attendance/biometric/sync', {
+    method: 'POST',
+    body: payload,
+  });
+  return (res as { data: BiometricSyncResult }).data;
+}
+
+export async function importBiometricRows(
+  payload: BiometricImportPayload,
+): Promise<BiometricImportResult> {
+  const res = await apiRequest('/attendance/biometric/import', {
+    method: 'POST',
+    body: payload,
+  });
+  return (res as { data: BiometricImportResult }).data;
+}
+
+export async function getBiometricStats(): Promise<BiometricStatsResult> {
+  const res = await apiRequest('/attendance/biometric/stats');
+  return (res as { data: BiometricStatsResult }).data;
+}
+
+export async function getBiometricDevices(): Promise<BiometricDevice[]> {
+  const res = await apiRequest('/attendance/biometric/devices');
+  return (res as { data: BiometricDevice[] }).data;
+}

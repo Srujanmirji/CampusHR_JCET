@@ -42,15 +42,15 @@ the iOS simulator on this Mac.
 
 ## Accounts
 
-All initial passwords are `home-check-only`. These are local demo identities with separate
+All initial passwords are `CampusHR@2026`. These are local demo identities with separate
 employee records and the normal role permission matrix.
 
 | Role | Login | Employee |
 | --- | --- | --- |
-| Faculty | faculty-check@jcet.test | Asha Patil · JCET-CSE-021 |
-| HOD | home-check@jcet.test | Ramesh Kulkarni · JCET-CSE-001 |
+| Faculty | asha.patil@jcethbl.edu.in | Asha Patil · JCET-CSE-021 |
+| HOD | hod.cse@jcethbl.edu.in | Ramesh Kulkarni · JCET-CSE-001 |
 | HR | hr-check@jcet.test | Maya Desai · JCET-HR-001 |
-| Substitute | coverage-recipient@jcet.test | Priya Kulkarni · JCET-CSE-022 |
+| Substitute | priya.kulkarni@jcethbl.edu.in | Priya Kulkarni · JCET-CSE-022 |
 
 The mobile Faculty/HOD workflows are retained. HR final approval uses the existing web app.
 CL/DL/RH/EL balances and Monday theory/laboratory classes are seeded for testing.

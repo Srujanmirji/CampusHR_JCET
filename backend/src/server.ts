@@ -1,4 +1,5 @@
 import { startResetDelivery } from './modules/auth/password-reset.service.js';
+import { startDocumentExpiryWorker } from './modules/documents/documents.expiry.js';
 import 'dotenv/config';
 import { createApp } from './app.js';
 import { envSchema } from './config/env.js';
@@ -21,11 +22,12 @@ if (!parsed.success) {
 const prisma = createPrismaClient(parsed.data.DATABASE_URL);
 const authRepository = createPrismaAuthRepository(prisma);
 const realtime = createRealtime();
-const server = createApp(parsed.data, {
+const app = createApp(parsed.data, {
   authRepository,
   prisma,
   realtime,
-}).listen(parsed.data.PORT, () => {
+});
+const server = app.listen(parsed.data.PORT, () => {
   console.log(`CampusHR API listening on port ${parsed.data.PORT}`);
 });
 const stopReset = startResetDelivery(prisma, parsed.data);
@@ -35,6 +37,7 @@ const stopPush = parsed.data.PUSH_ENABLED
       parsed.data.EXPO_ACCESS_TOKEN,
     ).start()
   : async () => {};
+const stopExpiry = startDocumentExpiryWorker(prisma, app.locals.notifier);
 const auth = createAuthService(authRepository, parsed.data.JWT_ACCESS_SECRET);
 realtime.attach(server, {
   origin: parsed.data.CORS_ORIGIN,
@@ -52,6 +55,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
       clearTimeout(timeout);
       await stopReset();
       await stopPush();
+      await stopExpiry();
       await prisma.$disconnect();
       process.exit(error ? 1 : 0);
     });

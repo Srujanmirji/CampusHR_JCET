@@ -108,6 +108,12 @@ export function createNotificationRepository(
       });
       return user?.id ?? null;
     },
+    async emailsOfUsers(userIds: string[]) {
+      return prisma.user.findMany({
+        where: { id: { in: userIds }, status: 'ACTIVE' },
+        select: { id: true, email: true },
+      });
+    },
     /** Active logins, optionally only those in one department. */
     async activeUsers(departmentId: number | undefined) {
       const users = await prisma.user.findMany({

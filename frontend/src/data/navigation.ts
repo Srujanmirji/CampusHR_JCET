@@ -11,6 +11,11 @@ import {
   Bell,
   Settings,
   Files,
+  GraduationCap,
+  ScrollText,
+  ClipboardList,
+  UserPlus,
+  Briefcase,
 } from 'lucide-react';
 
 // `permission` (product/USER_ROLES.md) decides who sees each page; the
@@ -33,6 +38,13 @@ export const navigation: {
     permission: 'employee.read',
     label: 'Employees',
     icon: UsersRound,
+    group: 'People & academics',
+  },
+  {
+    path: '/onboarding',
+    permission: 'recruitment.read',
+    label: 'Recruitment & Onboarding',
+    icon: UserPlus,
     group: 'People & academics',
   },
   {
@@ -64,6 +76,13 @@ export const navigation: {
     group: 'People & academics',
   },
   {
+    path: '/on-duty',
+    permission: 'on_duty.read',
+    label: 'On-Duty (OD)',
+    icon: Briefcase,
+    group: 'People & academics',
+  },
+  {
     path: '/timetable',
     permission: 'timetable.read',
     label: 'Timetable',
@@ -85,6 +104,27 @@ export const navigation: {
     group: 'People & academics',
   },
   {
+    path: '/exam-duty',
+    permission: 'exam_duty.read',
+    label: 'Exam Duty Allotment',
+    icon: GraduationCap,
+    group: 'People & academics',
+  },
+  {
+    path: '/circulars',
+    permission: 'circular.read',
+    label: 'Digital Circulars',
+    icon: ScrollText,
+    group: 'Administration',
+  },
+  {
+    path: '/work-assignments',
+    permission: 'work_assignment.read',
+    label: 'Work Delegation',
+    icon: ClipboardList,
+    group: 'Administration',
+  },
+  {
     path: '/reports',
     permission: 'report.read',
     label: 'Reports',
@@ -96,6 +136,13 @@ export const navigation: {
     permission: 'notification.read',
     label: 'Notifications',
     icon: Bell,
+    group: 'Administration',
+  },
+  {
+    path: '/academic-calendar',
+    permission: 'academic_calendar.read',
+    label: 'Academic Calendar',
+    icon: CalendarDays,
     group: 'Administration',
   },
   {
@@ -135,6 +182,20 @@ export const facultyNavigation: {
     group: 'My Academics',
   },
   {
+    path: '/exam-duty',
+    permission: 'exam_duty.read',
+    label: 'My Exam Duties',
+    icon: GraduationCap,
+    group: 'My Academics',
+  },
+  {
+    path: '/academic-calendar',
+    permission: 'academic_calendar.read',
+    label: 'Academic Calendar',
+    icon: CalendarDays,
+    group: 'My Academics',
+  },
+  {
     path: '/attendance',
     permission: 'attendance.read',
     label: 'My Attendance',
@@ -149,11 +210,32 @@ export const facultyNavigation: {
     group: 'My Services',
   },
   {
+    path: '/on-duty',
+    permission: 'on_duty.read',
+    label: 'On-Duty (OD)',
+    icon: Briefcase,
+    group: 'My Services',
+  },
+  {
     path: '/documents',
     permission: 'document.read',
     label: 'My Documents',
     icon: Files,
     group: 'My Services',
+  },
+  {
+    path: '/work-assignments',
+    permission: 'work_assignment.read',
+    label: 'My Assigned Work',
+    icon: ClipboardList,
+    group: 'My Services',
+  },
+  {
+    path: '/circulars',
+    permission: 'circular.read',
+    label: 'Notice Board',
+    icon: ScrollText,
+    group: 'Communication',
   },
   {
     path: '/notifications',
@@ -199,10 +281,24 @@ export const hodNavigation: {
     group: 'Academic Operations',
   },
   {
+    path: '/exam-duty',
+    permission: 'exam_duty.read',
+    label: 'Exam Duty & Swaps',
+    icon: GraduationCap,
+    group: 'Academic Operations',
+  },
+  {
     path: '/employees',
     permission: 'employee.read',
     label: 'Faculty Directory',
     icon: UsersRound,
+    group: 'Department Staff',
+  },
+  {
+    path: '/onboarding',
+    permission: 'recruitment.read',
+    label: 'Dept. Recruits',
+    icon: UserPlus,
     group: 'Department Staff',
   },
   {
@@ -220,6 +316,13 @@ export const hodNavigation: {
     group: 'Department Staff',
   },
   {
+    path: '/on-duty',
+    permission: 'on_duty.read',
+    label: 'On-Duty Approvals',
+    icon: Briefcase,
+    group: 'Department Staff',
+  },
+  {
     path: '/documents',
     permission: 'document.read',
     label: 'Faculty Documents',
@@ -227,10 +330,24 @@ export const hodNavigation: {
     group: 'Department Staff',
   },
   {
+    path: '/work-assignments',
+    permission: 'work_assignment.read',
+    label: 'Assign & Track Work',
+    icon: ClipboardList,
+    group: 'Department Staff',
+  },
+  {
     path: '/reports',
     permission: 'report.read',
     label: 'Department Reports',
     icon: ChartColumn,
+    group: 'Administration',
+  },
+  {
+    path: '/circulars',
+    permission: 'circular.read',
+    label: 'Circulars & Notices',
+    icon: ScrollText,
     group: 'Administration',
   },
   {
@@ -270,6 +387,20 @@ export const principalNavigation: {
     group: 'Academic Governance',
   },
   {
+    path: '/exam-duty',
+    permission: 'exam_duty.read',
+    label: 'Exam Duty Allotments',
+    icon: GraduationCap,
+    group: 'Academic Governance',
+  },
+  {
+    path: '/work-assignments',
+    permission: 'work_assignment.read',
+    label: 'Work & Delegations',
+    icon: ClipboardList,
+    group: 'Academic Governance',
+  },
+  {
     path: '/departments',
     permission: 'department.read',
     label: 'Academic Departments',
@@ -281,6 +412,13 @@ export const principalNavigation: {
     permission: 'employee.read',
     label: 'Faculty & Staff',
     icon: UsersRound,
+    group: 'Institutional People',
+  },
+  {
+    path: '/onboarding',
+    permission: 'recruitment.read',
+    label: 'Recruitment & Offers',
+    icon: UserPlus,
     group: 'Institutional People',
   },
   {
@@ -298,10 +436,24 @@ export const principalNavigation: {
     group: 'Institutional People',
   },
   {
+    path: '/on-duty',
+    permission: 'on_duty.read',
+    label: 'On-Duty Sanctions',
+    icon: Briefcase,
+    group: 'Institutional People',
+  },
+  {
     path: '/reports',
     permission: 'report.read',
     label: 'Executive Reports',
     icon: ChartColumn,
+    group: 'Executive & Reports',
+  },
+  {
+    path: '/circulars',
+    permission: 'circular.read',
+    label: 'Institutional Circulars',
+    icon: ScrollText,
     group: 'Executive & Reports',
   },
   {
@@ -341,11 +493,32 @@ export const nonTeachingNavigation: {
     group: 'My Services & Duties',
   },
   {
+    path: '/on-duty',
+    permission: 'on_duty.read',
+    label: 'On-Duty (OD)',
+    icon: Briefcase,
+    group: 'My Services & Duties',
+  },
+  {
     path: '/documents',
     permission: 'document.read',
     label: 'My Documents',
     icon: Files,
     group: 'My Services & Duties',
+  },
+  {
+    path: '/work-assignments',
+    permission: 'work_assignment.read',
+    label: 'My Assigned Work',
+    icon: ClipboardList,
+    group: 'My Services & Duties',
+  },
+  {
+    path: '/circulars',
+    permission: 'circular.read',
+    label: 'Campus Circulars',
+    icon: ScrollText,
+    group: 'Communication',
   },
   {
     path: '/notifications',

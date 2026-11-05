@@ -34,12 +34,12 @@ const mode = async (name) =>
       .status,
     204,
   );
-const login = async (page, email = 'home-check@jcet.test') => {
+const login = async (page, email = 'hod.cse@jcethbl.edu.in') => {
   await page.goto(base);
   await page
     .getByLabel('Employee ID or College Email', { exact: true })
     .fill(email);
-  await page.getByLabel('Password', { exact: true }).fill('home-check-only');
+  await page.getByLabel('Password', { exact: true }).fill('CampusHR@2026');
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
   await page
     .getByRole('button', { name: 'Refresh all Home summaries', exact: true })
@@ -308,7 +308,7 @@ try {
     viewport: { width: 375, height: 812 },
   });
   const admin = await context.newPage();
-  await login(admin, 'no-employee@jcet.test');
+  await login(admin, 'no-employee@jcethbl.edu.in');
   await admin
     .getByRole('button', { name: 'My Leave Records', exact: true })
     .click();

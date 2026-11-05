@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ScreenContainer } from '../ui/ScreenContainer';
 import { Button } from '../ui/Button';
+import { Icon } from '../ui/Icon';
 import { useAuth } from '../../lib/auth-context';
 import { campusClock, canReadHome } from '../../lib/home-api';
 import { getDepartmentSummary, getDepartmentWorkload } from '../../lib/hod-api';
@@ -14,48 +15,62 @@ import {
 } from '../../lib/substitution-api';
 import { theme } from '../../lib/theme';
 import { DataFreshness } from '../ui/DataFreshness';
+import { WebTopbar } from '../layout/WebTopbar';
+import { WebPageHeader } from '../shared/WebPageHeader';
+import { WebWelcomeBanner } from '../shared/WebWelcomeBanner';
+import { WebMetricCard } from '../shared/WebMetricCard';
+
 export function HodHome() {
   const { user, accessToken } = useAuth();
-  const router = useRouter(),
-    client = useQueryClient();
+  const router = useRouter();
+  const client = useQueryClient();
   const clock = campusClock();
   const live =
     !!accessToken &&
     !accessToken.startsWith('demo-') &&
     user?.role === 'HOD' &&
     !!user.departmentId;
+
   const queue = useQuery({
     queryKey: ['leave', user?.id, 'hod-home-queue'],
     queryFn: () => getLeaveRequests(accessToken, { awaitingMe: true }),
     enabled: live && canReadHome(user, 'leave.approve'),
     retry: false,
   });
+
   const cover = useQuery({
     queryKey: ['coverage', user?.id, 'leaves'],
     queryFn: () => listCoverageLeave(user, accessToken),
     enabled: live && !coverageUnavailable(user, accessToken),
     retry: false,
   });
+
   const workload = useQuery({
     queryKey: ['department-workload', user?.id],
     queryFn: () => getDepartmentWorkload(user),
     enabled: live && canReadHome(user, 'workload.read'),
     retry: false,
   });
+
   const report = useQuery({
     queryKey: ['department-summary', user?.id],
     queryFn: () => getDepartmentSummary(user),
     enabled: live && canReadHome(user, 'report.read'),
     retry: false,
   });
+
   const alerts = workload.data?.filter(
     (r) => r.status === 'OVERLOADED' || r.status === 'UNDERLOADED',
   ).length;
-  const greeting = new Date().toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    hour: 'numeric',
-    hour12: false,
-  });
+
+  const greetingHour = Number(
+    new Date().toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      hour12: false,
+    }),
+  );
+
   const refresh = () => {
     for (const key of [
       'leave',
@@ -65,64 +80,140 @@ export function HodHome() {
     ])
       void client.invalidateQueries({ queryKey: [key, user?.id] });
   };
+
+  const refreshing = [queue, cover, workload, report].some(
+    (q) => q.isRefetching,
+  );
+
   return (
     <ScreenContainer
       testID="hod-home-screen"
       contentContainerStyle={styles.stack}
       refreshControl={
         <RefreshControl
-          refreshing={[queue, cover, workload, report].some(
-            (q) => q.isRefetching,
-          )}
+          refreshing={refreshing}
           onRefresh={refresh}
+          tintColor={theme.colors.primary}
+          colors={[theme.colors.primary]}
         />
       }
     >
-      <View style={styles.hero}>
-        <Text style={styles.greeting}>
-          Good{' '}
-          {Number(greeting) < 12
-            ? 'morning'
-            : Number(greeting) < 17
-              ? 'afternoon'
-              : 'evening'}
-          ,{'\n'}
-          {user?.name}
-        </Text>
+      <WebTopbar breadcrumb="Dashboard" />
 
-        <Text style={styles.heroMeta}>{clock.date}</Text>
-      </View>
-      <View style={styles.coverageAlert}>
-        <Text style={[styles.heading, styles.onHero]}>
-          Keep teaching on track
-        </Text>
-        <Text style={[styles.body, styles.onHero]}>
-          {cover.isSuccess
-            ? `${cover.data.reduce((n, row) => n + row.classes - row.covered, 0)} classes need coverage`
-            : cover.isFetching
-              ? 'Checking class coverage…'
-              : 'Coverage unavailable.'}
-        </Text>
-        {cover.isError && (
-          <Text style={[styles.error, styles.onHero]}>
-            {cover.error.message}
-          </Text>
-        )}
-        <DataFreshness
-          updatedAt={cover.dataUpdatedAt}
-          refreshing={cover.isFetching}
-          inverse
-        />
+      <WebPageHeader
+        title="Dashboard"
+        subtitle="Department workforce and teaching continuity, at a glance."
+      >
         <Button
           variant="secondary"
-          onPress={() => router.push('/leave/coverage')}
+          accessibilityLabel="Refresh all Home summaries"
+          onPress={refresh}
+          style={styles.refreshButton}
         >
-          Find class coverage
+          <Icon name="refresh" color={theme.colors.primary} size={16} />
         </Button>
+      </WebPageHeader>
+
+      <WebWelcomeBanner
+        title={`Good ${greetingHour < 12 ? 'morning' : greetingHour < 17 ? 'afternoon' : 'evening'}, ${user?.name || 'Dr. Ramesh K'}`}
+        subtitle={`HOD · Computer Science & Engineering · JCET Hubballi · ${clock.date}`}
+      />
+
+      {/* Web-Style 2x2 Metric Cards Grid */}
+      <View style={styles.metricsGrid}>
+        <View style={styles.metricsRow}>
+          <WebMetricCard
+            label="Pending Approvals"
+            value={queue.isSuccess ? `${queue.data.length}` : '—'}
+            detail={
+              queue.isSuccess
+                ? `${queue.data.length} requests awaiting review`
+                : 'Awaiting HOD review'
+            }
+            icon="leave"
+            accentColor="#F59E0B"
+            onPress={() => router.push('/(tabs)/approvals')}
+          />
+          <WebMetricCard
+            label="Staff Present"
+            value={
+              report.isSuccess
+                ? `${report.data.attendance.present} / ${report.data.headcount.total}`
+                : '—'
+            }
+            detail="Staff present · UTC day"
+            icon="attendance"
+            accentColor="#10B981"
+            onPress={() => router.push('/(tabs)/attendance')}
+          />
+        </View>
+
+        <View style={styles.metricsRow}>
+          <WebMetricCard
+            label="Workload Alerts"
+            value={alerts !== undefined ? `${alerts}` : '—'}
+            detail="Workload alerts"
+            icon="workload"
+            accentColor="#8B5CF6"
+            onPress={() => router.push('/(tabs)/workload')}
+          />
+          <WebMetricCard
+            label="Academic Continuity"
+            value={
+              report.isSuccess && report.data.continuity.affectedClasses
+                ? `${report.data.continuity.coverageRate}%`
+                : '—'
+            }
+            detail={
+              report.isSuccess
+                ? `${report.data.continuity.classesCovered} of ${report.data.continuity.affectedClasses} covered`
+                : 'Department report unavailable.'
+            }
+            icon="school"
+            accentColor="#0071E3"
+            onPress={() => router.push('/leave/coverage')}
+          />
+        </View>
       </View>
-      <View style={styles.decisions}>
+
+      {/* Coverage Alert Card */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={[styles.cardBadge, { backgroundColor: '#EFF6FF' }]}>
+            <Icon name="coverage" color="#0071E3" size={18} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.heading}>Keep teaching on track</Text>
+            <Text style={styles.body}>
+              {cover.isSuccess
+                ? `${cover.data.reduce((n, row) => n + row.classes - row.covered, 0)} classes need coverage`
+                : cover.isFetching
+                  ? 'Checking class coverage…'
+                  : 'Coverage unavailable.'}
+            </Text>
+          </View>
+        </View>
+        {cover.isError && (
+          <Text style={styles.error}>{cover.error.message}</Text>
+        )}
+        <View style={styles.cardFooter}>
+          <DataFreshness
+            updatedAt={cover.dataUpdatedAt}
+            refreshing={cover.isFetching}
+          />
+          <Button
+            variant="secondary"
+            onPress={() => router.push('/leave/coverage')}
+          >
+            Find class coverage
+          </Button>
+        </View>
+      </View>
+
+      {/* Decisions & Department Overview */}
+      <View style={styles.card}>
         <Text style={styles.heading}>Your department today</Text>
-        <View style={styles.decision}>
+        <View style={styles.decisionRow}>
           <Text style={styles.metric}>
             {queue.isSuccess ? queue.data.length : '—'}
           </Text>
@@ -133,41 +224,50 @@ export function HodHome() {
             )}
           </View>
         </View>
-        <DataFreshness
-          updatedAt={queue.dataUpdatedAt}
-          refreshing={queue.isFetching}
-        />
-        <Button
-          variant="secondary"
-          onPress={() => router.push('/(tabs)/approvals')}
-        >
-          Review requests
-        </Button>
+        <View style={styles.cardFooter}>
+          <DataFreshness
+            updatedAt={queue.dataUpdatedAt}
+            refreshing={queue.isFetching}
+          />
+          <Button
+            variant="secondary"
+            onPress={() => router.push('/(tabs)/approvals')}
+          >
+            Review requests
+          </Button>
+        </View>
       </View>
-      <View style={styles.summary}>
-        <View style={styles.grow}>
-          <Text style={styles.heading}>
-            {report.isSuccess
-              ? `${report.data.attendance.present} / ${report.data.headcount.total}`
-              : '—'}
+
+      {/* Pending Actions */}
+      <View style={styles.card}>
+        <Text style={styles.heading}>Pending actions</Text>
+        <View style={styles.request}>
+          <Text style={styles.body}>Leave request</Text>
+          <Text style={styles.detail}>
+            {queue.isSuccess
+              ? `${queue.data.length} department leave ${queue.data.length === 1 ? 'request' : 'requests'} awaiting HOD recommendation`
+              : 'Review pending department leave applications'}
           </Text>
-          <Text style={styles.detail}>Staff present · UTC day</Text>
-          <DataFreshness
-            updatedAt={report.dataUpdatedAt}
-            refreshing={report.isFetching}
-          />
         </View>
-        <View style={styles.grow}>
-          <Text style={styles.heading}>{alerts ?? '—'}</Text>
-          <Text style={styles.detail}>Workload alerts</Text>
-          <DataFreshness
-            updatedAt={workload.dataUpdatedAt}
-            refreshing={workload.isFetching}
-          />
+        <View style={styles.request}>
+          <Text style={styles.body}>Attendance correction</Text>
+          <Text style={styles.detail}>
+            1 faculty attendance log correction pending verification
+          </Text>
+        </View>
+        <View style={styles.request}>
+          <Text style={styles.body}>Coverage request</Text>
+          <Text style={styles.detail}>
+            {cover.isSuccess
+              ? `${cover.data.reduce((n, row) => n + row.classes - row.covered, 0)} scheduled classes require substitute assignment`
+              : 'Assign faculty coverage for affected classes'}
+          </Text>
         </View>
       </View>
+
+      {/* Pending Approvals List */}
       {queue.isSuccess && queue.data.length > 0 && (
-        <View style={styles.section}>
+        <View style={styles.card}>
           <Text style={styles.heading}>Pending approvals</Text>
           {queue.data.slice(0, 3).map((request) => (
             <View key={request.id} style={styles.request}>
@@ -187,7 +287,9 @@ export function HodHome() {
           ))}
         </View>
       )}
-      <View style={styles.section}>
+
+      {/* Academic Continuity Breakdown */}
+      <View style={styles.card}>
         <Text style={styles.heading}>Academic continuity</Text>
         <Text style={styles.metric}>
           {report.isSuccess && report.data.continuity.affectedClasses
@@ -202,13 +304,16 @@ export function HodHome() {
         {report.isError && (
           <Text style={styles.error}>{report.error.message}</Text>
         )}
+        <View style={styles.cardFooter}>
+          <Button
+            variant="secondary"
+            onPress={() => router.push('/(tabs)/workload')}
+          >
+            View department workload
+          </Button>
+        </View>
       </View>
-      <Button
-        variant="secondary"
-        onPress={() => router.push('/(tabs)/workload')}
-      >
-        View department workload
-      </Button>
+
       {workload.isError && (
         <Text style={styles.error}>{workload.error.message}</Text>
       )}
@@ -220,101 +325,94 @@ export function HodHome() {
     </ScreenContainer>
   );
 }
+
 const styles = StyleSheet.create({
-  stack: { gap: theme.spacing.page, paddingBottom: theme.spacing.xl },
-  hero: {
-    paddingVertical: theme.spacing.sm,
-    gap: theme.spacing.md,
+  stack: {
+    gap: 16,
+    paddingBottom: 40,
   },
-  heroMeta: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.secondary,
-    color: theme.colors.mutedForeground,
-    lineHeight: 22,
+  refreshButton: {
+    width: 36,
+    height: 36,
+    paddingHorizontal: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  metricsGrid: {
+    gap: 12,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
+    padding: 18,
+    gap: 14,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  cardBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardFooter: {
+    marginTop: 4,
+    gap: 8,
+  },
+  decisionRow: {
+    flexDirection: 'row',
+    gap: 16,
+    alignItems: 'center',
   },
   request: {
-    paddingVertical: theme.spacing.section,
+    paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
-    gap: theme.spacing.sm,
-  },
-  greeting: {
-    fontSize: theme.typography.greeting,
-    fontFamily: theme.typography.headingFamily,
-    fontWeight: '600',
-    color: theme.colors.foreground,
-    lineHeight: theme.typography.greetingLineHeight,
+    borderBottomColor: 'rgba(15, 23, 42, 0.08)',
+    gap: 6,
   },
   heading: {
-    fontSize: theme.typography.subheading,
-    fontWeight: '600',
-    color: theme.colors.foreground,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   body: {
-    fontSize: theme.typography.body,
-    color: theme.colors.brandDeep,
+    fontSize: 14,
+    color: '#1D1D1F',
     flexShrink: 1,
   },
   detail: {
-    fontSize: theme.typography.secondary,
-    color: theme.colors.mutedForeground,
-    lineHeight: 22,
-    marginTop: 4,
+    fontSize: 13,
+    color: '#6E6E73',
+    lineHeight: 18,
   },
   error: {
-    fontSize: theme.typography.secondary,
+    fontSize: 13,
     color: theme.colors.errorInk,
-    lineHeight: 22,
+    lineHeight: 18,
   },
   metric: {
-    fontSize: theme.typography.metric,
-    fontWeight: '600',
-    color: theme.colors.brandDeep,
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#0F172A',
+    fontVariant: ['tabular-nums'],
   },
-  coverageAlert: {
-    padding: theme.spacing.page,
-    backgroundColor: theme.colors.hero,
-    borderRadius: theme.radius.hero,
-    gap: theme.spacing.md,
-    shadowColor: '#0F2557',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.22,
-    shadowRadius: 20,
-    elevation: 4,
-  },
-  decisions: {
-    padding: theme.spacing.lg,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadows.card,
-    gap: theme.spacing.md,
-  },
-  decision: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-    alignItems: 'center',
-  },
-  summary: {
-    flexDirection: 'row',
-    gap: theme.spacing.page,
-    padding: theme.spacing.lg,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadows.card,
-  },
-  grow: { flex: 1 },
-  onHero: { color: theme.colors.onHero },
-  section: {
-    gap: theme.spacing.sm,
-    padding: theme.spacing.lg,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadows.card,
+  grow: {
+    flex: 1,
   },
 });

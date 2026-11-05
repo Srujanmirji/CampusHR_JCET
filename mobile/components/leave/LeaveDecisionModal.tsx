@@ -24,6 +24,8 @@ import {
   ApprovalPath,
   FacultyInitials,
   LeaveStatus,
+  LeaveTypeBadge,
+  OfficialDutyBadge,
   leaveDates,
 } from './LeavePresentation';
 import {
@@ -63,7 +65,9 @@ export function LeaveDecisionModal({
   const { fontScale } = useWindowDimensions();
   const { user } = useAuth();
   const scroll = useRef<ScrollViewInstance>(null);
-  const [choice, setChoice] = useState<'APPROVE' | 'REJECT' | null>(null);
+  const [choice, setChoice] = useState<
+    'APPROVE' | 'RECOMMEND' | 'RECOMMEND_COVERAGE' | 'REJECT' | null
+  >(null);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
@@ -126,15 +130,23 @@ export function LeaveDecisionModal({
   }, [choice, reduceMotion]);
   if (!request) return null;
   const isReject = choice === 'REJECT';
+  const isFinalAuthority =
+    user?.role === 'PRINCIPAL' ||
+    user?.role === 'HR_ADMIN' ||
+    user?.role === 'HR' ||
+    user?.permissions.includes('leave.approve.all');
+
   const canDecide =
     current.isSuccess &&
     !current.isFetching &&
     request.status === 'PENDING' &&
-    request.pendingRole === 'HOD' &&
-    user?.role === 'HOD' &&
-    user.employeeId !== request.employee.id &&
-    user.departmentId === request.department.id &&
-    canReadHome(user, 'leave.approve');
+    ((request.pendingRole === 'HOD' &&
+      user?.role === 'HOD' &&
+      user.employeeId !== request.employee.id &&
+      user.departmentId === request.department.id &&
+      canReadHome(user, 'leave.approve')) ||
+      (isFinalAuthority && canReadHome(user, 'leave.approve')));
+
   const selectedBalance = balances.data?.find(
     (balance) => balance.leaveType.id === request.leaveType.id,
   );
@@ -157,7 +169,7 @@ export function LeaveDecisionModal({
       const fresh = await current.refetch({ throwOnError: true });
       if (
         fresh.data?.status !== 'PENDING' ||
-        fresh.data.pendingRole !== 'HOD'
+        (fresh.data.pendingRole !== 'HOD' && !isFinalAuthority)
       ) {
         setError(
           'This request has changed. Review its current status before proceeding.',
@@ -169,10 +181,17 @@ export function LeaveDecisionModal({
           'Your session changed. Reopen the request before deciding.',
         );
       writeStarted = true;
+      const actionMap = {
+        REJECT: 'reject' as const,
+        APPROVE: 'approve' as const,
+        RECOMMEND: 'recommend' as const,
+        RECOMMEND_COVERAGE: 'recommend_coverage' as const,
+      };
+      const action = actionMap[choice];
       const result = await decideLeaveRequest(
         token,
         request.id,
-        !isReject,
+        action,
         note.trim(),
         deciderName,
       );
@@ -246,7 +265,11 @@ export function LeaveDecisionModal({
                 </View>
               </View>
               <View style={styles.leaveSummary}>
-                <Icon name="leave" color={theme.colors.violet} />
+                <View style={styles.summaryBadgeRow}>
+                  <LeaveTypeBadge code={request.leaveType.code} />
+                  {(request.leaveType.code === 'OOD' ||
+                    request.leaveType.code === 'ODE') && <OfficialDutyBadge />}
+                </View>
                 <View style={styles.grow}>
                   <Text style={styles.leaveTitle}>
                     {request.leaveType.name}
@@ -261,6 +284,74 @@ export function LeaveDecisionModal({
                   <LeaveStatus status={request.status} />
                 </View>
               </View>
+
+              {/* Official Duty Particulars for OOD / ODE */}
+              {(request.leaveType.code === 'OOD' ||
+                request.leaveType.code === 'ODE') && (
+                <View style={styles.dutyParticulars}>
+                  <Text style={styles.sectionLabel}>
+                    Official duty particulars
+                  </Text>
+                  {!!request.dutyType && (
+                    <View style={styles.factRow}>
+                      <Text style={styles.factLabel}>Duty type:</Text>
+                      <Text style={styles.factValue}>{request.dutyType}</Text>
+                    </View>
+                  )}
+                  {!!request.organisation && (
+                    <View style={styles.factRow}>
+                      <Text style={styles.factLabel}>Organisation:</Text>
+                      <Text style={styles.factValue}>
+                        {request.organisation}
+                      </Text>
+                    </View>
+                  )}
+                  {!!request.location && (
+                    <View style={styles.factRow}>
+                      <Text style={styles.factLabel}>Location:</Text>
+                      <Text style={styles.factValue}>{request.location}</Text>
+                    </View>
+                  )}
+                  {!!request.referenceNumber && (
+                    <View style={styles.factRow}>
+                      <Text style={styles.factLabel}>Reference number:</Text>
+                      <Text style={styles.factValue}>
+                        {request.referenceNumber}
+                      </Text>
+                    </View>
+                  )}
+                  {!!request.attachmentName && (
+                    <View style={styles.factRow}>
+                      <Text style={styles.factLabel}>Official order:</Text>
+                      <Text style={[styles.factValue, styles.linkText]}>
+                        {request.attachmentName}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Supporting document for medical/other */}
+              {!!request.attachmentName &&
+                request.leaveType.code !== 'OOD' &&
+                request.leaveType.code !== 'ODE' && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionLabel}>
+                      Supporting document
+                    </Text>
+                    <View style={styles.factRow}>
+                      <Icon
+                        name="document"
+                        size={theme.spacing.lg}
+                        color={theme.colors.primary}
+                      />
+                      <Text style={[styles.body, styles.linkText]}>
+                        {request.attachmentName}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>Reason</Text>
                 <Text style={styles.body}>{request.reason}</Text>
@@ -272,9 +363,11 @@ export function LeaveDecisionModal({
                 <View style={styles.grow}>
                   <Text style={styles.sectionLabel}>Academic impact</Text>
                   <Text style={styles.detail}>
-                    {request.status === 'APPROVED'
-                      ? 'Final leave approval is recorded. Manage dated classes from Class coverage.'
-                      : 'Coverage is arranged after final approval. An HOD recommendation does not assign a substitute.'}
+                    {request.coverageRequired
+                      ? 'Scheduled teaching classes are affected. Class coverage arrangement is required.'
+                      : request.status === 'APPROVED'
+                        ? 'Final leave approval is recorded. Manage dated classes from Class coverage.'
+                        : 'No conflicting classes recorded, or coverage is arranged after recommendation.'}
                   </Text>
                 </View>
               </View>
@@ -306,10 +399,13 @@ export function LeaveDecisionModal({
                     <>
                       <Text style={styles.balance}>
                         {selectedBalance.remaining === null
-                          ? 'Unlimited'
+                          ? 'As per policy'
                           : `${selectedBalance.remaining} days remaining`}
                       </Text>
                       <Text style={styles.detail}>
+                        {selectedBalance.entitled !== null
+                          ? `${selectedBalance.entitled} entitled · `
+                          : 'As per policy · '}
                         Used {selectedBalance.used} · Pending{' '}
                         {selectedBalance.pending} · Carried{' '}
                         {selectedBalance.carriedIn}
@@ -444,34 +540,63 @@ export function LeaveDecisionModal({
             <View style={styles.footer}>
               {canDecide || loading ? (
                 !choice ? (
-                  <View
-                    style={[
-                      styles.actions,
-                      fontScale > 1.2 && styles.stackedActions,
-                    ]}
-                  >
-                    <Button
-                      variant="outline"
-                      onPress={() => setChoice('REJECT')}
-                      disabled={loading || blocked}
+                  isFinalAuthority ? (
+                    <View
                       style={[
-                        styles.rejectAction,
-                        fontScale > 1.2 && styles.stackedAction,
+                        styles.actions,
+                        fontScale > 1.2 && styles.stackedActions,
                       ]}
                     >
-                      Reject
-                    </Button>
-                    <Button
-                      onPress={() => setChoice('APPROVE')}
-                      disabled={loading || blocked}
-                      style={[
-                        styles.grow,
-                        fontScale > 1.2 && styles.stackedAction,
-                      ]}
-                    >
-                      Recommend approval
-                    </Button>
-                  </View>
+                      <Button
+                        variant="outline"
+                        onPress={() => setChoice('REJECT')}
+                        disabled={loading || blocked}
+                        style={[
+                          styles.rejectAction,
+                          fontScale > 1.2 && styles.stackedAction,
+                        ]}
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        onPress={() => setChoice('APPROVE')}
+                        disabled={loading || blocked}
+                        style={[
+                          styles.grow,
+                          fontScale > 1.2 && styles.stackedAction,
+                        ]}
+                      >
+                        Approve
+                      </Button>
+                    </View>
+                  ) : (
+                    <View style={styles.stackedActions}>
+                      <View style={styles.actions}>
+                        <Button
+                          variant="outline"
+                          onPress={() => setChoice('REJECT')}
+                          disabled={loading || blocked}
+                          style={styles.rejectAction}
+                        >
+                          Reject
+                        </Button>
+                        <Button
+                          onPress={() => setChoice('RECOMMEND')}
+                          disabled={loading || blocked}
+                          style={styles.grow}
+                        >
+                          Recommend approval
+                        </Button>
+                      </View>
+                      <Button
+                        variant="secondary"
+                        onPress={() => setChoice('RECOMMEND_COVERAGE')}
+                        disabled={loading || blocked}
+                      >
+                        Recommend & arrange coverage
+                      </Button>
+                    </View>
+                  )
                 ) : (
                   <>
                     <Button
@@ -482,7 +607,11 @@ export function LeaveDecisionModal({
                     >
                       {isReject
                         ? 'Confirm rejection'
-                        : 'Confirm recommendation'}
+                        : choice === 'RECOMMEND_COVERAGE'
+                          ? 'Confirm recommendation & coverage'
+                          : choice === 'RECOMMEND'
+                            ? 'Confirm recommendation'
+                            : 'Confirm approval'}
                     </Button>
                     <Button
                       variant="text"
@@ -501,7 +630,7 @@ export function LeaveDecisionModal({
               <Text style={styles.footerNote}>
                 {request.status === 'PENDING'
                   ? request.pendingRole === 'HOD'
-                    ? 'HOD recommendation · HR final approval follows'
+                    ? 'HOD review · Recommend approval or arrange coverage'
                     : `Awaiting ${request.pendingRole ?? 'the next reviewer'} · Final approval is still required`
                   : `Request ${request.status.toLowerCase()}`}
               </Text>
@@ -564,6 +693,39 @@ const styles = StyleSheet.create({
     padding: theme.spacing.section,
     backgroundColor: theme.colors.violetContainer,
     borderRadius: theme.radius.field,
+  },
+  summaryBadgeRow: {
+    gap: theme.spacing.xs,
+    alignItems: 'flex-start',
+  },
+  dutyParticulars: {
+    gap: theme.spacing.sm,
+    padding: theme.spacing.section,
+    backgroundColor: '#CCFBF1',
+    borderRadius: theme.radius.field,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#99F6E4',
+  },
+  factRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.sm,
+  },
+  factLabel: {
+    fontSize: theme.typography.caption,
+    fontWeight: '600',
+    color: theme.colors.mutedForeground,
+    width: 120,
+  },
+  factValue: {
+    flex: 1,
+    fontSize: theme.typography.caption,
+    color: theme.colors.foreground,
+    fontWeight: '500',
+  },
+  linkText: {
+    color: theme.colors.primary,
+    fontWeight: '600',
   },
   leaveTitle: {
     fontSize: theme.typography.body,

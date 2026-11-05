@@ -8,7 +8,8 @@ export const coveragePermissions = [
 export const recipientUser = {
   ...homeUser,
   id: '99999999-9999-4999-8999-999999999999',
-  email: 'coverage-recipient@jcet.test',
+  email: 'priya.kulkarni@jcethbl.edu.in',
+  name: 'Prof. Priya Kulkarni',
   role: 'Faculty',
   employeeId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
   permissions: [
@@ -32,8 +33,8 @@ export function createCoveragePreviewRepository() {
   const faculty = {
     id: dto.faculty.id,
     employeeCode: dto.faculty.employeeCode,
-    firstName: 'Absent',
-    lastName: 'Faculty',
+    firstName: 'Prof. Asha',
+    lastName: 'Patil',
   };
   const entry = {
     ...dto,
@@ -55,9 +56,9 @@ export function createCoveragePreviewRepository() {
   };
   const recipient = {
     id: recipientUser.employeeId,
-    employeeCode: 'COV001',
-    firstName: 'Coverage',
-    lastName: 'Recipient',
+    employeeCode: 'JCET-CSE-022',
+    firstName: 'Prof. Priya',
+    lastName: 'Kulkarni',
     department: { id: 1, code: 'CSE' },
     designation: {
       name: 'Assistant Professor',
@@ -69,11 +70,11 @@ export function createCoveragePreviewRepository() {
   const overloaded = {
     ...recipient,
     id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
-    employeeCode: 'COV002',
-    firstName: 'Overloaded',
-    lastName: 'Faculty',
+    employeeCode: 'JCET-CSE-014',
+    firstName: 'Dr. Rahul',
+    lastName: 'Deshpande',
     designation: {
-      name: 'Assistant Professor',
+      name: 'Associate Professor',
       workload: { minHours: 0, maxHours: 1 },
     },
   };

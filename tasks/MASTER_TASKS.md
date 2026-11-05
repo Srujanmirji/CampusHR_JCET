@@ -10,7 +10,7 @@
 
 ## Phase 1 — Auth & Core
 
-- [x] Authentication (done except password reset, which needs SMTP)
+- [x] Authentication (including email password reset via Resend)
 - [x] RBAC
 - [x] Employee management
 - [x] Department management

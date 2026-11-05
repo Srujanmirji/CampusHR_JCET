@@ -90,14 +90,15 @@ if (existsSync(join(web, 'index.html'))) {
   });
 }
 app.use(createApp(env, { authRepository, prisma, realtime }));
-const server = app.listen(4012, '127.0.0.1');
+const host = process.env.DEMO_HOST || '0.0.0.0';
+const server = app.listen(4012, host);
 await once(server, 'listening');
 const io = realtime.attach(server, {
   origin: env.CORS_ORIGIN,
   verify: async (token) => (await auth.authenticateAccessToken(token)).userId,
 });
 console.log(
-  'Persistent CampusHR demo: http://127.0.0.1:4012; database backend/.demo/pgdata; local accounts only.',
+  `Persistent CampusHR demo: http://127.0.0.1:4012 (LAN: http://192.168.29.254:4012); database backend/.demo/pgdata; local accounts only.`,
 );
 let stopping = false;
 for (const signal of ['SIGINT', 'SIGTERM'] as const)

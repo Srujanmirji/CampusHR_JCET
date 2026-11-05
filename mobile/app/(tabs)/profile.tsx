@@ -116,17 +116,23 @@ export default function ProfileTab() {
         <View style={styles.stats}>
           {row?.experienceYears != null && (
             <View style={styles.stat}>
-              <Text style={styles.value}>{row.experienceYears}</Text>
-              <Text style={styles.detail}>years of experience</Text>
+              <Text style={styles.value}>{row.experienceYears} yrs</Text>
+              <Text style={styles.detail}>Experience</Text>
             </View>
           )}
+          <View
+            style={[
+              styles.stat,
+              row?.experienceYears != null && styles.statDivider,
+            ]}
+          >
+            <Text style={[styles.value, { color: theme.colors.mintInk }]}>
+              Present
+            </Text>
+            <Text style={styles.detail}>Attendance</Text>
+          </View>
           {workload.isSuccess && (
-            <View
-              style={[
-                styles.stat,
-                row?.experienceYears != null && styles.statDivider,
-              ]}
-            >
+            <View style={[styles.stat, styles.statDivider]}>
               <Text style={styles.value}>
                 {workload.data.totalHours}
                 {workload.data.maxHours != null
@@ -134,7 +140,7 @@ export default function ProfileTab() {
                   : ''}{' '}
                 hrs
               </Text>
-              <Text style={styles.detail}>weekly workload</Text>
+              <Text style={styles.detail}>Workload</Text>
             </View>
           )}
         </View>
@@ -159,32 +165,64 @@ export default function ProfileTab() {
           />
           <ProfileListRow
             label="Academic profile"
+            detail="Qualifications, subjects & committees"
             icon="school"
-            onPress={() => router.push('/profile/details')}
+            onPress={() => router.push('/profile/details?section=academic')}
+          />
+          <ProfileListRow
+            label="Academic calendar & holidays"
+            detail="Institutional events, exam dates & RH list"
+            icon="timetable"
+            onPress={() => router.push('/calendar' as any)}
+          />
+          <ProfileListRow
+            label="Digital circulars & notices"
+            detail="Institutional orders, VTU notifications & announcements"
+            icon="document"
+            onPress={() => router.push('/circulars' as any)}
+          />
+          <ProfileListRow
+            label="Work delegation & tasks"
+            detail="Department assignments, NBA/NAAC criteria & submissions"
+            icon="workload"
+            onPress={() => router.push('/work-assignments' as any)}
+          />
+          <ProfileListRow
+            label="Exam duty allotment"
+            detail="VTU invigilation, room allocations & duty swap requests"
+            icon="timetable"
+            onPress={() => router.push('/exam-duty' as any)}
+          />
+          <ProfileListRow
+            label="Official On-Duty & Valuation"
+            detail="OD applications, VTU duties & attendance certificates"
+            icon="workload"
+            onPress={() => router.push('/on-duty' as any)}
           />
           <ProfileListRow
             label="Documents"
+            detail="Verified, pending & expiring records"
             icon="document"
             onPress={() => router.push('/documents')}
           />
           <ProfileListRow
             label="Research & publications"
-            detail="Ask administration for your record"
+            detail="Papers, patents, grants & FDPs"
             icon="school"
-            onPress={() => unavailable('Research & publications')}
+            onPress={() => router.push('/profile/details?section=research')}
           />
           <ProfileListRow
             label="Performance"
-            detail="Ask administration for your record"
+            detail="Current appraisal cycle & KRAs"
             icon="workload"
-            onPress={() => unavailable('Performance')}
+            onPress={() => router.push('/profile/details?section=performance')}
           />
           <ProfileListRow
             label="Service history"
             detail="Employment and joining details"
             icon="clock"
             last
-            onPress={() => router.push('/profile/details')}
+            onPress={() => router.push('/profile/details?section=service')}
           />
         </View>
       </View>

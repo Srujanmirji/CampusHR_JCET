@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { LEAVE_STATUS_LABEL, type LeaveRequest } from '../api/leave';
-import { formatDays, leaveDates } from '../utils/leave';
+import { formatDays, getLeaveTheme, leaveDates } from '../utils/leave';
 
 export function RequestsTable({
   requests,
@@ -61,7 +61,16 @@ export function RequestsTable({
               </TableCell>
             )}
             <TableCell className={showEmployee ? '' : 'pl-6'}>
-              {request.leaveType.name}
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold ${getLeaveTheme(request.leaveType.code).bg} ${getLeaveTheme(request.leaveType.code).text}`}
+                >
+                  {request.leaveType.code}
+                </span>
+                <span className="font-medium text-foreground">
+                  {request.leaveType.name}
+                </span>
+              </div>
             </TableCell>
             <TableCell>{leaveDates(request)}</TableCell>
             <TableCell className="text-right tabular-nums">

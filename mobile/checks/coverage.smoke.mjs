@@ -34,12 +34,12 @@ const mode = async (name) =>
   );
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
-async function login(page, email = 'home-check@jcet.test') {
+async function login(page, email = 'hod.cse@jcethbl.edu.in') {
   await page.goto(base);
   await page
     .getByLabel('Employee ID or College Email', { exact: true })
     .fill(email);
-  await page.getByLabel('Password', { exact: true }).fill('home-check-only');
+  await page.getByLabel('Password', { exact: true }).fill('CampusHR@2026');
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
   await page
     .getByRole('button', { name: 'Refresh all Home summaries', exact: true })
@@ -51,12 +51,12 @@ try {
     const response = await globalThis.fetch(`${api}/api/v1/auth/native/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier, password: 'home-check-only' }),
+      body: JSON.stringify({ identifier, password: 'CampusHR@2026' }),
     });
     assert.equal(response.status, 200);
     return (await response.json()).accessToken;
   };
-  const facultyToken = await nativeLogin('coverage-recipient@jcet.test');
+  const facultyToken = await nativeLogin('priya.kulkarni@jcethbl.edu.in');
   assert.equal(
     (
       await globalThis.fetch(`${api}/api/v1/substitution/assignments`, {
@@ -70,7 +70,7 @@ try {
     ).status,
     403,
   );
-  const hodToken = await nativeLogin('home-check@jcet.test');
+  const hodToken = await nativeLogin('hod.cse@jcethbl.edu.in');
   assert.equal(
     (
       await globalThis.fetch(
@@ -100,7 +100,7 @@ try {
   });
   await manage.click();
   await panel
-    .getByRole('button', { name: 'Select Coverage Recipient', exact: true })
+    .getByRole('button', { name: 'Select Prof. Priya Kulkarni', exact: true })
     .waitFor();
   assert.equal(
     await panel
@@ -155,10 +155,10 @@ try {
     .getByRole('button', { name: 'Refresh coverage', exact: true })
     .click();
   await panel
-    .getByRole('button', { name: 'Select Coverage Recipient', exact: true })
+    .getByRole('button', { name: 'Select Prof. Priya Kulkarni', exact: true })
     .waitFor();
   await panel
-    .getByRole('button', { name: 'Select Coverage Recipient', exact: true })
+    .getByRole('button', { name: 'Select Prof. Priya Kulkarni', exact: true })
     .scrollIntoViewIfNeeded();
   await page.screenshot({
     path: `${output}/coverage-candidates.png`,
@@ -166,7 +166,7 @@ try {
   });
 
   await panel
-    .getByRole('button', { name: 'Select Coverage Recipient', exact: true })
+    .getByRole('button', { name: 'Select Prof. Priya Kulkarni', exact: true })
     .click();
   await panel
     .getByLabel('Coverage note', { exact: true })
@@ -206,7 +206,7 @@ try {
     }),
     recipient = await recipientContext.newPage();
   recipient.on('pageerror', (error) => errors.push(error.message));
-  await login(recipient, 'coverage-recipient@jcet.test');
+  await login(recipient, 'priya.kulkarni@jcethbl.edu.in');
   await recipient.getByText('Timetable', { exact: true }).last().click();
   const schedule = recipient.getByTestId('timetable-screen');
   await schedule.getByText(/Covering Absent Faculty/).waitFor();
@@ -270,7 +270,7 @@ try {
     )
     .waitFor();
   await panel
-    .getByRole('button', { name: 'Select Coverage Recipient', exact: true })
+    .getByRole('button', { name: 'Select Prof. Priya Kulkarni', exact: true })
     .click();
   await panel
     .getByLabel('Coverage note', { exact: true })
@@ -284,7 +284,7 @@ try {
   await panel
     .getByRole('button', { name: 'Check recorded coverage', exact: true })
     .click();
-  await panel.getByText(/Recorded coverage: Coverage Recipient/).waitFor();
+  await panel.getByText(/Recorded coverage: Prof. Priya Kulkarni/).waitFor();
   await panel
     .getByText('Retained unknown outcome note', { exact: true })
     .waitFor();

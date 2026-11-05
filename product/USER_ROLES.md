@@ -72,6 +72,12 @@ The key is `resource.action.<scope>`, e.g. `leave.approve.department`.
 | `leave.cancel` (own pending requests)           |      —      |    O     |     O     |  O  |    O    |         O          |
 | `leave.approve` ²                               |      A      |    A     |     A     |  D  |    —    |         —          |
 | `leave_type.manage` (types, balances, policy)   |      A      |    A     |     —     |  —  |    —    |         —          |
+| `leave_policy.read`                             |      A      |    A     |     A     |  D  |    O    |         O          |
+| `leave_policy.manage`                           |      A      |    A     |     —     |  —  |    —    |         —          |
+| **On-duty (OD)**                                |             |          |           |     |         |                    |
+| `on_duty.apply`                                 |      —      |    O     |     O     |  O  |    O    |         O          |
+| `on_duty.read`                                  |      A      |    A     |     A     |  D  |    O    |         O          |
+| `on_duty.approve`                               |      A      |    A     |     A     |  D  |    —    |         —          |
 | **Timetable**                                   |             |          |           |     |         |                    |
 | `timetable.read`                                |      A      |    A     |     A     |  D  |    O    |         —          |
 | `timetable.manage`                              |      A      |    —     |     —     |  D  |    —    |         —          |
@@ -81,6 +87,9 @@ The key is `resource.action.<scope>`, e.g. `leave.approve.department`.
 | **Smart substitution**                          |             |          |           |     |         |                    |
 | `substitution.read`                             |      A      |    —     |     A     |  D  |    O    |         —          |
 | `substitution.assign`                           |      A      |    —     |     —     |  D  |    —    |         —          |
+| **Exam duty**                                    |             |          |           |     |         |                    |
+| `exam_duty.read`                                 |      A      |    A     |     A     |  D  |    O    |         —          |
+| `exam_duty.manage`                               |      A      |    A     |     A     |  D  |    —    |         —          |
 | **Documents**                                   |             |          |           |     |         |                    |
 | `document.upload`                               |      —      |    O     |     O     |  O  |    O    |         O          |
 | `document.read` ³                               |      A      |    A     |     —     |  O  |    O    |         O          |
@@ -88,9 +97,18 @@ The key is `resource.action.<scope>`, e.g. `leave.approve.department`.
 | **Faculty academic profile**                    |             |          |           |     |         |                    |
 | `academic_profile.read`                         |      A      |    A     |     A     |  D  |    O    |         —          |
 | `academic_profile.update`                       |      A      |    A     |     —     |  O  |    O    |         —          |
+| **Academic calendar & holidays**                |             |          |           |     |         |                    |
+| `academic_calendar.read`                        |      A      |    A     |     A     |  D  |    D    |         D          |
+| `academic_calendar.manage`                      |      A      |    A     |     —     |  —  |    —    |         —          |
 | **Notifications**                               |             |          |           |     |         |                    |
 | `notification.read`                             |      O      |    O     |     O     |  O  |    O    |         O          |
 | `announcement.send`                             |      A      |    A     |     A     |  D  |    —    |         —          |
+| **Digital circulars**                            |             |          |           |     |         |                    |
+| `circular.read`                                  |      A      |    A     |     A     |  A  |    A    |         A          |
+| `circular.manage`                                |      A      |    A     |     A     |  D  |    —    |         —          |
+| **Work delegation**                             |             |          |           |     |         |                    |
+| `work_assignment.read`                           |      A      |    A     |     A     |  D  |    O    |         O          |
+| `work_assignment.assign`                         |      A      |    A     |     A     |  D  |    —    |         —          |
 | **Reports**                                     |             |          |           |     |         |                    |
 | `report.read` (includes export)                 |      A      |    A     |     A     |  D  |    —    |         —          |
 | **Recruitment** (Phase 6)                       |             |          |           |     |         |                    |

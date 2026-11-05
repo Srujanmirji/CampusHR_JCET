@@ -12,9 +12,9 @@ export const profilePermissions = [
 export function createProfilePreview(directory) {
   let employee = {
     id: employeeId,
-    employeeCode: 'IOS004',
-    firstName: 'Home',
-    lastName: 'Test',
+    employeeCode: 'JCET-CSE-001',
+    firstName: 'Dr. Ramesh',
+    lastName: 'K',
     email: homeUser.email,
     phone: '+91 98765 43210',
     department: { id: 1, code: 'CSE', name: 'Computer Science' },
@@ -58,9 +58,9 @@ export function createProfilePreview(directory) {
         updatedAt: new Date(),
         employee: {
           id: employeeId,
-          firstName: 'Home',
-          lastName: 'Test',
-          employeeCode: 'IOS004',
+          firstName: 'Dr. Ramesh',
+          lastName: 'K',
+          employeeCode: 'JCET-CSE-001',
           department: employee.department,
         },
       };

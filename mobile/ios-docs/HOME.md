@@ -45,6 +45,6 @@ EXPO_PUBLIC_API_URL='http://[::1]:4011/api/v1' EXPO_PUBLIC_SOCKET_URL='http://[:
 node mobile/checks/home.smoke.mjs
 ```
 
-The preview server binds only IPv6 loopback and uses the in-memory auth repository plus `home-fixtures.mjs`. It never connects to a database. `home.smoke.mjs` requires Playwright and Chrome (the same local runtime used by the web smoke checks); screenshots go to `/tmp/campushr-ios004`. For a simulator check, open the Metro URL and use test ID `IOS004` with disposable password `home-check-only`; these are fixture-only credentials, not a real account. Do not enable Remember me for this throwaway check.
+The preview server binds only IPv6 loopback and uses the in-memory auth repository plus `home-fixtures.mjs`. It never connects to a database. `home.smoke.mjs` requires Playwright and Chrome (the same local runtime used by the web smoke checks); screenshots go to `/tmp/campushr-ios004`. For a simulator check, open the Metro URL and use test ID `JCET-CSE-001` with disposable password `CampusHR@2026`; these are fixture-only credentials, not a real account. Do not enable Remember me for this throwaway check.
 
 Stop both servers afterward and restart Metro without the temporary environment overrides. Never deploy this preview server or use a production login in the smoke script.

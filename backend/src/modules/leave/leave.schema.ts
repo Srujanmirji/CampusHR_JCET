@@ -14,12 +14,41 @@ export const leaveTypeInputSchema = z
       .string()
       .trim()
       .toUpperCase()
-      .regex(/^[A-Z]{1,6}$/, 'Use 1–6 letters, e.g. CL.'),
-    name: z.string().trim().min(2).max(60),
-    yearlyQuota: days(366).nullable(),
-    allowHalfDay: z.boolean().default(false),
+      .regex(
+        /^[A-Z_]{1,10}$/,
+        'Use 1–10 letters/underscores, e.g. CL, SPL_ML.',
+      ),
+    name: z.string().trim().min(2).max(100),
+    description: z.string().trim().max(300).optional(),
+    yearlyQuota: days(366).nullable().optional(),
+    annualEntitlement: days(366).nullable().optional(),
+    carryForwardAllowed: z.boolean().default(false),
     carryForwardMax: days(366).default(0),
+    allowHalfDay: z.boolean().default(false),
+    attachmentRequired: z.boolean().default(false),
+    reasonRequired: z.boolean().default(true),
+    minimumNoticeDays: z.number().int().min(0).max(60).default(0),
+    maximumConsecutiveDays: z.number().int().min(1).max(366).default(30),
+    approvalChain: z.array(z.string()).optional(),
+    attendanceStatus: z
+      .enum([
+        'Leave',
+        'Medical / Special Leave',
+        'Official Duty',
+        'Restricted Holiday',
+        'Vacation Leave',
+      ])
+      .optional(),
+    affectsTimetable: z.boolean().default(true),
+    requiresCoverage: z.boolean().default(true),
+    applicableEmployeeTypes: z
+      .array(z.enum(['TEACHING', 'NON_TEACHING']))
+      .optional(),
     active: z.boolean().default(true),
+    displayOrder: z.number().int().min(0).max(100).optional(),
+    colorToken: z
+      .enum(['blue', 'violet', 'rose', 'teal', 'cyan', 'amber', 'sky'])
+      .optional(),
   })
   .strict();
 export type LeaveTypeInput = z.infer<typeof leaveTypeInputSchema>;
@@ -35,7 +64,23 @@ export const leaveApplySchema = z
     startDate: z.iso.date(),
     endDate: z.iso.date(),
     halfDay: z.enum(['FIRST', 'SECOND']).nullable().default(null),
-    reason: z.string().trim().min(3).max(500),
+    reason: z.string().trim().max(500).default(''),
+    // Official Duty / Examination Duty metadata (OOD, ODE)
+    dutyType: z.string().trim().max(150).optional(),
+    organisation: z.string().trim().max(200).optional(),
+    location: z.string().trim().max(200).optional(),
+    referenceNumber: z.string().trim().max(100).optional(),
+    // Supporting documents / medical certificates (SPL_ML, OOD, ODE)
+    attachmentName: z.string().trim().max(255).optional(),
+    attachmentUrl: z.string().trim().optional(),
+    // Eligible selection for Restricted Holiday (RH)
+    restrictedHolidayId: z.string().trim().max(100).optional(),
+    // Eligible selection for Vacation Leave (VL)
+    vacationPeriodId: z.string().trim().max(100).optional(),
+    // Smart coverage indicator & non-teaching operational coverage
+    coverageRequired: z.boolean().optional(),
+    operationalCoverageRole: z.string().trim().max(100).optional(),
+    operationalCoverageNote: z.string().trim().max(500).optional(),
   })
   .strict()
   .refine((input) => input.startDate <= input.endDate, {
@@ -79,10 +124,36 @@ export const balanceQuerySchema = z.object({
 export type BalanceQuery = z.infer<typeof balanceQuerySchema>;
 
 export const approveSchema = z
-  .object({ note: z.string().trim().max(500).optional() })
+  .object({
+    note: z.string().trim().max(500).optional(),
+    action: z.enum(['approve', 'recommend', 'recommend_coverage']).optional(),
+  })
   .strict();
+
 export const rejectSchema = z
   .object({
     note: z.string().trim().min(3, 'Say why, in a few words.').max(500),
   })
   .strict();
+
+export const rolloverQuerySchema = z.object({
+  year: z.coerce
+    .number()
+    .int()
+    .min(2020)
+    .max(2100)
+    .default(new Date().getUTCFullYear()),
+  targetYear: z.coerce.number().int().min(2020).max(2100).optional(),
+  departmentId: z.coerce.number().int().positive().optional(),
+});
+export type RolloverQuery = z.infer<typeof rolloverQuerySchema>;
+
+export const rolloverExecuteSchema = z
+  .object({
+    fromYear: z.number().int().min(2020).max(2100),
+    toYear: z.number().int().min(2020).max(2100),
+    departmentId: z.number().int().positive().optional(),
+    notes: z.string().trim().max(500).optional(),
+  })
+  .strict();
+export type RolloverExecuteInput = z.infer<typeof rolloverExecuteSchema>;

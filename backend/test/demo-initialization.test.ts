@@ -9,7 +9,7 @@ test('a restarted local demo loads its saved initialization without reseeding ed
   const directory = await mkdtemp(join(tmpdir(), 'campushr-demo-init-'));
   try {
     const initial = {
-      accounts: [{ email: 'faculty-check@jcet.test', employeeId: 'saved-id' }],
+      accounts: [{ email: 'asha.patil@jcethbl.edu.in', employeeId: 'saved-id' }],
     };
     assert.deepEqual(
       await initializeDemo(directory, async () => initial),

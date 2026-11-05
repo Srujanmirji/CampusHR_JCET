@@ -44,8 +44,8 @@ try {
   await page.goto(base);
   await page
     .getByLabel('Employee ID or College Email', { exact: true })
-    .fill('home-check@jcet.test');
-  await page.getByLabel('Password', { exact: true }).fill('home-check-only');
+    .fill('hod.cse@jcethbl.edu.in');
+  await page.getByLabel('Password', { exact: true }).fill('CampusHR@2026');
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
   await page.getByText('6.5 days', { exact: true }).waitFor();
   assert.ok(await page.getByText('12 hours', { exact: true }).isVisible());
@@ -118,8 +118,8 @@ try {
   await admin.goto(base);
   await admin
     .getByLabel('Employee ID or College Email', { exact: true })
-    .fill('no-employee@jcet.test');
-  await admin.getByLabel('Password', { exact: true }).fill('home-check-only');
+    .fill('no-employee@jcethbl.edu.in');
+  await admin.getByLabel('Password', { exact: true }).fill('CampusHR@2026');
   await mode('normal');
   await admin.getByRole('button', { name: 'Sign In', exact: true }).click();
   await admin.getByText('2 unread', { exact: true }).waitFor();

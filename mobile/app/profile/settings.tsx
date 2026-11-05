@@ -17,6 +17,7 @@ import { Button } from '../../components/ui/Button';
 import { Icon } from '../../components/ui/Icon';
 import { SegmentedControl } from '../../components/ui/SegmentedControl';
 import { usePush } from '../../lib/push-context';
+import { apiFetch } from '../../lib/session';
 import {
   getAppearance,
   setAppearance,
@@ -140,6 +141,24 @@ export default function Settings() {
                 Retry remote alert setup
               </Button>
             )}
+            <View style={{ marginTop: 8 }}>
+              <Button
+                variant="secondary"
+                onPress={async () => {
+                  try {
+                    await apiFetch('/notifications/test', { method: 'POST' });
+                    Alert.alert(
+                      'Test Alert Sent',
+                      'A real-time notification was dispatched to your account and device.',
+                    );
+                  } catch {
+                    Alert.alert('Notice', 'Could not send test notification.');
+                  }
+                }}
+              >
+                Send test notification
+              </Button>
+            </View>
           </View>
         </View>
       </View>

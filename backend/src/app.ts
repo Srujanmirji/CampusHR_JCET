@@ -1,5 +1,6 @@
 import { createPasswordResetService } from './modules/auth/password-reset.service.js';
 import { createPasswordResetRouter } from './modules/auth/password-reset.routes.js';
+import { createEmailService } from './modules/email/email.service.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +31,13 @@ import { createEmployeeService } from './modules/employees/employee.service.js';
 import { createLeaveRepository } from './modules/leave/leave.repository.js';
 import { createLeaveRouter } from './modules/leave/leave.routes.js';
 import { createLeaveService } from './modules/leave/leave.service.js';
+import { createLeavePolicyRepository } from './modules/leave/leave-policy.repository.js';
+import { createLeavePolicyService } from './modules/leave/leave-policy.service.js';
+import {
+  createLeavePolicyRouter,
+  createLeaveBalancesRouter,
+  createLeaveAdjustmentsRouter,
+} from './modules/leave/leave-policy.routes.js';
 import {
   createPushRepository,
   createPushRouter,
@@ -53,6 +61,30 @@ import { createUserService } from './modules/users/users.service.js';
 import { createWorkloadRepository } from './modules/workload/workload.repository.js';
 import { createWorkloadRouter } from './modules/workload/workload.routes.js';
 import { createWorkloadService } from './modules/workload/workload.service.js';
+import { createExamDutyRepository } from './modules/exam-duty/exam-duty.repository.js';
+import { createExamDutyService } from './modules/exam-duty/exam-duty.service.js';
+import { createExamDutyRouter } from './modules/exam-duty/exam-duty.routes.js';
+import { createCircularRepository } from './modules/circulars/circulars.repository.js';
+import { createCircularService } from './modules/circulars/circulars.service.js';
+import { createCircularRouter } from './modules/circulars/circulars.routes.js';
+import { createWorkAssignmentRepository } from './modules/work-assignments/work-assignments.repository.js';
+import { createWorkAssignmentService } from './modules/work-assignments/work-assignments.service.js';
+import { createWorkAssignmentRouter } from './modules/work-assignments/work-assignments.routes.js';
+import { createOnboardingRepository } from './modules/onboarding/onboarding.repository.js';
+import { createOnboardingService } from './modules/onboarding/onboarding.service.js';
+import { createOnboardingRouter } from './modules/onboarding/onboarding.routes.js';
+import { createOnDutyRepository } from './modules/on-duty/on-duty.repository.js';
+import { createOnDutyService } from './modules/on-duty/on-duty.service.js';
+import { createOnDutyRouter } from './modules/on-duty/on-duty.routes.js';
+import { createAcademicCalendarRepository } from './modules/academic-calendar/academic-calendar.repository.js';
+import { createAcademicCalendarService } from './modules/academic-calendar/academic-calendar.service.js';
+import {
+  createAcademicCalendarRouter,
+  createAcademicYearsRouter,
+  createSemestersRouter,
+  createHolidaysRouter,
+  createRestrictedHolidaysRouter,
+} from './modules/academic-calendar/academic-calendar.routes.js';
 
 // The built web app (`npm run build --workspace @campushr/web`). In production
 // the API serves it from the same address, so the SameSite=Strict refresh
@@ -76,20 +108,28 @@ export function createApp(
   },
 ) {
   const auth = createAuthService(authRepository, env.JWT_ACCESS_SECRET);
+  const emailService = createEmailService(env.RESEND_API_KEY, env.RESEND_FROM);
   const notifications = createNotificationService(
     createNotificationRepository(prisma, env.PUSH_ENABLED),
     realtime,
+    emailService,
   );
   const departments = createDepartmentService(
     createDepartmentRepository(prisma),
   );
   const app = express();
+  app.locals.notifier = notifications.notifier;
   app.disable('x-powered-by');
   // Behind Railway's proxy: take the client address from X-Forwarded-For, so
   // sign-in rate limits count people, not the proxy.
   if (env.NODE_ENV === 'production') app.set('trust proxy', 1);
   app.use(helmet());
-  app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+  app.use(
+    cors({
+      origin: env.NODE_ENV === 'development' ? true : env.CORS_ORIGIN,
+      credentials: true,
+    }),
+  );
   app.use(express.json({ limit: '1mb' }));
   // Liveness stays independent from database readiness.
   app.get('/api/v1/health', (_req, res) => {
@@ -146,6 +186,7 @@ export function createApp(
         createAttendanceRepository(prisma),
         notifications.notifier,
       ),
+      env.BIOMETRIC_SYNC_SECRET,
     ),
   );
   app.use(
@@ -169,12 +210,29 @@ export function createApp(
   );
   app.use('/api/v1/departments', createDepartmentRouter(auth, departments));
   app.use('/api/v1/designations', createDesignationRouter(auth, departments));
+
+  const academicCalendarRepo = createAcademicCalendarRepository(prisma);
+  const academicCalendarService = createAcademicCalendarService(academicCalendarRepo);
+  const leaveRepo = createLeaveRepository(prisma);
+  const leavePolicyRepo = createLeavePolicyRepository(prisma);
+  const leavePolicyService = createLeavePolicyService(leavePolicyRepo, leaveRepo, academicCalendarService);
+  const leaveService = createLeaveService(leaveRepo, notifications.notifier, academicCalendarService, leavePolicyService);
+
   app.use(
     '/api/v1/leave',
-    createLeaveRouter(
-      auth,
-      createLeaveService(createLeaveRepository(prisma), notifications.notifier),
-    ),
+    createLeaveRouter(auth, leaveService),
+  );
+  app.use(
+    '/api/v1/leave-policies',
+    createLeavePolicyRouter(auth, leavePolicyService),
+  );
+  app.use(
+    '/api/v1/leave-balances',
+    createLeaveBalancesRouter(auth, leavePolicyService),
+  );
+  app.use(
+    '/api/v1/leave-adjustments',
+    createLeaveAdjustmentsRouter(auth, leavePolicyService),
   );
   app.use(
     '/api/v1/notifications/push',
@@ -221,6 +279,76 @@ export function createApp(
       auth,
       createWorkloadService(createWorkloadRepository(prisma)),
     ),
+  );
+  app.use(
+    '/api/v1/exam-duty',
+    createExamDutyRouter(
+      auth,
+      createExamDutyService(
+        createExamDutyRepository(prisma),
+        notifications.notifier,
+      ),
+    ),
+  );
+  app.use(
+    '/api/v1/circulars',
+    createCircularRouter(
+      auth,
+      createCircularService(
+        createCircularRepository(prisma),
+        notifications.notifier,
+      ),
+    ),
+  );
+  app.use(
+    '/api/v1/work-assignments',
+    createWorkAssignmentRouter(
+      auth,
+      createWorkAssignmentService(
+        createWorkAssignmentRepository(prisma),
+        notifications.notifier,
+      ),
+    ),
+  );
+  app.use(
+    '/api/v1/onboarding',
+    createOnboardingRouter(
+      auth,
+      createOnboardingService(
+        createOnboardingRepository(prisma),
+        notifications.notifier,
+      ),
+    ),
+  );
+  app.use(
+    '/api/v1/on-duty',
+    createOnDutyRouter(
+      auth,
+      createOnDutyService(
+        createOnDutyRepository(prisma),
+        notifications.notifier,
+      ),
+    ),
+  );
+  app.use(
+    '/api/v1/academic-calendar',
+    createAcademicCalendarRouter(auth, academicCalendarService),
+  );
+  app.use(
+    '/api/v1/academic-years',
+    createAcademicYearsRouter(auth, academicCalendarService),
+  );
+  app.use(
+    '/api/v1/semesters',
+    createSemestersRouter(auth, academicCalendarService),
+  );
+  app.use(
+    '/api/v1/holidays',
+    createHolidaysRouter(auth, academicCalendarService),
+  );
+  app.use(
+    '/api/v1/restricted-holidays',
+    createRestrictedHolidaysRouter(auth, academicCalendarService),
   );
   if (env.NODE_ENV === 'production' && existsSync(webDir)) {
     app.use(express.static(webDir, { index: false, maxAge: '1h' }));

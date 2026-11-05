@@ -13,7 +13,7 @@ import {
   resetKey,
   type ResetMail,
 } from './password-reset.crypto.js';
-import { sendResetMail } from './password-reset.mail.js';
+import { sendResetMail, sendResendResetMail } from './password-reset.mail.js';
 
 const TTL = 600000;
 const HOUR = 3600000;
@@ -25,9 +25,12 @@ const invalid = () =>
   );
 export interface ResetSettings {
   PASSWORD_RESET_ENABLED: boolean;
+  RESEND_API_KEY?: string;
+  RESEND_FROM?: string;
   PASSWORD_RESET_SCRIPT_URL?: string;
   PASSWORD_RESET_SCRIPT_SECRET?: string;
   PASSWORD_RESET_DAILY_LIMIT: number;
+  JWT_ACCESS_SECRET?: string;
 }
 async function reserve(
   tx: Prisma.TransactionClient,
@@ -70,10 +73,14 @@ export function createPasswordResetService(
 ) {
   const enabled = !!(
     env.PASSWORD_RESET_ENABLED &&
-    env.PASSWORD_RESET_SCRIPT_URL &&
-    env.PASSWORD_RESET_SCRIPT_SECRET
+    (env.RESEND_API_KEY ||
+      (env.PASSWORD_RESET_SCRIPT_URL && env.PASSWORD_RESET_SCRIPT_SECRET))
   );
-  const secret = env.PASSWORD_RESET_SCRIPT_SECRET || '';
+  const secret =
+    env.PASSWORD_RESET_SCRIPT_SECRET ||
+    env.JWT_ACCESS_SECRET ||
+    env.RESEND_API_KEY ||
+    '';
   const requireEnabled = () => {
     if (!enabled)
       throw new HttpError(
@@ -90,61 +97,64 @@ export function createPasswordResetService(
         id = randomUUID(),
         otp = randomInt(1000000).toString().padStart(6, '0');
       const accountKey = resetKey('account', email, secret);
-      await prisma.$transaction(async (tx) => {
-        await reserve(
-          tx,
-          [
-            {
-              key: 'account:' + accountKey,
-              max: 5,
-              window: HOUR,
-              cooldown: 60000,
+      await prisma.$transaction(
+        async (tx) => {
+          await reserve(
+            tx,
+            [
+              {
+                key: 'account:' + accountKey,
+                max: 5,
+                window: HOUR,
+                cooldown: 60000,
+              },
+              {
+                key: 'request-ip:' + resetKey('ip', ip, secret),
+                max: 30,
+                window: HOUR,
+                cooldown: 0,
+              },
+              {
+                key: 'global-request',
+                max: env.PASSWORD_RESET_DAILY_LIMIT,
+                window: 24 * HOUR,
+                cooldown: 0,
+              },
+            ],
+            now,
+          );
+          const user = await tx.user.findUnique({
+            where: { email },
+            select: { id: true, email: true, status: true, passwordHash: true },
+          });
+          const active = user?.status === 'ACTIVE' ? user : null;
+          const mail: ResetMail = {
+            action: 'password-reset',
+            requestId: id,
+            to: email,
+            otp,
+            issuedAt: +now,
+            expiresAt: +now + TTL,
+          };
+          const encrypted = sealResetMail(mail, secret);
+          await tx.passwordResetChallenge.updateMany({
+            where: { accountKey, consumedAt: null },
+            data: { consumedAt: now, encryptedMail: null },
+          });
+          await tx.passwordResetChallenge.create({
+            data: {
+              id,
+              accountKey,
+              userId: active?.id,
+              otpHash: otpDigest(id, otp, secret),
+              passwordStamp: active ? passwordStamp(active.passwordHash) : null,
+              expiresAt: new Date(+now + TTL),
+              encryptedMail: active ? encrypted : null,
             },
-            {
-              key: 'request-ip:' + resetKey('ip', ip, secret),
-              max: 30,
-              window: HOUR,
-              cooldown: 0,
-            },
-            {
-              key: 'global-request',
-              max: env.PASSWORD_RESET_DAILY_LIMIT,
-              window: 24 * HOUR,
-              cooldown: 0,
-            },
-          ],
-          now,
-        );
-        const user = await tx.user.findUnique({
-          where: { email },
-          select: { id: true, email: true, status: true, passwordHash: true },
-        });
-        const active = user?.status === 'ACTIVE' ? user : null;
-        const mail: ResetMail = {
-          action: 'password-reset',
-          requestId: id,
-          to: email,
-          otp,
-          issuedAt: +now,
-          expiresAt: +now + TTL,
-        };
-        const encrypted = sealResetMail(mail, secret);
-        await tx.passwordResetChallenge.updateMany({
-          where: { accountKey, consumedAt: null },
-          data: { consumedAt: now, encryptedMail: null },
-        });
-        await tx.passwordResetChallenge.create({
-          data: {
-            id,
-            accountKey,
-            userId: active?.id,
-            otpHash: otpDigest(id, otp, secret),
-            passwordStamp: active ? passwordStamp(active.passwordHash) : null,
-            expiresAt: new Date(+now + TTL),
-            encryptedMail: active ? encrypted : null,
-          },
-        });
-      });
+          });
+        },
+        { timeout: 20000, maxWait: 10000 },
+      );
       return {
         challengeId: id,
         expiresIn: 600,
@@ -156,72 +166,77 @@ export function createPasswordResetService(
     async confirm(id: string, code: string, newPassword: string, ip: string) {
       requireEnabled();
       const now = new Date();
-      await prisma.$transaction((tx) =>
-        reserve(
-          tx,
-          [
-            {
-              key: 'verify-ip:' + resetKey('ip', ip, secret),
-              max: 50,
-              window: HOUR,
-              cooldown: 0,
-            },
-          ],
-          now,
-        ),
+      await prisma.$transaction(
+        (tx) =>
+          reserve(
+            tx,
+            [
+              {
+                key: 'verify-ip:' + resetKey('ip', ip, secret),
+                max: 50,
+                window: HOUR,
+                cooldown: 0,
+              },
+            ],
+            now,
+          ),
+        { timeout: 20000, maxWait: 10000 },
       );
       const hash = await bcrypt.hash(newPassword, BCRYPT_COST);
-      const changed = await prisma.$transaction(async (tx) => {
-        // Conditional update locks this challenge; wrong attempts commit, while
-        // concurrent valid submissions cannot both consume the same code.
-        const attempt = await tx.passwordResetChallenge.updateMany({
-          where: {
-            id,
-            consumedAt: null,
-            expiresAt: { gt: now },
-            attempts: { lt: 5 },
-          },
-          data: { attempts: { increment: 1 } },
-        });
-        if (!attempt.count) return null;
-        const row = await tx.passwordResetChallenge.findUniqueOrThrow({
-          where: { id },
-          include: { user: true },
-        });
-        if (
-          row.otpHash !== otpDigest(id, code, secret) ||
-          !row.user ||
-          row.user.status !== 'ACTIVE' ||
-          row.passwordStamp !== passwordStamp(row.user.passwordHash)
-        )
-          return null;
-        const updated = await tx.user.updateMany({
-          where: {
-            id: row.user.id,
-            passwordHash: row.user.passwordHash,
-            status: 'ACTIVE',
-          },
-          data: { passwordHash: hash, authVersion: { increment: 1 } },
-        });
-        if (!updated.count) return null;
-        await tx.passwordResetChallenge.update({
-          where: { id },
-          data: { consumedAt: now, encryptedMail: null },
-        });
-        await tx.refreshSession.updateMany({
-          where: { userId: row.user.id },
-          data: { expiresAt: now, revokedAt: now },
-        });
-        await tx.pushDevice.deleteMany({ where: { userId: row.user.id } });
-        await writeAudit(tx, {
-          actorUserId: row.user.id,
-          action: 'user.password_reset',
-          resource: 'user',
-          resourceId: row.user.id,
-          after: { passwordReset: true },
-        });
-        return row.user.id;
-      });
+      const changed = await prisma.$transaction(
+        async (tx) => {
+          // Conditional update locks this challenge; wrong attempts commit, while
+          // concurrent valid submissions cannot both consume the same code.
+          const attempt = await tx.passwordResetChallenge.updateMany({
+            where: {
+              id,
+              consumedAt: null,
+              expiresAt: { gt: now },
+              attempts: { lt: 5 },
+            },
+            data: { attempts: { increment: 1 } },
+          });
+          if (!attempt.count) return null;
+          const row = await tx.passwordResetChallenge.findUniqueOrThrow({
+            where: { id },
+            include: { user: true },
+          });
+          if (
+            row.otpHash !== otpDigest(id, code, secret) ||
+            !row.user ||
+            row.user.status !== 'ACTIVE' ||
+            row.passwordStamp !== passwordStamp(row.user.passwordHash)
+          )
+            return null;
+          const updated = await tx.user.updateMany({
+            where: {
+              id: row.user.id,
+              passwordHash: row.user.passwordHash,
+              status: 'ACTIVE',
+            },
+            data: { passwordHash: hash, authVersion: { increment: 1 } },
+          });
+          if (!updated.count) return null;
+          await tx.passwordResetChallenge.update({
+            where: { id },
+            data: { consumedAt: now, encryptedMail: null },
+          });
+          await tx.refreshSession.updateMany({
+            where: { userId: row.user.id },
+            data: { expiresAt: now, revokedAt: now },
+          });
+          await tx.pushDevice.deleteMany({ where: { userId: row.user.id } });
+          await writeAudit(tx, {
+            actorUserId: row.user.id,
+            action: 'user.password_reset',
+            resource: 'user',
+            resourceId: row.user.id,
+            after: { passwordReset: true },
+          });
+          return row.user.id;
+        },
+        { timeout: 20000, maxWait: 10000 },
+      );
       if (!changed) throw invalid();
       disconnect?.(changed);
       return {
@@ -236,17 +251,26 @@ export function createPasswordResetService(
 export async function deliverResetMail(
   prisma: PrismaClient,
   env: ResetSettings,
-  sender: (mail: ResetMail) => Promise<void> = (mail) =>
-    sendResetMail(
+  sender: (mail: ResetMail) => Promise<void> = (mail) => {
+    if (env.RESEND_API_KEY) {
+      return sendResendResetMail(env.RESEND_API_KEY, env.RESEND_FROM, mail);
+    }
+    return sendResetMail(
       env.PASSWORD_RESET_SCRIPT_URL!,
       env.PASSWORD_RESET_SCRIPT_SECRET!,
       mail,
-    ),
+    );
+  },
 ) {
+  const secret =
+    env.PASSWORD_RESET_SCRIPT_SECRET ||
+    env.JWT_ACCESS_SECRET ||
+    env.RESEND_API_KEY ||
+    '';
   if (
     !env.PASSWORD_RESET_ENABLED ||
-    !env.PASSWORD_RESET_SCRIPT_SECRET ||
-    !env.PASSWORD_RESET_SCRIPT_URL
+    !secret ||
+    (!env.RESEND_API_KEY && !env.PASSWORD_RESET_SCRIPT_URL)
   )
     return false;
   const now = new Date();
@@ -272,17 +296,14 @@ export async function deliverResetMail(
   });
   if (!claimed.count) return false;
   try {
-    const mail = openResetMail(
-      row.encryptedMail!,
-      env.PASSWORD_RESET_SCRIPT_SECRET,
-    );
+    const mail = openResetMail(row.encryptedMail!, secret);
     if (Date.now() - mail.issuedAt > 120000) throw new Error('Stale mail');
     await sender(mail);
     await prisma.passwordResetChallenge.updateMany({
       where: { id: row.id, leaseUntil: lease },
       data: { encryptedMail: null, deliveredAt: new Date(), leaseUntil: null },
     });
-  } catch {
+  } catch (error) {
     const exhausted =
       row.deliveryAttempts >= 2 || +now - +row.createdAt > 90000;
     await prisma.passwordResetChallenge.updateMany({
@@ -297,6 +318,7 @@ export async function deliverResetMail(
     });
     console.warn(
       'Password-reset mail delivery was not confirmed. Check relay configuration and quota.',
+      error,
     );
   }
   return true;

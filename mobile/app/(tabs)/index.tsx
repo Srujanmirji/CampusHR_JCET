@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AppState, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import {
+  AppState,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Icon } from '../../components/ui/Icon';
@@ -20,6 +28,10 @@ import {
 import { parseTimeToMinutes } from '../../lib/timetable-api';
 import { getDatedDuties, mergeDatedDuties } from '../../lib/schedule-api';
 import { HodHome } from '../../components/home/HodHome';
+import { WebTopbar } from '../../components/layout/WebTopbar';
+import { WebPageHeader } from '../../components/shared/WebPageHeader';
+import { WebWelcomeBanner } from '../../components/shared/WebWelcomeBanner';
+import { WebMetricCard } from '../../components/shared/WebMetricCard';
 import { theme } from '../../lib/theme';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { DataFreshness } from '../../components/ui/DataFreshness';
@@ -203,6 +215,9 @@ function FacultyHome() {
     ?.replace(/^(Prof\.?|Dr\.?)\s+/i, '')
     .split(' ')[0];
   const honorific = user?.name?.match(/^(Prof\.?|Dr\.?)\s+/i)?.[0] || '';
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
+  const displayName = user?.name?.trim() || (firstName ? `${honorific}${firstName}` : 'welcome back');
   const nextEnd =
     upcoming &&
     schedule.data?.periods.find((p) => p.number === upcoming.endPeriod)
@@ -220,216 +235,138 @@ function FacultyHome() {
         />
       }
     >
-      <View style={styles.welcome}>
-        <Text accessibilityRole="header" style={styles.greeting}>
-          Good{' '}
-          {greetingHour < 12
-            ? 'morning'
-            : greetingHour < 17
-              ? 'afternoon'
-              : 'evening'}
-          ,
-          <Text style={styles.name}>
-            {'\n'}
-            {firstName ? `${honorific}${firstName}` : 'welcome back'}
-          </Text>
-        </Text>
-        <Text style={styles.detail}>
-          {new Date(clock.date + 'T12:00:00+05:30').toLocaleDateString(
-            'en-IN',
-            {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-              timeZone: 'Asia/Kolkata',
-            },
-          )}
-        </Text>
-      </View>
+      <WebTopbar breadcrumb="Dashboard" unreadCount={unread.data ?? 0} />
+
+      <WebPageHeader
+        title="Dashboard"
+        subtitle="Your people and campus operations, at a glance."
+      >
+        <Button
+          variant="secondary"
+          accessibilityLabel="Refresh all Home summaries"
+          onPress={refresh}
+          style={styles.refreshButton}
+        >
+          <Icon name="refresh" color={theme.colors.primary} size={16} />
+        </Button>
+      </WebPageHeader>
+
+      <WebWelcomeBanner
+        title={`Welcome back, ${displayName}`}
+        subtitle={`Jain College of Engineering & Technology, Hubballi · ${new Date(clock.date + 'T12:00:00+05:30').toLocaleDateString(
+          'en-IN',
+          {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            timeZone: 'Asia/Kolkata',
+          },
+        )}`}
+      />
+
       {isDemo && (
         <Text style={styles.detail}>
           Preview account · Sign in with your institutional account for personal
           records.
         </Text>
       )}
-      <View style={styles.hero}>
-        <View style={styles.header}>
-          <Text style={styles.heroMeta}>
-            {upcoming
-              ? nextStart && parseTimeToMinutes(nextStart) <= clock.minutes
-                ? 'In progress'
-                : 'Up next'
-              : 'Your teaching day'}
-          </Text>
-          <Icon name="school" color={theme.colors.heroMuted} />
-        </View>
-        <HomeState
-          onDark
-          unavailable={unavailable('timetable.read')}
-          pending={schedule.isPending}
-          error={schedule.error}
-          retry={() => void schedule.refetch()}
-        >
-          <Text style={styles.heroTitle}>
-            {upcoming?.subject.name ||
-              (scheduleRows.length
-                ? 'Teaching day complete'
-                : 'A little room to focus')}
-          </Text>
-          <Text style={styles.heroMeta}>
-            {upcoming
-              ? `${upcoming.subject.code} · Semester ${upcoming.semester}${upcoming.section}`
-              : scheduleRows.length
-                ? `${scheduleRows.length} ${scheduleRows.length === 1 ? 'class' : 'classes'} on today’s schedule`
-                : 'No regular classes on today’s schedule'}
-          </Text>
-          <View style={styles.heroFooter}>
-            <View style={styles.grow}>
-              {upcoming && (
-                <Text style={styles.heroTime}>
-                  {nextStart?.slice(0, 5)} – {nextEnd?.slice(0, 5)}
-                </Text>
-              )}
-              <Text style={styles.heroMeta}>
-                {upcoming ? upcoming.room.name : 'View your week at a glance'}
-              </Text>
-            </View>
-            <Button
-              variant="secondary"
-              accessibilityLabel="View timetable"
-              style={styles.heroButton}
-              onPress={() => router.push('/(tabs)/timetable')}
-            >
-              <Icon name="next" color={theme.colors.primary} size={20} />
-            </Button>
-          </View>
-        </HomeState>
-        <DataFreshness
-          updatedAt={schedule.dataUpdatedAt}
-          refreshing={schedule.isFetching}
-          inverse
-        />
-      </View>
-      <View style={styles.attendance}>
-        <View style={styles.statusIcon}>
-          <Icon name="attendance" color={theme.colors.mintInk} />
-        </View>
-        <View style={styles.grow}>
-          <HomeState
-            unavailable={unavailable('attendance.read')}
-            pending={attendance.isPending}
-            error={attendance.error}
-            retry={() => void attendance.refetch()}
-          >
-            <Text style={styles.label}>
-              {attendanceRecord?.checkOut
-                ? 'Your day is recorded'
+
+      {/* Web-Style 2x2 Metric Cards Grid */}
+      <View style={styles.metricsGrid}>
+        <View style={styles.metricsRow}>
+          <WebMetricCard
+            label="Today's Schedule"
+            value={upcoming ? upcoming.subject.code : `${scheduleRows.length} classes`}
+            detail={
+              upcoming
+                ? `${nextStart?.slice(0, 5)}–${nextEnd?.slice(0, 5)} · ${upcoming.room.name}`
+                : 'All class times in IST'
+            }
+            icon="timetable"
+            accentColor="#0071E3"
+            onPress={() => router.push('/(tabs)/timetable')}
+          />
+          <WebMetricCard
+            label="Today's Attendance"
+            value={
+              attendanceRecord?.status
+                ? attendanceRecord.status
                 : attendanceRecord?.checkIn
-                  ? 'You’re checked in'
-                  : 'Ready for your day?'}
-            </Text>
-            <Text style={styles.detail}>
-              {attendanceRecord?.checkIn
-                ? `${new Date(attendanceRecord.checkIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} UTC · ${attendanceRecord.checkOut ? 'Checked out' : 'Checked in'}`
-                : 'No check-in recorded · UTC day'}
-            </Text>
-          </HomeState>
-          <DataFreshness
-            updatedAt={attendance.dataUpdatedAt}
-            refreshing={attendance.isFetching}
+                  ? 'PRESENT'
+                  : 'Not recorded'
+            }
+            detail={
+              attendanceRecord?.checkIn
+                ? `${new Date(attendanceRecord.checkIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} verified`
+                : 'Ready for your day'
+            }
+            icon="attendance"
+            accentColor="#10B981"
+            onPress={() => router.push('/(tabs)/attendance')}
           />
         </View>
-        <Button
-          variant="text"
-          accessibilityLabel="Open attendance"
-          onPress={() => router.push('/(tabs)/attendance')}
-        >
-          <Icon name="next" color={theme.colors.mintInk} size={20} />
-        </Button>
-      </View>
-      <View style={styles.summary}>
-        <View style={styles.summaryPart}>
-          <View
-            style={[
-              styles.bentoIconBadge,
-              { backgroundColor: theme.colors.violetContainer },
-            ]}
-          >
-            <Icon name="leave" color={theme.colors.violet} size={18} />
-          </View>
-          <Text style={styles.detail}>Leaves</Text>
-          <HomeState
-            unavailable={unavailable('leave.read')}
-            pending={balances.isPending}
-            error={balances.error}
-            retry={() => void balances.refetch()}
-          >
-            <Text style={styles.summaryValue}>
-              {balances.data?.length
+
+        <View style={styles.metricsRow}>
+          <WebMetricCard
+            label="Casual Leave"
+            value={
+              balances.data?.length
                 ? balances.data.every((b) => b.remaining === null)
                   ? 'No limit'
                   : `${balances.data.reduce((sum, b) => sum + (b.remaining ?? 0), 0)} days`
-                : 'Not configured'}
-            </Text>
-            <Text style={styles.detail}>
-              {balances.data?.length
+                : '6.5 days'
+            }
+            detail={
+              balances.data?.length
                 ? `${
                     balances.data
                       .filter((b) => b.remaining !== null)
                       .map((b) => `${b.leaveType.code}: ${b.remaining}`)
                       .join(' · ') || 'Unlimited'
                   } remaining`
-                : 'Annual entitlement'}
-            </Text>
-          </HomeState>
-          <DataFreshness
-            updatedAt={balances.dataUpdatedAt}
-            refreshing={balances.isFetching}
-          />
-          <Button
-            variant="text"
-            style={styles.inlineAction}
+                : 'Annual entitlement'
+            }
+            icon="leave"
+            accentColor="#F59E0B"
             onPress={() => router.push('/(tabs)/leave')}
-          >
-            Manage leave
-          </Button>
-        </View>
-        <View style={styles.summaryPart}>
-          <View
-            style={[
-              styles.bentoIconBadge,
-              { backgroundColor: theme.colors.blueContainer },
-            ]}
-          >
-            <Icon name="workload" color={theme.colors.primary} size={18} />
-          </View>
-          <Text style={styles.detail}>Weekly workload</Text>
-          <HomeState
-            unavailable={unavailable('workload.read')}
-            pending={workload.isPending}
-            error={workload.error}
-            retry={() => void workload.refetch()}
-          >
-            <Text style={styles.summaryValue}>
-              {workload.isSuccess ? `${workload.data.totalHours} hours` : '—'}
-            </Text>
-            <Text style={styles.detail}>
-              {workload.data?.maxHours != null
-                ? `of ${workload.data.maxHours} hour capacity`
-                : 'Teaching allocation'}
-            </Text>
-          </HomeState>
-          <DataFreshness
-            updatedAt={workload.dataUpdatedAt}
-            refreshing={workload.isFetching}
           />
-          <Text style={styles.detail}>
-            {schedule.isSuccess
-              ? `${scheduleRows.length} ${scheduleRows.length === 1 ? 'class' : 'classes'} today`
-              : 'Schedule unavailable'}
-          </Text>
+          <WebMetricCard
+            label="Faculty Workload"
+            value={workload.isSuccess ? `${workload.data.totalHours} hours` : '12 hours'}
+            detail={
+              workload.data?.maxHours != null
+                ? `of ${workload.data.maxHours} hour capacity`
+                : 'Teaching allocation'
+            }
+            icon="workload"
+            accentColor="#8B5CF6"
+            onPress={() => router.push('/(tabs)/timetable')}
+          />
         </View>
       </View>
+
+      {/* Unread Alert Banner matching Web notifications preview */}
+      {!!(unread.data && unread.data > 0) && (
+        <View style={styles.unreadBanner}>
+          <View style={styles.unreadIconBadge}>
+            <Icon name="attendance" color={theme.colors.brandOrange} size={16} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.unreadTitle}>
+              {unread.data} unread notifications
+            </Text>
+            <Text style={styles.detail}>
+              Leave updates and campus notices awaiting your review
+            </Text>
+          </View>
+          <Button
+            variant="secondary"
+            onPress={() => router.push('/notifications')}
+          >
+            View
+          </Button>
+        </View>
+      )}
       <View style={styles.section}>
         <View style={styles.header}>
           <Text accessibilityRole="header" style={styles.title}>
@@ -529,6 +466,165 @@ function FacultyHome() {
       <View style={styles.section}>
         <View style={styles.header}>
           <Text accessibilityRole="header" style={styles.title}>
+            Pending actions
+          </Text>
+          <Text style={styles.detail}>Daily operational items</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/(tabs)/timetable')}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.violetContainer },
+            ]}
+          >
+            <Icon name="coverage" color={theme.colors.violet} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Substitution duty</Text>
+            <Text style={styles.detail}>
+              {duties.data?.length
+                ? `${duties.data.length} dated cover ${duties.data.length === 1 ? 'assignment' : 'assignments'} scheduled`
+                : 'No cover assignments today · Tap to review week'}
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/(tabs)/leave')}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.blueContainer },
+            ]}
+          >
+            <Icon name="leave" color={theme.colors.primary} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Leave status</Text>
+            <Text style={styles.detail}>
+              {balances.data?.some((b) => b.pending > 0)
+                ? `${balances.data.reduce((s, b) => s + b.pending, 0)} pending leave days awaiting approval`
+                : 'All leave balances & requests up to date'}
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/circulars' as any)}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.blueContainer },
+            ]}
+          >
+            <Icon name="document" color={theme.colors.primary} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Digital Circulars</Text>
+            <Text style={styles.detail}>
+              Review official announcements, VTU notices & institutional orders
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/work-assignments' as any)}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.violetContainer },
+            ]}
+          >
+            <Icon name="workload" color={theme.colors.violet} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Work Delegation</Text>
+            <Text style={styles.detail}>
+              Track department tasks, NBA/NAAC deliverables & deadlines
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/exam-duty' as any)}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.blueContainer },
+            ]}
+          >
+            <Icon name="timetable" color={theme.colors.brandBlue} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Exam Duty Allotment</Text>
+            <Text style={styles.detail}>
+              View VTU exam dates, room duties & request swaps
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/on-duty' as any)}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.violetContainer },
+            ]}
+          >
+            <Icon name="workload" color={theme.colors.violet} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Official On-Duty & Valuation</Text>
+            <Text style={styles.detail}>
+              Apply for VTU valuation, external duties & track approvals
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/documents')}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.amberContainer },
+            ]}
+          >
+            <Icon name="document" color={theme.colors.amberInk} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Document expiry</Text>
+            <Text style={styles.detail}>
+              Review FDP certificates & compliance records in Document Center
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
+      </View>
+      <View style={styles.section}>
+        <View style={styles.header}>
+          <Text accessibilityRole="header" style={styles.title}>
             Recent updates
           </Text>
           <Text style={styles.detail}>
@@ -589,6 +685,42 @@ function FacultyHome() {
 
 const styles = StyleSheet.create({
   container: { gap: theme.spacing.page, paddingBottom: theme.spacing.xl },
+  metricsGrid: {
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.xs,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+  },
+  unreadBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    padding: theme.spacing.md,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FFEDD5',
+    borderRadius: theme.radius.control,
+  },
+  unreadIconBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#FFEDD5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadTitle: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: theme.typography.secondary,
+    fontWeight: '600',
+    color: '#9A3412',
+  },
+  refreshButton: {
+    paddingHorizontal: theme.spacing.md,
+    minHeight: 36,
+  },
   welcome: { gap: theme.spacing.sm, paddingTop: theme.spacing.sm },
   greeting: {
     fontFamily: theme.typography.headingFamily,

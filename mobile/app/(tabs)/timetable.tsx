@@ -27,6 +27,9 @@ import {
   weekDates,
 } from '../../lib/schedule-api';
 import { parseTimeToMinutes } from '../../lib/timetable-api';
+import { WebTopbar } from '../../components/layout/WebTopbar';
+import { WebPageHeader } from '../../components/shared/WebPageHeader';
+import { WebMetricCard } from '../../components/shared/WebMetricCard';
 import { theme } from '../../lib/theme';
 
 const label = (value: string, options: Intl.DateTimeFormatOptions) =>
@@ -37,7 +40,8 @@ const label = (value: string, options: Intl.DateTimeFormatOptions) =>
 
 export default function TimetableScreen() {
   const { user, accessToken } = useAuth();
-  const { fontScale } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
+  const isTablet = width >= 768;
   const client = useQueryClient();
   const [clock, setClock] = useState(() => campusClock());
   const [view, setView] = useState<'TODAY' | 'WEEK'>('TODAY');
@@ -55,17 +59,20 @@ export default function TimetableScreen() {
     accessToken,
     'substitution.read',
   );
+
   const refresh = useCallback(() => {
     setClock(campusClock());
     void client.invalidateQueries({ queryKey: ['schedule', user?.id] });
     void client.invalidateQueries({ queryKey: ['dated-duties', user?.id] });
     void client.invalidateQueries({ queryKey: ['home', user?.id, 'schedule'] });
   }, [client, user?.id]);
+
   useFocusEffect(
     useCallback(() => {
       refresh();
     }, [refresh]),
   );
+
   useEffect(() => {
     const timer = setInterval(() => setClock(campusClock()), 60_000);
     const listener = AppState.addEventListener('change', (state) => {
@@ -76,6 +83,7 @@ export default function TimetableScreen() {
       listener.remove();
     };
   }, [refresh]);
+
   const regular = useQuery({
     queryKey: ['schedule', user?.id, date],
     queryFn: () => getOwnSchedule(user, accessToken, date),
@@ -83,6 +91,7 @@ export default function TimetableScreen() {
     retry: false,
     staleTime: 30_000,
   });
+
   const duties = useQuery({
     queryKey: ['dated-duties', user?.id, clock.date],
     queryFn: () => getDatedDuties(user, accessToken),
@@ -90,6 +99,7 @@ export default function TimetableScreen() {
     retry: false,
     staleTime: 30_000,
   });
+
   let dutyError = duties.error;
   let entries = regular.data?.entries ?? [];
   if (regular.data && !duties.isError) {
@@ -107,10 +117,26 @@ export default function TimetableScreen() {
           : new Error('Duty timings could not be read.');
     }
   }
+
   const error = regular.error;
   const dutyCount = entries.filter((entry) => entry.isSubstitute).length;
   const past = date < clock.date;
   const refreshing = regular.isFetching || duties.isFetching;
+
+  const currentClass = entries.find((e) => {
+    const pStart = regular.data?.periods.find((p) => p.number === e.startPeriod);
+    const pEnd = regular.data?.periods.find((p) => p.number === e.endPeriod);
+    if (!pStart || !pEnd) return false;
+    return (
+      classStatus(
+        date,
+        parseTimeToMinutes(pStart.startTime),
+        parseTimeToMinutes(pEnd.endTime),
+        clock,
+      ) === 'In progress'
+    );
+  });
+
   return (
     <ScreenContainer
       testID="timetable-screen"
@@ -119,29 +145,65 @@ export default function TimetableScreen() {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={refresh}
+          tintColor={theme.colors.primary}
           colors={[theme.colors.primary]}
         />
       }
     >
-      <View style={styles.header}>
-        <View style={styles.heading}>
-          <Text accessibilityRole="header" style={styles.title}>
-            Timetable
-          </Text>
-          <Text style={styles.supporting}>
-            {label(date, { weekday: 'long', day: 'numeric', month: 'long' })}
-          </Text>
-        </View>
+      <WebTopbar breadcrumb="Timetable" />
+
+      <WebPageHeader
+        title="Timetable"
+        subtitle="Weekly classes by department, semester and section."
+      >
         <Button
-          variant="text"
+          variant="secondary"
           accessibilityLabel="Refresh timetable"
           onPress={refresh}
           loading={refreshing}
-          style={styles.iconButton}
+          style={styles.refreshButton}
         >
-          <Icon name="refresh" color={theme.colors.primary} />
+          <Icon name="refresh" color={theme.colors.primary} size={16} />
         </Button>
+      </WebPageHeader>
+
+      {/* Web-Style 2x2 Metric Cards Grid */}
+      <View style={styles.metricsGrid}>
+        <View style={styles.metricsRow}>
+          <WebMetricCard
+            label="Classes Today"
+            value={`${entries.length}`}
+            detail={label(date, { weekday: 'short', day: 'numeric', month: 'short' })}
+            icon="timetable"
+            accentColor="#0071E3"
+          />
+          <WebMetricCard
+            label="Active Period"
+            value={currentClass ? currentClass.subject.code : 'None active'}
+            detail={currentClass ? currentClass.room.name : 'All class times in IST'}
+            icon="clock"
+            accentColor="#10B981"
+          />
+        </View>
+
+        <View style={styles.metricsRow}>
+          <WebMetricCard
+            label="Substitutions"
+            value={`${dutyCount}`}
+            detail={`${dutyCount} dated duties`}
+            icon="coverage"
+            accentColor="#8B5CF6"
+          />
+          <WebMetricCard
+            label="Teaching Load"
+            value={`${entries.length * 2}h`}
+            detail="Hours scheduled today"
+            icon="workload"
+            accentColor="#F59E0B"
+          />
+        </View>
       </View>
+
       <SegmentedControl
         label="Timetable view"
         value={view}
@@ -157,16 +219,17 @@ export default function TimetableScreen() {
           }
         }}
       />
+
       {view === 'WEEK' && (
-        <View style={styles.week}>
-          <View style={styles.header}>
+        <View style={styles.card}>
+          <View style={styles.weekHeader}>
             <Button
               variant="secondary"
-              style={styles.iconButton}
+              style={styles.navButton}
               onPress={() => setOffset((value) => value - 1)}
               accessibilityLabel="Previous week"
             >
-              <Icon name="back" color={theme.colors.foreground} />
+              <Icon name="back" color="#0F172A" size={16} />
             </Button>
             <Text style={styles.weekRange}>
               {label(dates[0], { day: 'numeric', month: 'short' })} –{' '}
@@ -178,11 +241,11 @@ export default function TimetableScreen() {
             </Text>
             <Button
               variant="secondary"
-              style={styles.iconButton}
+              style={styles.navButton}
               onPress={() => setOffset((value) => value + 1)}
               accessibilityLabel="Next week"
             >
-              <Icon name="next" color={theme.colors.foreground} />
+              <Icon name="next" color="#0F172A" size={16} />
             </Button>
           </View>
           <ScrollView
@@ -232,6 +295,7 @@ export default function TimetableScreen() {
           </ScrollView>
         </View>
       )}
+
       {unavailable ? (
         <View style={styles.notice}>
           <Text style={styles.body}>{unavailable}</Text>
@@ -259,507 +323,546 @@ export default function TimetableScreen() {
           </Button>
         </View>
       ) : (
-        <>
-          <View style={styles.scheduleHeading}>
-            <Text accessibilityRole="header" style={styles.sectionTitle}>
-              {view === 'TODAY'
-                ? `${entries.length} ${entries.length === 1 ? 'class' : 'classes'} today`
-                : label(date, {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                  })}
-            </Text>
-            <Text style={styles.detail}>
-              {view === 'WEEK' &&
-                `${entries.length} ${entries.length === 1 ? 'slot' : 'slots'} · `}
-              All class times in IST
-            </Text>
-          </View>
-          {past ? (
-            <Text style={styles.detail}>
-              Regular timetable for this weekday. Past substitution history is
-              not provided by the API.
-            </Text>
-          ) : dutiesUnavailable ? (
-            <Text style={styles.detail}>
-              Regular classes only. Substitution duties are not available for
-              your account.
-            </Text>
-          ) : duties.isPending ? (
-            <Text style={styles.detail}>
-              Checking dated substitution duties…
-            </Text>
-          ) : dutyError ? (
-            <View style={styles.notice}>
-              <Text accessibilityRole="alert" style={styles.error}>
-                Substitution duties could not be loaded. Regular classes are
-                shown; coverage may be missing.
-              </Text>
-              <Button
-                variant="outline"
-                onPress={() => {
-                  void duties.refetch();
-                }}
-              >
-                Retry duties
-              </Button>
-            </View>
-          ) : dutyCount > 0 ? (
-            <Text style={styles.coverageSummary}>
-              Includes {dutyCount} substitution{' '}
-              {dutyCount === 1 ? 'duty' : 'duties'} for {date}
-            </Text>
-          ) : null}
-          {regular.dataUpdatedAt > 0 && (
-            <Text style={styles.detail}>
-              Updated{' '}
-              {new Date(regular.dataUpdatedAt).toLocaleTimeString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-              {regular.isFetching ? ' · Refreshing…' : ''}
-            </Text>
-          )}
-          {entries.length === 0 && (
-            <View style={styles.empty}>
-              <Icon
-                name="timetable"
-                color={theme.colors.primary}
-                size={theme.spacing.xl}
-              />
-              <Text style={styles.sectionTitle}>
-                A little space in your day
-              </Text>
-              <Text style={styles.supporting}>
-                No regular classes
-                {!past && !dutiesUnavailable && duties.isSuccess
-                  ? ' or assigned duties'
-                  : ''}{' '}
-                for this date. Select another day or refresh to check for
-                changes.
-              </Text>
-            </View>
-          )}
-          <View style={styles.timeline}>
-            {entries.map((entry) => {
-              const start = regular.data!.periods.find(
-                (p) => p.number === entry.startPeriod,
-              )!.startTime;
-              const end = regular.data!.periods.find(
-                (p) => p.number === entry.endPeriod,
-              )!.endTime;
-              const status = classStatus(
-                date,
-                parseTimeToMinutes(start),
-                parseTimeToMinutes(end),
-                clock,
-              );
-              const current = status === 'In progress';
-              const completed = status === 'Completed';
-              return (
-                <View key={entry.id} style={styles.timelineRow}>
-                  <View
-                    style={[
-                      styles.timeRail,
-                      {
-                        width:
-                          (theme.sizes.tapTarget + theme.spacing.md) *
-                          Math.max(fontScale, 1),
-                      },
-                    ]}
+        <View style={isTablet ? styles.tabletSplit : undefined}>
+          <View style={isTablet ? styles.tabletScheduleColumn : undefined}>
+            <View style={styles.card}>
+              <View style={styles.scheduleHeading}>
+                <Text accessibilityRole="header" style={styles.sectionTitle}>
+                  {view === 'TODAY'
+                    ? `${entries.length} ${entries.length === 1 ? 'class' : 'classes'} today`
+                    : label(date, {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                      })}
+                </Text>
+                <Text style={styles.detail}>
+                  {view === 'WEEK' &&
+                    `${entries.length} ${entries.length === 1 ? 'slot' : 'slots'} · `}
+                  All class times in IST
+                </Text>
+              </View>
+
+              {past ? (
+                <Text style={styles.detail}>
+                  Regular timetable for this weekday. Past substitution history is
+                  not provided by the API.
+                </Text>
+              ) : dutiesUnavailable ? (
+                <Text style={styles.detail}>
+                  Regular classes only. Substitution duties are not available for
+                  your account.
+                </Text>
+              ) : duties.isPending ? (
+                <Text style={styles.detail}>
+                  Checking dated substitution duties…
+                </Text>
+              ) : dutyError ? (
+                <View style={styles.notice}>
+                  <Text accessibilityRole="alert" style={styles.error}>
+                    Substitution duties could not be loaded. Regular classes are
+                    shown; coverage may be missing.
+                  </Text>
+                  <Button
+                    variant="outline"
+                    onPress={() => {
+                      void duties.refetch();
+                    }}
                   >
-                    <Text style={[styles.time, current && styles.activeText]}>
-                      {start.slice(0, 5)}
-                    </Text>
-                    <Text style={styles.detail}>{end.slice(0, 5)}</Text>
-                  </View>
-                  <View style={styles.timelineSpine}>
-                    <View
-                      style={[
-                        styles.timelineDot,
-                        completed && styles.completedDot,
-                        current && styles.currentDot,
-                      ]}
-                    />
-                  </View>
-                  <View style={styles.timelineCopy}>
-                    <Text style={[styles.code, current && styles.activeText]}>
-                      {entry.subject.code}
-                    </Text>
-                    <Text style={styles.subject}>{entry.subject.name}</Text>
-                    <View style={styles.metadata}>
-                      <Icon name="profile" size={theme.spacing.section} />
-                      <Text style={styles.detail}>
-                        Sem {entry.semester}
-                        {entry.section}
-                        {entry.batch ? ` · Batch ${entry.batch}` : ''}
-                      </Text>
-                      <Icon name="location" size={theme.spacing.section} />
-                      <Text style={styles.detail}>{entry.room.name}</Text>
-                    </View>
-                    <Text style={styles.detail}>
-                      {entry.subject.kind} ·{' '}
-                      {entry.startPeriod === entry.endPeriod
-                        ? `Period ${entry.startPeriod}`
-                        : `Periods ${entry.startPeriod}–${entry.endPeriod}`}
-                    </Text>
-                    {entry.isSubstitute && (
-                      <View style={styles.coverage}>
-                        <Text style={styles.coverageLabel}>
-                          Substitution · {entry.dutyDate}
-                        </Text>
-                        <Text style={styles.supporting}>
-                          {entry.substituteNote}
-                        </Text>
-                      </View>
-                    )}
-                    {status && (
+                    Retry duties
+                  </Button>
+                </View>
+              ) : dutyCount > 0 ? (
+                <Text style={styles.coverageSummary}>
+                  Includes {dutyCount} substitution{' '}
+                  {dutyCount === 1 ? 'duty' : 'duties'} for {date}
+                </Text>
+              ) : null}
+
+              {regular.dataUpdatedAt > 0 && (
+                <Text style={styles.detail}>
+                  Updated{' '}
+                  {new Date(regular.dataUpdatedAt).toLocaleTimeString('en-IN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                  {regular.isFetching ? ' · Refreshing…' : ''}
+                </Text>
+              )}
+
+              {entries.length === 0 && (
+                <View style={styles.empty}>
+                  <Icon
+                    name="timetable"
+                    color={theme.colors.primary}
+                    size={32}
+                  />
+                  <Text style={styles.sectionTitle}>
+                    A little space in your day
+                  </Text>
+                  <Text style={styles.supporting}>
+                    No regular classes
+                    {!past && !dutiesUnavailable && duties.isSuccess
+                      ? ' or assigned duties'
+                      : ''}{' '}
+                    for this date. Select another day or refresh to check for
+                    changes.
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.timeline}>
+                {entries.map((entry) => {
+                  const start = regular.data!.periods.find(
+                    (p) => p.number === entry.startPeriod,
+                  )!.startTime;
+                  const end = regular.data!.periods.find(
+                    (p) => p.number === entry.endPeriod,
+                  )!.endTime;
+                  const status = classStatus(
+                    date,
+                    parseTimeToMinutes(start),
+                    parseTimeToMinutes(end),
+                    clock,
+                  );
+                  const current = status === 'In progress';
+                  const completed = status === 'Completed';
+
+                  return (
+                    <View key={entry.id} style={styles.timelineRow}>
                       <View
                         style={[
-                          styles.status,
-                          completed
-                            ? styles.completedStatus
-                            : styles.activeStatus,
+                          styles.timeRail,
+                          {
+                            width:
+                              (theme.sizes.tapTarget + theme.spacing.md) *
+                              Math.max(fontScale, 1),
+                          },
                         ]}
                       >
-                        <Text
-                          style={[
-                            styles.statusText,
-                            completed
-                              ? styles.completedText
-                              : styles.activeText,
-                          ]}
-                        >
-                          {status}
+                        <Text style={[styles.time, current && styles.activeText]}>
+                          {start.slice(0, 5)}
                         </Text>
+                        <Text style={styles.detail}>{end.slice(0, 5)}</Text>
                       </View>
-                    )}
+                      <View style={styles.timelineSpine}>
+                        <View
+                          style={[
+                            styles.timelineDot,
+                            completed && styles.completedDot,
+                            current && styles.currentDot,
+                          ]}
+                        />
+                      </View>
+                      <View style={styles.timelineCopy}>
+                        <Text style={[styles.code, current && styles.activeText]}>
+                          {entry.subject.code}
+                        </Text>
+                        <Text style={styles.subject}>{entry.subject.name}</Text>
+                        <View style={styles.metadata}>
+                          <Icon name="profile" size={14} color="#6E6E73" />
+                          <Text style={styles.detail}>
+                            Sem {entry.semester}
+                            {entry.section}
+                            {entry.batch ? ` · Batch ${entry.batch}` : ''}
+                          </Text>
+                          <Icon name="location" size={14} color="#6E6E73" />
+                          <Text style={styles.detail}>{entry.room.name}</Text>
+                        </View>
+                        <Text style={styles.detail}>
+                          {entry.subject.kind} ·{' '}
+                          {entry.startPeriod === entry.endPeriod
+                            ? `Period ${entry.startPeriod}`
+                            : `Periods ${entry.startPeriod}–${entry.endPeriod}`}
+                        </Text>
+                        {entry.isSubstitute && (
+                          <View style={styles.coverage}>
+                            <Text style={styles.coverageLabel}>
+                              Substitution · {entry.dutyDate}
+                            </Text>
+                            <Text style={styles.supporting}>
+                              {entry.substituteNote}
+                            </Text>
+                          </View>
+                        )}
+                        {status && (
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              completed
+                                ? styles.completedStatus
+                                : styles.activeStatus,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.statusText,
+                                completed
+                                  ? styles.completedText
+                                  : styles.activeText,
+                              ]}
+                            >
+                              {status}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
+
+          <View style={isTablet ? styles.tabletInspectorColumn : undefined}>
+            <View style={styles.card}>
+              <View style={styles.bentoHeader}>
+                <View style={styles.heading}>
+                  <Text style={styles.sectionTitle}>Mutual Class Swap</Text>
+                  <Text style={styles.supporting}>
+                    Exchange a lecture period with a departmental peer without
+                    using casual leave.
+                  </Text>
+                </View>
+                <Button
+                  variant="secondary"
+                  accessibilityLabel={
+                    swapRequested
+                      ? 'Withdraw peer period swap proposal'
+                      : 'Propose peer period swap'
+                  }
+                  onPress={() => {
+                    selectionFeedback();
+                    setSwapRequested((prev) => !prev);
+                  }}
+                >
+                  {swapRequested ? 'Swap Proposed' : 'Propose Swap'}
+                </Button>
+              </View>
+              <View style={styles.bentoItem}>
+                <Text style={styles.code}>
+                  Prof. Asha Patil ⇄ Prof. Priya Kulkarni
+                </Text>
+                <Text style={styles.subject}>
+                  BCS501 Mon P2 (10:00) ⇄ BCS502 Wed P4 (12:00) · CSE-5A · Room
+                  204
+                </Text>
+                <Text style={styles.detail}>
+                  {swapRequested
+                    ? 'Your additional Fri P3 ⇄ Tue P2 swap proposal is queued for HOD review'
+                    : 'Approved by HOD · Zero leave balance deduction'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.heading}>
+                <Text style={styles.sectionTitle}>VTU Academic Calendar</Text>
+                <Text style={styles.supporting}>
+                  Odd Semester 2026–27 CIE windows and JCET institutional
+                  holidays.
+                </Text>
+              </View>
+              {[
+                {
+                  title: 'CIE-1 Internal Assessment',
+                  window: '28 Sep – 01 Oct',
+                  badge: 'CIE Exam',
+                },
+                {
+                  title: 'Gandhi Jayanti',
+                  window: '02 Oct · Institutional Holiday',
+                  badge: 'Holiday',
+                },
+                {
+                  title: 'CIE-2 Internal Assessment',
+                  window: '02 Nov – 05 Nov',
+                  badge: 'CIE Exam',
+                },
+                {
+                  title: 'CIE-3 & Lab Internals',
+                  window: '07 Dec – 12 Dec',
+                  badge: 'Lab + CIE',
+                },
+              ].map((item) => (
+                <View key={item.title} style={styles.bentoRow}>
+                  <View style={styles.heading}>
+                    <Text style={styles.code}>{item.title}</Text>
+                    <Text style={styles.detail}>{item.window}</Text>
+                  </View>
+                  <View style={styles.calendarBadge}>
+                    <Text style={styles.calendarBadgeText}>{item.badge}</Text>
                   </View>
                 </View>
-              );
-            })}
+              ))}
+            </View>
           </View>
-        </>
+        </View>
       )}
-
-      <View style={styles.bentoSection}>
-        <View style={styles.bentoHeader}>
-          <View style={styles.heading}>
-            <Text style={styles.sectionTitle}>Mutual Class Swap</Text>
-            <Text style={styles.supporting}>
-              Exchange a lecture period with a departmental peer without using
-              casual leave.
-            </Text>
-          </View>
-          <Button
-            variant="secondary"
-            accessibilityLabel={
-              swapRequested
-                ? 'Withdraw peer period swap proposal'
-                : 'Propose peer period swap'
-            }
-            onPress={() => {
-              selectionFeedback();
-              setSwapRequested((prev) => !prev);
-            }}
-          >
-            {swapRequested ? 'Swap Proposed' : 'Propose Swap'}
-          </Button>
-        </View>
-        <View style={styles.bentoItem}>
-          <Text style={styles.code}>
-            Prof. Asha Patil ⇄ Prof. Priya Kulkarni
-          </Text>
-          <Text style={styles.subject}>
-            BCS501 Mon P2 (10:00) ⇄ BCS502 Wed P4 (12:00) · CSE-5A · Room 204
-          </Text>
-          <Text style={styles.detail}>
-            {swapRequested
-              ? 'Your additional Fri P3 ⇄ Tue P2 swap proposal is queued for HOD review'
-              : 'Approved by HOD · Zero leave balance deduction'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.bentoSection}>
-        <View style={styles.heading}>
-          <Text style={styles.sectionTitle}>VTU Academic Calendar</Text>
-          <Text style={styles.supporting}>
-            Odd Semester 2026–27 CIE windows and JCET institutional holidays.
-          </Text>
-        </View>
-        {[
-          {
-            title: 'CIE-1 Internal Assessment',
-            window: '28 Sep – 01 Oct',
-            badge: 'CIE Exam',
-          },
-          {
-            title: 'Gandhi Jayanti',
-            window: '02 Oct · Institutional Holiday',
-            badge: 'Holiday',
-          },
-          {
-            title: 'CIE-2 Internal Assessment',
-            window: '02 Nov – 05 Nov',
-            badge: 'CIE Exam',
-          },
-          {
-            title: 'CIE-3 & Lab Internals',
-            window: '07 Dec – 12 Dec',
-            badge: 'Lab + CIE',
-          },
-        ].map((item) => (
-          <View key={item.title} style={styles.bentoRow}>
-            <View style={styles.heading}>
-              <Text style={styles.code}>{item.title}</Text>
-              <Text style={styles.detail}>{item.window}</Text>
-            </View>
-            <View style={[styles.status, styles.activeStatus]}>
-              <Text style={[styles.statusText, styles.activeText]}>
-                {item.badge}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </View>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: theme.spacing.page,
-    gap: theme.spacing.sm,
-    paddingBottom: theme.spacing.xl,
-  },
-  header: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  content: { gap: 16, paddingBottom: 40 },
+  refreshButton: {
+    width: 38,
+    height: 38,
+    paddingHorizontal: 0,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing.sm,
+    justifyContent: 'center',
+    borderRadius: 8,
   },
-  heading: { flex: 1, gap: theme.spacing.xs },
-  title: {
-    fontFamily: theme.typography.headingFamily,
+  navButton: {
+    width: 34,
+    height: 34,
+    paddingHorizontal: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  metricsGrid: { gap: 12 },
+  metricsRow: { flexDirection: 'row', gap: 12 },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
+    padding: 18,
+    gap: 14,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  heading: { flex: 1, gap: 2 },
+  sectionTitle: {
+    fontSize: 16,
     fontWeight: '700',
-    fontSize: theme.typography.heading,
-    color: theme.colors.foreground,
+    color: '#0F172A',
   },
   supporting: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.secondary,
-    lineHeight: theme.typography.lineHeight,
-    color: theme.colors.mutedForeground,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#6E6E73',
   },
   detail: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
+    fontSize: 12,
+    color: '#6E6E73',
   },
-  body: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.body,
-    lineHeight: theme.typography.lineHeight,
-    color: theme.colors.foreground,
-  },
-  iconButton: { paddingHorizontal: theme.spacing.md },
-  week: { gap: theme.spacing.section, marginBottom: theme.spacing.md },
-  weekRange: {
-    flex: 1,
-    textAlign: 'center',
-    fontFamily: theme.typography.headingFamily,
-    fontWeight: '600',
-    fontSize: theme.typography.secondary,
-    color: theme.colors.foreground,
-  },
-  days: { flexGrow: 1, gap: theme.spacing.xs },
-  day: {
-    flex: 1,
-    minWidth: theme.sizes.tapTarget,
-    minHeight: theme.sizes.tapTarget + theme.spacing.lg,
-    gap: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.card,
-    ...theme.shadows.card,
-  },
-  selectedDay: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  focusedDay: { borderColor: theme.colors.foreground },
-  pressedDay: { opacity: 0.75 },
-  dayLabel: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-  },
-  dayNumber: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.body,
-    fontWeight: '600',
-    color: theme.colors.foreground,
-    fontVariant: ['tabular-nums'],
-  },
-  selectedDayText: { color: theme.colors.onAction },
-  scheduleHeading: {
-    gap: theme.spacing.xs,
-    marginTop: theme.spacing.md,
-    marginBottom: theme.spacing.xs,
-  },
-  sectionTitle: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.title,
-    fontWeight: '600',
-    color: theme.colors.foreground,
+  error: {
+    fontSize: 13,
+    color: theme.colors.errorInk,
+    lineHeight: 18,
   },
   coverageSummary: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.secondary,
+    fontSize: 13,
     color: theme.colors.violet,
+    fontWeight: '600',
   },
-  timeline: { marginTop: theme.spacing.md },
-  timelineRow: { flexDirection: 'row' },
+  weekHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  weekRange: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  days: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  day: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#F5F5F7',
+    alignItems: 'center',
+    minWidth: 48,
+  },
+  selectedDay: {
+    backgroundColor: '#0F172A',
+  },
+  focusedDay: {
+    borderColor: '#0071E3',
+    borderWidth: 1,
+  },
+  pressedDay: {
+    opacity: 0.7,
+  },
+  dayLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6E6E73',
+  },
+  dayNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  selectedDayText: {
+    color: '#FFFFFF',
+  },
+  scheduleHeading: {
+    gap: 2,
+  },
+  timeline: {
+    gap: 16,
+    marginTop: 8,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   timeRail: {
-    width: theme.sizes.tapTarget + theme.spacing.md,
-    gap: theme.spacing.xs,
-    paddingTop: theme.spacing.xs,
+    alignItems: 'flex-start',
+    gap: 2,
   },
   time: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.caption,
-    fontWeight: '600',
-    color: theme.colors.foreground,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
     fontVariant: ['tabular-nums'],
   },
   timelineSpine: {
-    width: theme.spacing.md,
-    borderLeftWidth: 1,
-    borderLeftColor: theme.colors.border,
-    marginLeft: theme.spacing.xs,
+    width: 16,
+    alignItems: 'center',
+    paddingTop: 4,
   },
   timelineDot: {
-    width: theme.spacing.md,
-    height: theme.spacing.md,
-    borderRadius: theme.radius.full,
-    marginLeft: -theme.spacing.md / 2,
-    marginTop: theme.spacing.sm,
-    backgroundColor: theme.colors.primary,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#CBD5E1',
   },
-  completedDot: { backgroundColor: theme.colors.mutedForeground },
-  currentDot: { backgroundColor: theme.colors.primary },
+  currentDot: {
+    backgroundColor: '#0071E3',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  completedDot: {
+    backgroundColor: '#10B981',
+  },
   timelineCopy: {
     flex: 1,
-    minWidth: 0,
-    gap: theme.spacing.sm,
-    padding: theme.spacing.section,
-    marginBottom: theme.spacing.section,
-    marginLeft: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadows.card,
+    gap: 4,
   },
   code: {
-    fontFamily: theme.typography.headingFamily,
-    fontWeight: '600',
-    fontSize: theme.typography.body,
-    color: theme.colors.foreground,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   subject: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.secondary,
-    lineHeight: theme.typography.lineHeight,
-    color: theme.colors.mutedForeground,
+    fontSize: 13,
+    color: '#1D1D1F',
   },
   metadata: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: theme.spacing.xs,
+    gap: 6,
+    flexWrap: 'wrap',
   },
-  status: {
-    alignSelf: 'flex-end',
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.status,
-  },
-  statusText: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-  },
-  completedStatus: { backgroundColor: theme.colors.mintContainer },
-  activeStatus: { backgroundColor: theme.colors.blueContainer },
-  completedText: { color: theme.colors.mintInk },
-  activeText: { color: theme.colors.primary },
   coverage: {
-    gap: theme.spacing.xs,
-    borderLeftWidth: 2,
-    borderLeftColor: theme.colors.violet,
-    paddingLeft: theme.spacing.md,
+    backgroundColor: '#EDE9FE',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 4,
+    gap: 2,
   },
   coverageLabel: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.violet,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6D28D9',
+  },
+  statusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  activeStatus: {
+    backgroundColor: '#EFF6FF',
+  },
+  completedStatus: {
+    backgroundColor: '#ECFDF5',
+  },
+  statusText: {
+    fontSize: 11,
     fontWeight: '600',
   },
-  loading: {
-    padding: theme.spacing.xl,
-    alignItems: 'center',
-    gap: theme.spacing.md,
+  activeText: {
+    color: '#0071E3',
   },
-  notice: { gap: theme.spacing.md, paddingVertical: theme.spacing.section },
-  error: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.secondary,
-    color: theme.colors.errorInk,
-    lineHeight: theme.typography.lineHeight,
+  completedText: {
+    color: '#10B981',
   },
   empty: {
-    gap: theme.spacing.md,
-    paddingVertical: theme.spacing.xl,
-    alignItems: 'flex-start',
+    paddingVertical: 32,
+    alignItems: 'center',
+    gap: 12,
   },
-  bentoSection: {
-    marginTop: theme.spacing.md,
-    padding: theme.spacing.section,
-    gap: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadows.card,
+  notice: {
+    padding: 16,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    gap: 8,
+  },
+  loading: {
+    paddingVertical: 32,
+    alignItems: 'center',
+    gap: 8,
+  },
+  body: {
+    fontSize: 14,
+    color: '#1D1D1F',
   },
   bentoHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: theme.spacing.sm,
+    gap: 12,
   },
   bentoItem: {
-    gap: theme.spacing.xs,
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.muted,
-    borderRadius: theme.radius.control,
+    backgroundColor: '#F5F5F7',
+    padding: 12,
+    borderRadius: 12,
+    gap: 4,
   },
   bentoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: theme.spacing.sm,
-    paddingTop: theme.spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: theme.colors.border,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(15, 23, 42, 0.08)',
+  },
+  calendarBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#EFF6FF',
+  },
+  calendarBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#0071E3',
+  },
+  tabletSplit: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  tabletScheduleColumn: {
+    flex: 3,
+  },
+  tabletInspectorColumn: {
+    flex: 2,
+    gap: 16,
   },
 });

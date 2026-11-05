@@ -22,6 +22,110 @@ export function leaveDates(start: string, end: string) {
     : `${leaveDate(start)} – ${leaveDate(end)}`;
 }
 
+export function getLeaveBadgeTheme(code: string) {
+  switch (code) {
+    case 'CL':
+      return {
+        ink: '#1D4ED8',
+        container: '#DBEAFE',
+        border: '#BFDBFE',
+        label: 'Casual Leave',
+      };
+    case 'EL':
+      return {
+        ink: '#6D28D9',
+        container: '#EDE9FE',
+        border: '#DDD6FE',
+        label: 'Earned Leave',
+      };
+    case 'SPL_ML':
+      return {
+        ink: '#BE123C',
+        container: '#FFE4E6',
+        border: '#FECDD3',
+        label: 'Special / Medical Leave',
+      };
+    case 'OOD':
+      return {
+        ink: '#0F766E',
+        container: '#CCFBF1',
+        border: '#99F6E4',
+        label: 'On Official Duty',
+      };
+    case 'ODE':
+      return {
+        ink: '#0E7490',
+        container: '#CFFAFE',
+        border: '#A5F3FC',
+        label: 'Official / Exam Duty',
+      };
+    case 'RH':
+      return {
+        ink: '#B45309',
+        container: '#FEF3C7',
+        border: '#FDE68A',
+        label: 'Restricted Holiday',
+      };
+    case 'VL':
+      return {
+        ink: '#0369A1',
+        container: '#E0F2FE',
+        border: '#BAE6FD',
+        label: 'Vacation Leave',
+      };
+    default:
+      return {
+        ink: theme.colors.violet,
+        container: theme.colors.violetContainer,
+        border: theme.colors.border,
+        label: code,
+      };
+  }
+}
+
+export function LeaveTypeBadge({
+  code,
+}: {
+  code: string;
+  name?: string;
+}) {
+  const badgeTheme = getLeaveBadgeTheme(code);
+  return (
+    <View
+      style={[
+        styles.typeBadge,
+        {
+          backgroundColor: badgeTheme.container,
+          borderColor: badgeTheme.border,
+        },
+      ]}
+    >
+      <Text style={[styles.typeBadgeText, { color: badgeTheme.ink }]}>
+        {code}
+      </Text>
+    </View>
+  );
+}
+
+export function OfficialDutyBadge() {
+  return (
+    <View style={styles.officialDutyBadge}>
+      <Icon name="check" size={12} color="#0F766E" />
+      <Text style={styles.officialDutyText}>Official Duty</Text>
+    </View>
+  );
+}
+
+export function formatEntitlement(entitled: number | null): string {
+  if (entitled === null) return 'As per policy';
+  return `${entitled} entitled`;
+}
+
+export function formatRemaining(remaining: number | null): string {
+  if (remaining === null) return 'As per policy';
+  return `${remaining} remaining`;
+}
+
 export function LeaveStatus({ status }: { status: LeaveRequestDto['status'] }) {
   const ink =
     status === 'APPROVED'
@@ -205,4 +309,33 @@ const styles = StyleSheet.create({
     lineHeight: theme.typography.captionLineHeight,
   },
   grow: { flex: 1, gap: theme.spacing.xs },
+  typeBadge: {
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 2,
+    borderRadius: theme.radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignSelf: 'flex-start',
+  },
+  typeBadgeText: {
+    fontSize: theme.typography.caption,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  officialDutyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#CCFBF1',
+    borderColor: '#99F6E4',
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 2,
+    borderRadius: theme.radius.full,
+    alignSelf: 'flex-start',
+  },
+  officialDutyText: {
+    fontSize: theme.typography.caption,
+    fontWeight: '600',
+    color: '#0F766E',
+  },
 });

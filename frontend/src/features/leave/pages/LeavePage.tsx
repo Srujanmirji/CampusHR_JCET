@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { CalendarClock } from 'lucide-react';
 import { useScope } from '@/features/auth/hooks/useCan';
 import { useLeaveWaiting } from '../hooks/useLeaveWaiting';
 import { LeaveCalendar } from '../components/LeaveCalendar';
@@ -10,12 +13,14 @@ import { LeaveRequestDrawer } from '../components/LeaveRequestDrawer';
 import { LeaveTypesPanel } from '../components/LeaveTypesPanel';
 import { MyLeave } from '../components/MyLeave';
 import { RequestsPanel, type RequestsView } from '../components/RequestsPanel';
+import { LeaveRolloverModal } from '../components/LeaveRolloverModal';
 
 type Tab = 'mine' | 'requests' | 'calendar' | 'types';
 
 export default function LeavePage() {
   const scopeOf = useScope();
   const [params, setParams] = useSearchParams();
+  const [rolloverOpen, setRolloverOpen] = useState(false);
   const canApply = scopeOf('leave.apply') !== undefined;
   const canDecide = scopeOf('leave.approve') !== undefined;
   const readScope = scopeOf('leave.read');
@@ -60,6 +65,18 @@ export default function LeavePage() {
       <PageHeader
         title="Leave management"
         description="Apply for leave, follow each approval step, and decide requests waiting for you."
+        action={
+          canSeeOthers && (
+            <Button
+              variant="outline"
+              onClick={() => setRolloverOpen(true)}
+              className="border-violet-600/30 text-violet-700 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/40"
+            >
+              <CalendarClock className="mr-2 h-4 w-4 text-violet-600" />
+              Year-End Rollover
+            </Button>
+          )
+        }
       />
       <Tabs value={tab} onValueChange={(value) => update({ tab: value })}>
         {tabs.length > 1 && (
@@ -116,6 +133,12 @@ export default function LeavePage() {
         requestId={openId}
         onClose={() => update({ request: null })}
       />
+      {canSeeOthers && (
+        <LeaveRolloverModal
+          open={rolloverOpen}
+          onOpenChange={setRolloverOpen}
+        />
+      )}
     </PageTransition>
   );
 }

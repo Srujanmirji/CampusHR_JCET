@@ -44,6 +44,9 @@ import {
   type CorrectionInput,
 } from '../../lib/attendance-api';
 import { committedFeedback } from '../../lib/feedback';
+import { WebTopbar } from '../../components/layout/WebTopbar';
+import { WebPageHeader } from '../../components/shared/WebPageHeader';
+import { WebMetricCard } from '../../components/shared/WebMetricCard';
 import { theme } from '../../lib/theme';
 
 const displayTime = (iso: string | null) =>
@@ -54,12 +57,14 @@ const displayTime = (iso: string | null) =>
         minute: '2-digit',
       })
     : 'Not recorded';
+
 const messageOf = (error: unknown) =>
   error instanceof Error
     ? error.name === 'ZodError'
       ? 'The server returned an unexpected response. Refresh or contact HR.'
       : error.message
     : 'Unable to finish. Check your connection.';
+
 function ReadState({
   pending,
   error,
@@ -89,6 +94,7 @@ function ReadState({
     );
   return null;
 }
+
 export default function AttendanceTab() {
   const { user, accessToken } = useAuth();
   const client = useQueryClient();
@@ -97,6 +103,12 @@ export default function AttendanceTab() {
   const [page, setPage] = useState(1);
   const [correctionFormOpen, setCorrectionFormOpen] = useState(false);
   const [focusedStatus, setFocusedStatus] = useState<string | null>(null);
+  const [correctionIssue, setCorrectionIssue] = useState<
+    'Missed check-in' | 'Missed check-out' | 'Incorrect time' | 'Other'
+  >('Missed check-in');
+  const [correctionAttachment, setCorrectionAttachment] = useState<
+    string | null
+  >(null);
   const [form, setForm] = useState<CorrectionInput>({
     date: day,
     checkIn: '',
@@ -141,6 +153,7 @@ export default function AttendanceTab() {
     'attendance_correction.request',
   );
   const key = ['attendance', user?.id];
+
   const today = useQuery({
     queryKey: [...key, 'today', day],
     queryFn: () => getAttendanceToday(user, accessToken, day),
@@ -148,6 +161,7 @@ export default function AttendanceTab() {
     retry: false,
     staleTime: 30_000,
   });
+
   const history = useQuery({
     queryKey: [...key, 'history', month],
     queryFn: () => getAttendanceHistory(user, accessToken, month),
@@ -155,6 +169,7 @@ export default function AttendanceTab() {
     retry: false,
     staleTime: 30_000,
   });
+
   const corrections = useQuery({
     queryKey: [...key, 'corrections', page],
     queryFn: () => getAttendanceCorrections(user, accessToken, page),
@@ -162,6 +177,7 @@ export default function AttendanceTab() {
     retry: false,
     staleTime: 30_000,
   });
+
   const policy = useQuery({
     queryKey: [...key, 'policy'],
     queryFn: () => getAttendancePolicy(user, accessToken),
@@ -169,6 +185,7 @@ export default function AttendanceTab() {
     retry: false,
     staleTime: 30_000,
   });
+
   const refresh = useCallback(() => {
     setDay(attendanceDay());
     void client.invalidateQueries({ queryKey: ['attendance', user?.id] });
@@ -176,11 +193,13 @@ export default function AttendanceTab() {
       queryKey: ['home', user?.id, 'attendance'],
     });
   }, [client, user?.id]);
+
   useFocusEffect(
     useCallback(() => {
       refresh();
     }, [refresh]),
   );
+
   useEffect(() => {
     const interval = setInterval(() => setDay(attendanceDay()), 60_000);
     const listener = AppState.addEventListener('change', (next) => {
@@ -191,7 +210,9 @@ export default function AttendanceTab() {
       listener.remove();
     };
   }, [refresh]);
+
   const record = today.data;
+
   async function punch() {
     if (
       sending.current ||
@@ -231,6 +252,7 @@ export default function AttendanceTab() {
       setPending(null);
     }
   }
+
   async function reconcilePunch() {
     const result = await today.refetch();
     if (!result.isError) {
@@ -241,6 +263,7 @@ export default function AttendanceTab() {
       );
     }
   }
+
   async function submitCorrection() {
     if (
       sending.current ||
@@ -253,93 +276,101 @@ export default function AttendanceTab() {
     if (!parsed.success) {
       setFields(
         Object.fromEntries(
-          parsed.error.issues.map((issue) => [
-            String(issue.path[0]),
-            issue.message,
-          ]),
+          parsed.error.issues.map((issue) => [issue.path[0], issue.message]),
         ),
       );
       return;
     }
-    const intent = createCorrectionIntent(user.employeeId, parsed.data);
-    if (blockedCorrectionFingerprints.current.has(intent.fingerprint)) {
-      setUncertainCorrection(intent);
-      setExistingCorrection(null);
-      setCorrectionRecovery(null);
+    const submitted = parsed.data;
+    const fingerprint = `${submitted.date}|${submitted.checkIn}|${submitted.checkOut}|${submitted.requestedStatus}|${submitted.reason.trim()}`;
+    if (blockedCorrectionFingerprints.current.has(fingerprint)) {
       setWriteError(
-        'This correction has an earlier unconfirmed submission. Check corrections or start a different correction; the same details will not be sent again.',
+        'A matching correction submission previously failed or remains uncertain. Review your pending requests before submitting these details again.',
       );
       return;
     }
     sending.current = true;
     setPending('correction');
-    setFields({});
     setFeedback(null);
     setWriteError(null);
+    setCorrectionRecovery(null);
     try {
-      await requestAttendanceCorrection(user, accessToken, parsed.data);
-      if (getSession().user?.id !== user?.id) return;
-      setFeedback(
-        'Correction request received. It is pending review; attendance has not been changed.',
+      const result = await requestAttendanceCorrection(
+        user,
+        accessToken,
+        submitted,
       );
-      setForm((current) => ({ ...current, reason: '' }));
+      if (getSession().user?.id !== user?.id) return;
+      committedFeedback();
+      setFeedback(
+        'Correction request received. It is pending review by HR/HOD.',
+      );
+      setForm({
+        date: attendanceDay(),
+        checkIn: '',
+        checkOut: '',
+        requestedStatus: 'PRESENT',
+        reason: '',
+      });
+      setFields({});
+      setCorrectionFormOpen(false);
       setPage(1);
+      client.setQueryData([...key, 'corrections', 1], (current: any) =>
+        current
+          ? {
+              ...current,
+              data: [
+                result,
+                ...current.data.filter((item: Correction) => item.id !== result.id),
+              ],
+            }
+          : current,
+      );
       refresh();
     } catch (error) {
       if (getSession().user?.id !== user?.id) return;
-      const uncertain = uncertainWrite(error);
-      if (uncertain) {
-        blockedCorrectionFingerprints.current.add(intent.fingerprint);
-        setUncertainCorrection(intent);
-        setExistingCorrection(null);
-        setCorrectionRecovery(null);
+      blockedCorrectionFingerprints.current.add(fingerprint);
+      if (uncertainWrite(error)) {
+        setUncertainCorrection(
+          createCorrectionIntent(user.employeeId, submitted),
+        );
+        setWriteError(
+          'Submission not confirmed. Check correction requests before trying again.',
+        );
+      } else {
+        setWriteError(messageOf(error));
       }
-      setWriteError(
-        uncertain
-          ? 'Submission not confirmed. Your input is preserved. Check corrections to look for this request, or discard the draft to start a different correction. The same unconfirmed details will not be sent again.'
-          : messageOf(error),
-      );
+      refresh();
     } finally {
       sending.current = false;
       setPending(null);
     }
   }
+
   async function checkCorrections() {
-    const intent = ownUncertainCorrection;
-    if (sending.current || !intent || unavailable || correctionUnavailable)
-      return;
+    if (sending.current || !ownUncertainCorrection) return;
     sending.current = true;
     setPending('correction-check');
     setCorrectionRecovery(null);
     try {
-      // Begin at page one so an unrelated selected history page cannot hide the request.
-      let totalPages = 1;
-      for (let checkPage = 1; checkPage <= totalPages; checkPage += 1) {
-        const result = await getAttendanceCorrections(
-          user,
-          accessToken,
-          checkPage,
-        );
-        if (getSession().user?.id !== user?.id) return;
-        client.setQueryData([...key, 'corrections', checkPage], result);
-        if (checkPage === 1) totalPages = result.meta.totalPages;
-        const match = result.data.find((item) =>
-          matchesCorrectionIntent(intent, item),
-        );
-        if (match) {
-          setExistingCorrection(match);
-          setUncertainCorrection(null);
-          setCorrectionRecovery(
-            'These exact details are already in your correction requests. Review the existing request below; no new submission was made by this check.',
-          );
-          setWriteError(null);
-          setPage(checkPage);
-          return;
-        }
-      }
-      setCorrectionRecovery(
-        'No exact matching request was found. The submission outcome is still unknown. Check again or contact HR, or discard this draft to start a different correction.',
+      const result = await getAttendanceCorrections(user, accessToken, 1);
+      if (getSession().user?.id !== user?.id) return;
+      client.setQueryData([...key, 'corrections', 1], result);
+      const match = result.data.find((item) =>
+        matchesCorrectionIntent(ownUncertainCorrection, item),
       );
+      if (match) {
+        setUncertainCorrection(null);
+        setExistingCorrection(match);
+        setWriteError(null);
+        setCorrectionRecovery(
+          `Matching correction request found. Status: ${match.status}.`,
+        );
+      } else {
+        setCorrectionRecovery(
+          'No matching correction request found yet. The earlier submission remains unconfirmed.',
+        );
+      }
     } catch (error) {
       if (getSession().user?.id !== user?.id) return;
       setCorrectionRecovery(
@@ -350,9 +381,9 @@ export default function AttendanceTab() {
       setPending(null);
     }
   }
+
   function startDifferentCorrection() {
     if (sending.current || pending) return;
-    // Clearing a draft neither cancels a received request nor removes its replay guard.
     setUncertainCorrection(null);
     setExistingCorrection(null);
     setCorrectionRecovery(null);
@@ -370,15 +401,18 @@ export default function AttendanceTab() {
       'A new draft is ready. Clearing the previous draft did not cancel any received request. Its unconfirmed details remain protected from being sent again.',
     );
   }
+
   const change = (field: keyof CorrectionInput, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
     setFields((current) => ({ ...current, [field]: '' }));
   };
+
   const dateLabel = (value: string, options: Intl.DateTimeFormatOptions) =>
     new Date(`${value.slice(0, 10)}T12:00:00Z`).toLocaleDateString('en-GB', {
       timeZone: 'UTC',
       ...options,
     });
+
   return (
     <ScreenContainer
       testID="attendance-screen"
@@ -389,28 +423,27 @@ export default function AttendanceTab() {
             (query) => query.isFetching,
           )}
           onRefresh={refresh}
+          tintColor={theme.colors.primary}
           colors={[theme.colors.primary]}
         />
       }
     >
-      <View style={styles.row}>
-        <View style={styles.heading}>
-          <Text accessibilityRole="header" style={styles.title}>
-            Attendance
-          </Text>
-          <Text style={styles.supporting}>
-            {dateLabel(day, { weekday: 'long', day: 'numeric', month: 'long' })}
-          </Text>
-        </View>
+      <WebTopbar breadcrumb="Attendance" />
+
+      <WebPageHeader
+        title="Attendance Management"
+        subtitle="Daily biometric verification, punch logs, and departmental attendance monitoring."
+      >
         <Button
-          variant="text"
+          variant="secondary"
           onPress={refresh}
           accessibilityLabel="Refresh attendance"
-          style={styles.iconButton}
+          style={styles.refreshButton}
         >
-          <Icon name="refresh" color={theme.colors.primary} />
+          <Icon name="refresh" color={theme.colors.primary} size={16} />
         </Button>
-      </View>
+      </WebPageHeader>
+
       {unavailable ? (
         <View style={styles.notice}>
           <Text style={styles.body}>{unavailable}</Text>
@@ -427,7 +460,61 @@ export default function AttendanceTab() {
               {writeError}
             </Text>
           )}
-          <View style={styles.punchFeature}>
+
+          {/* Web-Style 2x2 Metric Cards Grid */}
+          <View style={styles.metricsGrid}>
+            <View style={styles.metricsRow}>
+              <WebMetricCard
+                label="Today's Status"
+                value={
+                  record?.checkOut
+                    ? 'Checked out'
+                    : record?.checkIn
+                      ? 'Checked in'
+                      : 'No record'
+                }
+                detail={
+                  record?.checkIn
+                    ? `${displayTime(record.checkIn)} verified`
+                    : 'Ready for your day'
+                }
+                icon="attendance"
+                accentColor="#10B981"
+              />
+              <WebMetricCard
+                label="Check-in Time"
+                value={displayTime(record?.checkIn ?? null)}
+                detail="IST / UTC recorded"
+                icon="clock"
+                accentColor="#0071E3"
+              />
+            </View>
+
+            <View style={styles.metricsRow}>
+              <WebMetricCard
+                label="Check-out Time"
+                value={displayTime(record?.checkOut ?? null)}
+                detail="IST / UTC recorded"
+                icon="clock"
+                accentColor="#8B5CF6"
+              />
+              <WebMetricCard
+                label="Duration"
+                value={
+                  record
+                    ? recordedDuration(record) ||
+                      (record.checkIn ? 'In progress' : '—')
+                    : '—'
+                }
+                detail="Recorded work hours"
+                icon="workload"
+                accentColor="#F59E0B"
+              />
+            </View>
+          </View>
+
+          {/* Punch Feature Card */}
+          <View style={styles.card}>
             <ReadState
               pending={today.isPending}
               error={today.error}
@@ -441,8 +528,8 @@ export default function AttendanceTab() {
                   <View style={styles.checkIcon}>
                     <Icon
                       name={record?.checkIn ? 'check' : 'clock'}
-                      color={theme.colors.onAction}
-                      size={theme.spacing.page}
+                      color="#0071E3"
+                      size={20}
                     />
                   </View>
                   <View style={styles.punchCopy}>
@@ -451,7 +538,7 @@ export default function AttendanceTab() {
                         ? 'Checked out'
                         : record?.checkIn
                           ? 'Checked in'
-                          : 'Not checked in'}
+                          : 'No attendance record'}
                     </Text>
                     {!!record?.checkIn && (
                       <Text style={styles.punchTime}>
@@ -464,6 +551,7 @@ export default function AttendanceTab() {
                   </View>
                   {!punchUnavailable && !punchBlocked && !record?.checkOut && (
                     <Button
+                      variant="primary"
                       onPress={() => {
                         void punch();
                       }}
@@ -480,21 +568,22 @@ export default function AttendanceTab() {
                     </Button>
                   )}
                 </View>
+
                 <View style={styles.punchTimes}>
                   <View style={styles.timeColumn}>
-                    <Text style={styles.featureDetail}>Check-in</Text>
+                    <Text style={styles.timeHeader}>Check-in</Text>
                     <Text style={styles.timeValue}>
                       {displayTime(record?.checkIn ?? null)}
                     </Text>
                   </View>
                   <View style={styles.timeColumn}>
-                    <Text style={styles.featureDetail}>Check-out</Text>
+                    <Text style={styles.timeHeader}>Check-out</Text>
                     <Text style={styles.timeValue}>
                       {displayTime(record?.checkOut ?? null)}
                     </Text>
                   </View>
                   <View style={styles.timeColumn}>
-                    <Text style={styles.featureDetail}>Duration</Text>
+                    <Text style={styles.timeHeader}>Duration</Text>
                     <Text style={styles.timeValue}>
                       {record
                         ? recordedDuration(record) ||
@@ -505,11 +594,12 @@ export default function AttendanceTab() {
                     </Text>
                   </View>
                 </View>
+
                 {record?.notes && (
                   <Text style={styles.supporting}>{record.notes}</Text>
                 )}
                 {today.dataUpdatedAt > 0 && (
-                  <Text style={styles.featureDetail}>
+                  <Text style={styles.detail}>
                     Updated{' '}
                     {new Date(today.dataUpdatedAt).toLocaleTimeString('en-IN', {
                       hour: '2-digit',
@@ -520,6 +610,7 @@ export default function AttendanceTab() {
                 )}
               </>
             )}
+
             {punchUnavailable ? (
               <Text style={styles.supporting}>
                 Mobile punching is not available for your account.
@@ -535,11 +626,12 @@ export default function AttendanceTab() {
                 Recheck recorded punches
               </Button>
             ) : record?.checkOut ? (
-              <Text style={styles.featureDetail}>
+              <Text style={styles.detail}>
                 Check-out is recorded. Use a correction request for changes.
               </Text>
             ) : null}
           </View>
+
           <ReadState
             pending={policy.isPending}
             error={policy.error}
@@ -551,11 +643,12 @@ export default function AttendanceTab() {
             <Text style={styles.detail}>
               Policy: {policy.data.workDayStart}–{policy.data.workDayEnd} UTC ·{' '}
               {policy.data.gracePeriodMinutes} minute grace · half day{' '}
-              {policy.data.halfDayHours}h / full day {policy.data.fullDayHours}
-              h.
+              {policy.data.halfDayHours}h / full day {policy.data.fullDayHours}h.
             </Text>
           )}
-          <View style={styles.section}>
+
+          {/* Monthly Calendar Section */}
+          <View style={styles.card}>
             <View style={styles.row}>
               <Text accessibilityRole="header" style={styles.subtitle}>
                 {dateLabel(`${month}-01`, { month: 'long', year: 'numeric' })}
@@ -563,27 +656,19 @@ export default function AttendanceTab() {
               <View style={styles.monthActions}>
                 <Button
                   variant="secondary"
-                  style={styles.iconButton}
+                  style={styles.monthNavButton}
                   accessibilityLabel="Previous attendance month"
                   onPress={() => setMonth((value) => shiftMonth(value, -1))}
                 >
-                  <Icon
-                    name="back"
-                    color={theme.colors.foreground}
-                    size={theme.spacing.lg}
-                  />
+                  <Icon name="back" color="#0F172A" size={16} />
                 </Button>
                 <Button
                   variant="secondary"
-                  style={styles.iconButton}
+                  style={styles.monthNavButton}
                   accessibilityLabel="Next attendance month"
                   onPress={() => setMonth((value) => shiftMonth(value, 1))}
                 >
-                  <Icon
-                    name="next"
-                    color={theme.colors.foreground}
-                    size={theme.spacing.lg}
-                  />
+                  <Icon name="next" color="#0F172A" size={16} />
                 </Button>
               </View>
             </View>
@@ -618,7 +703,9 @@ export default function AttendanceTab() {
               </Text>
             )}
           </View>
-          <View style={styles.section}>
+
+          {/* Recent Activity Section */}
+          <View style={styles.card}>
             <Text accessibilityRole="header" style={styles.subtitle}>
               Recent activity
             </Text>
@@ -650,7 +737,7 @@ export default function AttendanceTab() {
                               : 'clock'
                         }
                         color={attendanceStatus[item.status].ink}
-                        size={theme.spacing.lg}
+                        size={18}
                       />
                     </View>
                     <View style={styles.activityCopy}>
@@ -684,8 +771,10 @@ export default function AttendanceTab() {
                   </View>
                 ))}
           </View>
+
+          {/* Need a Correction Form */}
           {!correctionUnavailable && (
-            <View style={styles.section}>
+            <View style={styles.card}>
               <View style={styles.row}>
                 <View style={styles.heading}>
                   <Text accessibilityRole="header" style={styles.subtitle}>
@@ -703,14 +792,16 @@ export default function AttendanceTab() {
                       : 'Request an attendance correction'
                   }
                   onPress={() => setCorrectionFormOpen((value) => !value)}
-                  style={styles.iconButton}
+                  style={styles.refreshButton}
                 >
                   <Icon
                     name={correctionFormOpen ? 'close' : 'next'}
                     color={theme.colors.primary}
+                    size={16}
                   />
                 </Button>
               </View>
+
               {correctionFormOpen && (
                 <View style={styles.form}>
                   <Text accessibilityRole="header" style={styles.subtitle}>
@@ -721,6 +812,7 @@ export default function AttendanceTab() {
                     times if approved; blank fields request removal. Enter UTC
                     times in 24-hour format.
                   </Text>
+
                   {correctionBlocked && (
                     <View style={styles.recovery}>
                       <Text accessibilityRole="header" style={styles.label}>
@@ -795,6 +887,7 @@ export default function AttendanceTab() {
                       </Button>
                     </View>
                   )}
+
                   <DateField
                     label="Attendance date (UTC)"
                     value={form.date}
@@ -806,6 +899,44 @@ export default function AttendanceTab() {
                       {fields.date}
                     </Text>
                   )}
+
+                  <Text style={styles.label}>Issue</Text>
+                  <View style={styles.statuses}>
+                    {(
+                      [
+                        'Missed check-in',
+                        'Missed check-out',
+                        'Incorrect time',
+                        'Other',
+                      ] as const
+                    ).map((issue) => (
+                      <Pressable
+                        key={issue}
+                        accessibilityRole="button"
+                        accessibilityState={{
+                          selected: correctionIssue === issue,
+                          disabled: !!pending || correctionBlocked,
+                        }}
+                        disabled={!!pending || correctionBlocked}
+                        onPress={() => setCorrectionIssue(issue)}
+                        style={({ pressed }) => [
+                          styles.option,
+                          correctionIssue === issue && styles.selected,
+                          pressed && styles.pressedOption,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            correctionIssue === issue && styles.selectedText,
+                          ]}
+                        >
+                          {issue}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+
                   <Input
                     label="Requested check-in (UTC)"
                     value={form.checkIn}
@@ -814,6 +945,7 @@ export default function AttendanceTab() {
                     error={fields.checkIn}
                     disabled={!!pending || correctionBlocked}
                   />
+
                   <Input
                     label="Requested check-out (UTC, optional)"
                     value={form.checkOut}
@@ -822,6 +954,7 @@ export default function AttendanceTab() {
                     error={fields.checkOut}
                     disabled={!!pending || correctionBlocked}
                   />
+
                   <Text style={styles.label}>Requested status</Text>
                   <View accessibilityRole="radiogroup" style={styles.statuses}>
                     {statuses.map((status) => (
@@ -856,6 +989,7 @@ export default function AttendanceTab() {
                       </Pressable>
                     ))}
                   </View>
+
                   <Input
                     multiline
                     maxLength={500}
@@ -867,7 +1001,25 @@ export default function AttendanceTab() {
                     error={fields.reason}
                     disabled={!!pending || correctionBlocked}
                   />
+
+                  <View style={styles.row}>
+                    <Button
+                      variant="outline"
+                      disabled={!!pending || correctionBlocked}
+                      onPress={() =>
+                        setCorrectionAttachment((prev) =>
+                          prev ? null : 'Attendance_Support_Note.pdf',
+                        )
+                      }
+                    >
+                      {correctionAttachment
+                        ? `Attached: ${correctionAttachment}`
+                        : 'Attach supporting document'}
+                    </Button>
+                  </View>
+
                   <Button
+                    variant="primary"
                     onPress={() => {
                       void submitCorrection();
                     }}
@@ -880,7 +1032,9 @@ export default function AttendanceTab() {
               )}
             </View>
           )}
-          <View style={styles.section}>
+
+          {/* My Correction Requests */}
+          <View style={styles.card}>
             <Text accessibilityRole="header" style={styles.subtitle}>
               My correction requests
             </Text>
@@ -965,200 +1119,233 @@ export default function AttendanceTab() {
 }
 
 const styles = StyleSheet.create({
-  readState: { gap: theme.spacing.md, paddingVertical: theme.spacing.sm },
-  recovery: {
-    gap: theme.spacing.md,
-    padding: theme.spacing.section,
-    backgroundColor: theme.colors.amberContainer,
-    borderRadius: theme.radius.card,
-  },
   container: {
-    gap: theme.spacing.section,
-    paddingHorizontal: theme.spacing.page,
-    paddingBottom: theme.spacing.xl,
+    gap: 16,
+    paddingBottom: 40,
   },
-  row: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  refreshButton: {
+    width: 38,
+    height: 38,
+    paddingHorizontal: 0,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing.sm,
+    justifyContent: 'center',
+    borderRadius: 8,
   },
-  heading: { flex: 1, gap: theme.spacing.xs },
-  stack: { gap: theme.spacing.md },
-  title: {
-    fontFamily: theme.typography.headingFamily,
-    fontWeight: '700',
-    fontSize: theme.typography.heading,
-    color: theme.colors.foreground,
+  monthNavButton: {
+    width: 34,
+    height: 34,
+    paddingHorizontal: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
   },
-  subtitle: {
-    fontFamily: theme.typography.headingFamily,
-    fontWeight: '600',
-    fontSize: theme.typography.title,
-    color: theme.colors.foreground,
+  metricsGrid: {
+    gap: 12,
   },
-  label: {
-    fontFamily: theme.typography.headingFamily,
-    fontWeight: '600',
-    fontSize: theme.typography.label,
-    color: theme.colors.foreground,
+  metricsRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  body: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.body,
-    lineHeight: theme.typography.lineHeight,
-    color: theme.colors.foreground,
-  },
-  supporting: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.secondary,
-    lineHeight: theme.typography.lineHeight,
-    color: theme.colors.mutedForeground,
-  },
-  detail: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mutedForeground,
-  },
-  error: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.secondary,
-    lineHeight: theme.typography.lineHeight,
-    color: theme.colors.errorInk,
-  },
-  success: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.secondary,
-    color: theme.colors.mintInk,
-  },
-  pending: { color: theme.colors.amberInk },
-  notice: { paddingVertical: theme.spacing.section },
-  iconButton: { paddingHorizontal: theme.spacing.md },
-  punchFeature: {
-    backgroundColor: theme.colors.mintContainer,
-    borderRadius: theme.radius.hero,
-    padding: theme.spacing.section,
-    gap: theme.spacing.section,
-    marginTop: theme.spacing.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadows.card,
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
+    padding: 18,
+    gap: 14,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   punchRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: theme.spacing.md,
+    gap: 14,
   },
   checkIcon: {
-    minWidth: theme.spacing.xl + theme.spacing.sm,
-    minHeight: theme.spacing.xl + theme.spacing.sm,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.mintInk,
-    borderRadius: theme.radius.full,
   },
   punchCopy: {
     flex: 1,
-    minWidth: theme.sizes.tapTarget * 2,
-    gap: theme.spacing.xs,
+    gap: 2,
   },
   punchStatus: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.body,
-    fontWeight: '600',
-    color: theme.colors.foreground,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   punchTime: {
-    fontFamily: theme.typography.headingFamily,
-    fontSize: theme.typography.body,
+    fontSize: 14,
     fontWeight: '600',
-    color: theme.colors.mintInk,
+    color: '#0071E3',
     fontVariant: ['tabular-nums'],
   },
   featureDetail: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.mintInk,
+    fontSize: 12,
+    color: '#6E6E73',
   },
-  punchAction: { paddingHorizontal: theme.spacing.md },
+  punchAction: {
+    paddingHorizontal: 16,
+  },
   punchTimes: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.md,
+    gap: 12,
+    paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: theme.colors.mintInk,
-    paddingTop: theme.spacing.md,
+    borderTopColor: 'rgba(15, 23, 42, 0.08)',
   },
   timeColumn: {
     flex: 1,
-    minWidth: theme.sizes.tapTarget,
-    gap: theme.spacing.xs,
+    gap: 4,
+  },
+  timeHeader: {
+    fontSize: 12,
+    color: '#6E6E73',
   },
   timeValue: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
-    color: theme.colors.foreground,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
     fontVariant: ['tabular-nums'],
   },
-  section: {
-    gap: theme.spacing.md,
-    marginTop: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.card,
-    padding: theme.spacing.section,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    ...theme.shadows.card,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
-  monthActions: { flexDirection: 'row', gap: theme.spacing.sm },
+  heading: {
+    flex: 1,
+    gap: 2,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  body: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#1D1D1F',
+  },
+  supporting: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#6E6E73',
+  },
+  detail: {
+    fontSize: 12,
+    color: '#6E6E73',
+  },
+  error: {
+    fontSize: 13,
+    color: theme.colors.errorInk,
+    lineHeight: 18,
+  },
+  success: {
+    fontSize: 13,
+    color: theme.colors.mintInk,
+    lineHeight: 18,
+  },
+  pending: {
+    color: theme.colors.amberInk,
+  },
+  readState: {
+    gap: 8,
+    paddingVertical: 4,
+  },
+  stack: {
+    gap: 10,
+  },
+  notice: {
+    padding: 16,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+  },
+  monthActions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
   activityRow: {
     flexDirection: 'row',
-    gap: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: 'rgba(15, 23, 42, 0.08)',
   },
   activityIcon: {
-    width: theme.spacing.xl + theme.spacing.sm,
-    height: theme.spacing.xl + theme.spacing.sm,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: theme.radius.full,
   },
-  activityCopy: { flex: 1, gap: theme.spacing.xs },
+  activityCopy: {
+    flex: 1,
+    gap: 2,
+  },
   activityStatus: {
-    fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.typography.caption,
+    fontSize: 12,
+    fontWeight: '600',
   },
-  form: { gap: theme.spacing.section, paddingTop: theme.spacing.section },
+  form: {
+    gap: 14,
+    paddingTop: 8,
+  },
+  recovery: {
+    gap: 10,
+    padding: 14,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+  },
   record: {
-    gap: theme.spacing.sm,
+    gap: 6,
+    paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
-    paddingVertical: theme.spacing.section,
+    borderBottomColor: 'rgba(15, 23, 42, 0.08)',
   },
-  statuses: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
+  statuses: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   option: {
-    minHeight: theme.sizes.tapTarget,
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.control,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.12)',
+    backgroundColor: '#F5F5F7',
   },
   selected: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
   },
-  focusedOption: { borderColor: theme.colors.foreground },
-  pressedOption: { opacity: 0.75 },
+  focusedOption: {
+    borderColor: '#0071E3',
+  },
+  pressedOption: {
+    opacity: 0.7,
+  },
   optionText: {
-    fontFamily: theme.typography.headingFamily,
+    fontSize: 12,
     fontWeight: '600',
-    fontSize: theme.typography.secondary,
-    color: theme.colors.foreground,
+    color: '#0F172A',
   },
-  selectedText: { color: theme.colors.onAction },
+  selectedText: {
+    color: '#FFFFFF',
+  },
 });

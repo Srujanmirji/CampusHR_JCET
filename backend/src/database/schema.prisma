@@ -63,6 +63,14 @@ model User {
   notifications         Notification[]
   attendanceReviewed    AttendanceCorrection[] @relation("AttendanceReviewed")
   documentsReviewed     Document[]             @relation("DocumentReviewed")
+  circularsAuthored     Circular[]             @relation("CircularAuthor")
+  circularReceipts      CircularReadReceipt[]
+  workAssignedBy        WorkAssignment[]       @relation("WorkAssignedBy")
+  issuedAppointmentLetters OnboardingCandidate[] @relation("AppointmentLetterIssuer")
+  onDutyHodReviews      OnDutyRequest[]        @relation("OnDutyHodReview")
+  onDutyFinalApprovals  OnDutyRequest[]        @relation("OnDutyFinalApproval")
+  calendarDaysCreated   CalendarDay[]          @relation("CalendarDayCreatedBy")
+  balanceAdjustmentsMade LeaveBalanceAdjustment[] @relation("BalanceAdjuster")
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt             DateTime         @updatedAt @map("updated_at")
   passwordResets        PasswordResetChallenge[]
@@ -129,6 +137,10 @@ model Department {
   subjects      Subject[]
   timetable     TimetableEntry[]
   leaveRequests LeaveRequest[]
+  circulars     Circular[]       @relation("DepartmentCirculars")
+  onboardingCandidates OnboardingCandidate[]
+  calendarDays  CalendarDay[]    @relation("DepartmentCalendarDays")
+  leavePolicies LeavePolicy[]    @relation("DepartmentLeavePolicies")
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
@@ -143,6 +155,7 @@ model Designation {
   category  StaffCategory
   employees Employee[]
   workload  WorkloadThreshold?
+  onboardingCandidates OnboardingCandidate[]
 
   @@map("designations")
 }
@@ -176,6 +189,14 @@ model Employee {
   attendance            Attendance[]
   attendanceCorrections AttendanceCorrection[]
   documents             Document[]
+  examDuties            ExamDuty[]             @relation("ExamDutyFaculty")
+  examDutySwapTarget    ExamDuty[]             @relation("ExamDutySwapTarget")
+  workAssignedTo        WorkAssignment[]       @relation("WorkAssignedTo")
+  onboardingRecord      OnboardingCandidate?   @relation("OnboardedCandidate")
+  onDutyRequests        OnDutyRequest[]
+  balanceAdjustments    LeaveBalanceAdjustment[] @relation("EmployeeBalanceAdjustments")
+  policyGroupId         String?                @map("policy_group_id") @db.Uuid
+  policyGroup           EmployeePolicyGroup?   @relation("EmployeeToPolicyGroup", fields: [policyGroupId], references: [id], onDelete: SetNull)
 
   @@index([departmentId])
   @@index([status])
@@ -254,8 +275,9 @@ model Subject {
 model Room {
   id      Int              @id @default(autoincrement())
   name    String           @unique
-  kind    RoomKind
-  entries TimetableEntry[]
+  kind       RoomKind
+  entries    TimetableEntry[]
+  examDuties ExamDuty[]
 
   @@map("rooms")
 }
@@ -322,6 +344,8 @@ model LeaveType {
   // Retired types stay for history but take no new requests.
   active          Boolean        @default(true)
   requests        LeaveRequest[]
+  policies        LeavePolicy[]  @relation("LeaveTypePolicies")
+  adjustments     LeaveBalanceAdjustment[] @relation("LeaveTypeAdjustments")
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
 
@@ -365,6 +389,21 @@ model LeaveRequest {
   approverRoles String[]        @map("approver_roles")
   // Role that acts next; null once the request is decided or cancelled.
   pendingRole   String?         @map("pending_role")
+  policyId      String?         @map("policy_id") @db.Uuid
+  policy        LeavePolicy?    @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  policyVersion Int?            @map("policy_version")
+  policySnapshot Json?          @map("policy_snapshot")
+  dutyType      String?         @map("duty_type")
+  organisation  String?
+  location      String?
+  referenceNumber String?       @map("reference_number")
+  attachmentName String?        @map("attachment_name")
+  attachmentUrl String?         @map("attachment_url")
+  restrictedHolidayId String?   @map("restricted_holiday_id")
+  vacationPeriodId String?      @map("vacation_period_id")
+  coverageRequired Boolean      @default(false) @map("coverage_required")
+  operationalCoverageRole String? @map("operational_coverage_role")
+  operationalCoverageNote String? @map("operational_coverage_note")
   decisions     LeaveDecision[]
   substitutions Substitution[]
   createdAt     DateTime        @default(now()) @map("created_at")
@@ -456,6 +495,7 @@ enum AttendanceStatus {
   HALF_DAY
   ON_LEAVE
   LATE
+  ON_DUTY
 
   @@map("attendance_status")
 }
@@ -644,3 +684,589 @@ model PasswordResetThrottle {
 
   @@map("password_reset_throttles")
 }
+
+// ----------------------------------------------------
+// Exam Duty & Invigilation Allotment Module
+// ----------------------------------------------------
+
+enum ExamType {
+  VTU_SEMESTER
+  INTERNAL_ASSESSMENT
+  LAB_EXAM
+}
+
+enum ExamSessionStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum ExamDutySession {
+  MORNING
+  AFTERNOON
+}
+
+enum ExamDutyRole {
+  CHIEF_SUPERINTENDENT
+  DEPUTY_CHIEF
+  INVIGILATOR
+  RELIEVER
+  SQUAD
+}
+
+enum ExamDutyStatus {
+  ASSIGNED
+  CONFIRMED
+  SWAP_REQUESTED
+  SWAPPED
+  ABSENT
+  COMPLETED
+}
+
+enum ExamDutySwapStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ExamSession {
+  id           String            @id @default(uuid()) @db.Uuid
+  name         String
+  academicYear String            @map("academic_year")
+  examType     ExamType          @default(VTU_SEMESTER) @map("exam_type")
+  startDate    DateTime          @map("start_date") @db.Date
+  endDate      DateTime          @map("end_date") @db.Date
+  status       ExamSessionStatus @default(ACTIVE)
+  notes        String?
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  duties       ExamDuty[]
+
+  @@map("exam_sessions")
+}
+
+model ExamDuty {
+  id                String              @id @default(uuid()) @db.Uuid
+  sessionId         String              @map("session_id") @db.Uuid
+  session           ExamSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  date              DateTime            @db.Date
+  sessionTime       ExamDutySession     @default(MORNING) @map("session_time")
+  reportingTime     String              @default("09:00 AM") @map("reporting_time")
+  roomId            Int?                @map("room_id")
+  room              Room?               @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  facultyId         String              @map("faculty_id") @db.Uuid
+  faculty           Employee            @relation("ExamDutyFaculty", fields: [facultyId], references: [id], onDelete: Restrict)
+  role              ExamDutyRole        @default(INVIGILATOR)
+  status            ExamDutyStatus      @default(ASSIGNED)
+  swapWithFacultyId String?             @map("swap_with_faculty_id") @db.Uuid
+  swapWithFaculty   Employee?           @relation("ExamDutySwapTarget", fields: [swapWithFacultyId], references: [id], onDelete: SetNull)
+  swapReason        String?             @map("swap_reason")
+  swapStatus        ExamDutySwapStatus? @map("swap_status")
+  remarks           String?
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  @@unique([facultyId, date, sessionTime])
+  @@index([sessionId])
+  @@index([date])
+  @@index([facultyId])
+  @@map("exam_duties")
+}
+
+// ----------------------------------------------------
+// Digital Circulars & Institutional Notice Board Module
+// ----------------------------------------------------
+
+enum CircularCategory {
+  ACADEMIC
+  ADMINISTRATIVE
+  HOLIDAY
+  VTU_NOTIFICATION
+  EXAMINATION
+  EVENT
+  URGENT
+}
+
+enum CircularPriority {
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum CircularAudience {
+  ALL
+  TEACHING_ONLY
+  NON_TEACHING_ONLY
+  DEPARTMENT
+}
+
+model Circular {
+  id                 String                @id @default(uuid()) @db.Uuid
+  circularNumber     String                @unique @map("circular_number")
+  title              String
+  content            String                @db.Text
+  category           CircularCategory      @default(ADMINISTRATIVE)
+  priority           CircularPriority      @default(NORMAL)
+  targetAudience     CircularAudience      @default(ALL) @map("target_audience")
+  targetDepartmentId Int?                  @map("target_department_id")
+  targetDepartment   Department?           @relation("DepartmentCirculars", fields: [targetDepartmentId], references: [id], onDelete: SetNull)
+  attachmentUrl      String?               @map("attachment_url")
+  attachmentName     String?               @map("attachment_name")
+  isPublished        Boolean               @default(true) @map("is_published")
+  publishedAt        DateTime              @default(now()) @map("published_at")
+  expiresAt          DateTime?             @map("expires_at")
+  createdById        String                @map("created_by_id") @db.Uuid
+  createdBy          User                  @relation("CircularAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+  receipts           CircularReadReceipt[]
+
+  @@index([publishedAt])
+  @@index([category])
+  @@index([targetAudience])
+  @@map("circulars")
+}
+
+model CircularReadReceipt {
+  id         String   @id @default(uuid()) @db.Uuid
+  circularId String   @map("circular_id") @db.Uuid
+  circular   Circular @relation(fields: [circularId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id") @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt     DateTime @default(now()) @map("read_at")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+
+  @@unique([circularId, userId])
+  @@index([circularId])
+  @@index([userId])
+  @@map("circular_read_receipts")
+}
+
+// ----------------------------------------------------
+// Official Task & Work Delegation Module
+// ----------------------------------------------------
+
+enum WorkPriority {
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum WorkStatus {
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
+  CANCELLED
+}
+
+enum WorkCategory {
+  ACADEMIC
+  NBA_NAAC
+  EXAMINATION
+  STUDENT_AFFAIR
+  EVENT
+  ADMINISTRATIVE
+  OTHER
+}
+
+model WorkAssignment {
+  id                      String        @id @default(uuid()) @db.Uuid
+  title                   String
+  description             String        @db.Text
+  category                WorkCategory  @default(ADMINISTRATIVE)
+  priority                WorkPriority  @default(NORMAL)
+  status                  WorkStatus    @default(ASSIGNED)
+  assignedById            String        @map("assigned_by_id") @db.Uuid
+  assignedBy              User          @relation("WorkAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
+  assignedToId            String        @map("assigned_to_id") @db.Uuid
+  assignedTo              Employee      @relation("WorkAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+  dueDate                 DateTime      @map("due_date")
+  attachmentUrl           String?       @map("attachment_url")
+  attachmentName          String?       @map("attachment_name")
+  submissionNotes         String?       @map("submission_notes") @db.Text
+  submissionAttachmentUrl String?       @map("submission_attachment_url")
+  submittedAt             DateTime?     @map("submitted_at")
+  reviewedAt              DateTime?     @map("reviewed_at")
+  reviewFeedback          String?       @map("review_feedback")
+  completedAt             DateTime?     @map("completed_at")
+  createdAt               DateTime      @default(now()) @map("created_at")
+  updatedAt               DateTime      @updatedAt @map("updated_at")
+
+  @@index([assignedToId])
+  @@index([assignedById])
+  @@index([dueDate])
+  @@index([status])
+  @@index([priority])
+  @@map("work_assignments")
+}
+
+// ----------------------------------------------------
+// Recruitment & Onboarding Module
+// ----------------------------------------------------
+
+enum CandidateStatus {
+  OFFER_PENDING
+  OFFER_ISSUED
+  OFFER_ACCEPTED
+  DOCUMENTS_SUBMITTED
+  ONBOARDED
+  REJECTED
+  WITHDRAWN
+
+  @@map("candidate_status")
+}
+
+model OnboardingCandidate {
+  id                  String          @id @default(uuid()) @db.Uuid
+  appointmentRefNo    String          @unique @map("appointment_ref_no")
+  firstName           String          @map("first_name")
+  lastName            String          @map("last_name")
+  email               String          @unique
+  phone               String
+  departmentId        Int             @map("department_id")
+  department          Department      @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  designationId       Int             @map("designation_id")
+  designation         Designation     @relation(fields: [designationId], references: [id], onDelete: Restrict)
+  employmentType      EmploymentType  @map("employment_type")
+  qualification       String
+  specialization      String?
+  experienceYears     Int             @default(0) @map("experience_years")
+  expectedJoiningDate DateTime        @map("expected_joining_date") @db.Date
+  status              CandidateStatus @default(OFFER_PENDING)
+
+  probationMonths     Int             @default(12) @map("probation_months")
+  noticePeriodMonths  Int             @default(3) @map("notice_period_months")
+
+  // Documents checklist (JSON object)
+  documentsChecklist  Json?           @map("documents_checklist")
+
+  // When onboarded: links to created Employee
+  employeeId          String?         @unique @map("employee_id") @db.Uuid
+  employee            Employee?       @relation("OnboardedCandidate", fields: [employeeId], references: [id], onDelete: SetNull)
+
+  // Appointment letter generation metadata
+  issuedById          String?         @map("issued_by_id") @db.Uuid
+  issuedBy            User?           @relation("AppointmentLetterIssuer", fields: [issuedById], references: [id], onDelete: SetNull)
+  issuedAt            DateTime?       @map("issued_at")
+  joinedAt            DateTime?       @map("joined_at")
+  notes               String?         @db.Text
+
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  @@index([departmentId])
+  @@index([designationId])
+  @@index([status])
+  @@index([appointmentRefNo])
+  @@map("onboarding_candidates")
+}
+
+// ----------------------------------------------------
+// Official On-Duty (OD) & Valuation Management Module
+// ----------------------------------------------------
+
+enum OnDutyCategory {
+  UNIVERSITY_VALUATION
+  EXTERNAL_EXAMINER
+  CONFERENCE_SEMINAR
+  FDP_WORKSHOP
+  BOS_BOE_MEETING
+  OFFICIAL_COLLEGE_DUTY
+  OTHER
+
+  @@map("on_duty_category")
+}
+
+enum OnDutyStatus {
+  PENDING
+  RECOMMENDED
+  APPROVED
+  REJECTED
+  CANCELLED
+
+  @@map("on_duty_status")
+}
+
+model OnDutyRequest {
+  id                       String         @id @default(uuid()) @db.Uuid
+  employeeId               String         @map("employee_id") @db.Uuid
+  employee                 Employee       @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  category                 OnDutyCategory @default(UNIVERSITY_VALUATION)
+  title                    String
+  description              String         @db.Text
+  venue                    String
+  startDate                DateTime       @map("start_date") @db.Date
+  endDate                  DateTime       @map("end_date") @db.Date
+  totalDays                Float          @map("total_days")
+  status                   OnDutyStatus   @default(PENDING)
+  attachmentUrl            String?        @map("attachment_url")
+  attachmentName           String?        @map("attachment_name")
+  attendanceCertificateUrl String?        @map("attendance_certificate_url")
+
+  // HOD review / recommendation
+  hodReviewedById          String?        @map("hod_reviewed_by_id") @db.Uuid
+  hodReviewedBy            User?          @relation("OnDutyHodReview", fields: [hodReviewedById], references: [id], onDelete: SetNull)
+  hodReviewedAt            DateTime?      @map("hod_reviewed_at")
+  hodNote                  String?        @map("hod_note")
+
+  // Principal / Executive final approval
+  finalApprovedById        String?        @map("final_approved_by_id") @db.Uuid
+  finalApprovedBy          User?          @relation("OnDutyFinalApproval", fields: [finalApprovedById], references: [id], onDelete: SetNull)
+  finalApprovedAt          DateTime?      @map("final_approved_at")
+  finalNote                String?        @map("final_note")
+
+  createdAt                DateTime       @default(now()) @map("created_at")
+  updatedAt                DateTime       @updatedAt @map("updated_at")
+
+  @@index([employeeId, startDate])
+  @@index([status])
+  @@index([category])
+  @@map("on_duty_requests")
+}
+
+// ----------------------------------------------------
+// Academic Calendar & Holiday Master Module
+// ----------------------------------------------------
+
+enum SemesterType {
+  ODD
+  EVEN
+
+  @@map("semester_type")
+}
+
+enum CalendarDayType {
+  WORKING_DAY
+  WEEKLY_OFF
+  PUBLIC_HOLIDAY
+  RESTRICTED_HOLIDAY
+  VACATION
+  EXAMINATION
+  INSTITUTIONAL_EVENT
+  ACADEMIC_EVENT
+  SPECIAL_WORKING_DAY
+
+  @@map("calendar_day_type")
+}
+
+model AcademicYear {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String        @unique
+  startDate    DateTime      @map("start_date") @db.Date
+  endDate      DateTime      @map("end_date") @db.Date
+  isCurrent    Boolean       @default(false) @map("is_current")
+  status       String        @default("ACTIVE")
+  semesters    Semester[]
+  calendarDays CalendarDay[]
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  @@index([isCurrent])
+  @@map("academic_years")
+}
+
+model Semester {
+  id                String          @id @default(uuid()) @db.Uuid
+  academicYearId    String          @map("academic_year_id") @db.Uuid
+  academicYear      AcademicYear    @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  name              String
+  type              SemesterType    @default(ODD)
+  startDate         DateTime        @map("start_date") @db.Date
+  endDate           DateTime        @map("end_date") @db.Date
+  teachingStartDate DateTime?       @map("teaching_start_date") @db.Date
+  teachingEndDate   DateTime?       @map("teaching_end_date") @db.Date
+  examStartDate     DateTime?       @map("exam_start_date") @db.Date
+  examEndDate       DateTime?       @map("exam_end_date") @db.Date
+  isCurrent         Boolean         @default(false) @map("is_current")
+  status            String          @default("ACTIVE")
+  calendarDays      CalendarDay[]
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  @@index([academicYearId])
+  @@index([isCurrent])
+  @@map("semesters")
+}
+
+model CalendarDay {
+  id                    String             @id @default(uuid()) @db.Uuid
+  date                  DateTime           @map("date") @db.Date
+  academicYearId        String             @map("academic_year_id") @db.Uuid
+  academicYear          AcademicYear       @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  semesterId            String?            @map("semester_id") @db.Uuid
+  semester              Semester?          @relation(fields: [semesterId], references: [id], onDelete: SetNull)
+  dayType               CalendarDayType    @map("day_type")
+  title                 String?
+  description           String?            @db.Text
+  isWorkingDay          Boolean            @map("is_working_day")
+  departmentId          Int?               @map("department_id")
+  department            Department?        @relation("DepartmentCalendarDays", fields: [departmentId], references: [id], onDelete: SetNull)
+  appliesToEmployeeType String?            @map("applies_to_employee_type")
+  source                String?            @default("MANUAL")
+  createdById           String?            @map("created_by_id") @db.Uuid
+  createdBy             User?              @relation("CalendarDayCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  restrictedHoliday     RestrictedHoliday?
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+
+  @@index([date])
+  @@index([academicYearId])
+  @@index([semesterId])
+  @@index([dayType])
+  @@index([departmentId])
+  @@map("calendar_days")
+}
+
+model RestrictedHoliday {
+  id                    String       @id @default(uuid()) @db.Uuid
+  calendarDayId         String?      @unique @map("calendar_day_id") @db.Uuid
+  calendarDay           CalendarDay? @relation(fields: [calendarDayId], references: [id], onDelete: SetNull)
+  name                  String
+  date                  DateTime     @map("date") @db.Date
+  active                Boolean      @default(true)
+  annualYear            String       @map("annual_year")
+  eligibleEmployeeTypes String?      @default("ALL") @map("eligible_employee_types")
+  description           String?      @db.Text
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+
+  @@index([date])
+  @@index([annualYear])
+  @@index([active])
+  @@map("restricted_holidays")
+}
+
+model WeeklyWorkingPattern {
+  id           String   @id @default(uuid()) @db.Uuid
+  dayOfWeek    Int      @unique @map("day_of_week")
+  dayName      String   @map("day_name")
+  isWorkingDay Boolean  @default(true) @map("is_working_day")
+  description  String?  @db.Text
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("weekly_working_patterns")
+}
+
+// Configurable Leave Policy Engine
+enum LeaveAdjustmentType {
+  CREDIT
+  DEBIT
+  OPENING_CORRECTION
+  CARRY_FORWARD_CORRECTION
+  LAPSE
+
+  @@map("leave_adjustment_type")
+}
+
+model LeavePolicy {
+  id                          String                  @id @default(uuid()) @db.Uuid
+  code                        String                  // CL, EL, SPL_ML, OOD, ODE, RH, VL
+  name                        String
+  description                 String?                 @db.Text
+  policyYear                  String                  @map("policy_year") // e.g. "2026", "2026-27"
+  employeeCategory            StaffCategory           @map("employee_category") // TEACHING | NON_TEACHING
+  appliesToAllCategories      Boolean                 @default(false) @map("applies_to_all_categories")
+  employmentType              EmploymentType?         @map("employment_type") // null = ALL
+  departmentId                Int?                    @map("department_id")
+  department                  Department?             @relation("DepartmentLeavePolicies", fields: [departmentId], references: [id], onDelete: SetNull)
+  leaveTypeId                 Int?                    @map("leave_type_id")
+  leaveType                   LeaveType?              @relation("LeaveTypePolicies", fields: [leaveTypeId], references: [id], onDelete: SetNull)
+  annualEntitlement           Float?                  @map("annual_entitlement") // null = "As per policy" / unfixed
+  entitlementUnit             String                  @default("DAYS") @map("entitlement_unit")
+  carryForwardAllowed         Boolean                 @default(false) @map("carry_forward_allowed")
+  carryForwardLimit           Float?                  @map("carry_forward_limit")
+  carryForwardExpiryMonths    Int?                    @map("carry_forward_expiry_months")
+  lapseAtYearEnd              Boolean                 @default(true) @map("lapse_at_year_end")
+  halfDayAllowed              Boolean                 @default(false) @map("half_day_allowed")
+  minimumNoticeDays           Int                     @default(0) @map("minimum_notice_days")
+  maximumConsecutiveDays      Int?                    @map("maximum_consecutive_days")
+  minimumServiceDays          Int?                    @map("minimum_service_days")
+  attachmentRequired          Boolean                 @default(false) @map("attachment_required")
+  attachmentRequiredAfterDays Float?                  @map("attachment_required_after_days")
+  reasonRequired              Boolean                 @default(true) @map("reason_required")
+  attendanceStatus            String                  @default("ON_LEAVE") @map("attendance_status")
+  affectsTimetable            Boolean                 @default(true) @map("affects_timetable")
+  requiresAcademicCoverage    Boolean                 @default(true) @map("requires_academic_coverage")
+  requiresOperationalCoverage Boolean                 @default(false) @map("requires_operational_coverage")
+  reservePendingBalance       Boolean                 @default(true) @map("reserve_pending_balance")
+  approvalPolicyKey           String?                 @default("STANDARD") @map("approval_policy_key")
+  approvalStatus              String                  @default("AWAITING_APPROVAL") @map("approval_status") // DRAFT, AWAITING_APPROVAL, APPROVED
+  policyGroupId               String?                 @map("policy_group_id") @db.Uuid
+  policyGroup                 EmployeePolicyGroup?    @relation("PolicyGroupLeavePolicies", fields: [policyGroupId], references: [id], onDelete: SetNull)
+  calendarPolicyKey           String?                 @default("INSTITUTION_CALENDAR") @map("calendar_policy_key")
+  version                     Int                     @default(1)
+  active                      Boolean                 @default(true)
+  effectiveFrom               DateTime                @map("effective_from") @db.Date
+  effectiveTo                 DateTime?               @map("effective_to") @db.Date
+  requests                    LeaveRequest[]
+  adjustments                 LeaveBalanceAdjustment[]
+  createdAt                   DateTime                @default(now()) @map("created_at")
+  updatedAt                   DateTime                @updatedAt @map("updated_at")
+
+  @@unique([code, policyYear, employeeCategory, departmentId, policyGroupId, version])
+  @@index([policyYear])
+  @@index([employeeCategory])
+  @@index([active])
+  @@map("leave_policies")
+}
+
+model LeaveBalanceAdjustment {
+  id               String              @id @default(uuid()) @db.Uuid
+  employeeId       String              @map("employee_id") @db.Uuid
+  employee         Employee            @relation("EmployeeBalanceAdjustments", fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId      Int?                @map("leave_type_id")
+  leaveType        LeaveType?          @relation("LeaveTypeAdjustments", fields: [leaveTypeId], references: [id], onDelete: SetNull)
+  policyId         String?             @map("policy_id") @db.Uuid
+  policy           LeavePolicy?        @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  leaveCode        String              @map("leave_code")
+  policyYear       String              @map("policy_year")
+  rolloverFromYear Int?                @map("rollover_from_year")
+  adjustmentType   LeaveAdjustmentType @map("adjustment_type")
+  days             Float
+  reason           String              @db.Text
+  actorUserId      String              @map("actor_user_id") @db.Uuid
+  actorUser        User                @relation("BalanceAdjuster", fields: [actorUserId], references: [id], onDelete: Restrict)
+  createdAt        DateTime            @default(now()) @map("created_at")
+
+  @@unique([employeeId, leaveCode, policyYear, adjustmentType, rolloverFromYear])
+  @@index([employeeId, policyYear])
+  @@index([leaveCode])
+  @@map("leave_balance_adjustments")
+}
+
+model EmployeePolicyGroup {
+  id               String        @id @default(uuid()) @db.Uuid
+  name             String        @unique
+  description      String?       @db.Text
+  employeeCategory StaffCategory @map("employee_category")
+  calendarPolicy   String?       @default("INSTITUTION_CALENDAR") @map("calendar_policy")
+  attendancePolicy String?       @default("STANDARD") @map("attendance_policy")
+  active           Boolean       @default(true)
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  employees        Employee[]    @relation("EmployeeToPolicyGroup")
+  leavePolicies    LeavePolicy[] @relation("PolicyGroupLeavePolicies")
+
+  @@map("employee_policy_groups")
+}
+
+model OnDutyDutyMapping {
+  id              String   @id @default(uuid()) @db.Uuid
+  dutyCategory    String   @unique @map("duty_category")
+  targetLeaveCode String   @map("target_leave_code")
+  title           String
+  description     String?  @db.Text
+  active          Boolean  @default(true)
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("on_duty_duty_mappings")
+}
+
+
+
+
+

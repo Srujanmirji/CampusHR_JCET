@@ -45,19 +45,31 @@ export const envSchema = z
       .min(1)
       .max(1000)
       .default(80),
+    RESEND_API_KEY: z.string().min(1).optional(),
+    RESEND_FROM: z
+      .string()
+      .min(1)
+      .optional()
+      .default('CampusHR JCET <onboarding@resend.dev>'),
     PUSH_ENABLED: z
       .enum(['true', 'false'])
       .default('false')
       .transform((value) => value === 'true'),
     EXPO_PROJECT_ID: z.uuid().optional(),
     EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
+    BIOMETRIC_SYNC_SECRET: z
+      .string()
+      .min(8)
+      .optional()
+      .default('jcet-biometric-terminal-secret-2026'),
   })
   .refine(
     (env) =>
       !env.PASSWORD_RESET_ENABLED ||
+      !!env.RESEND_API_KEY ||
       !!(env.PASSWORD_RESET_SCRIPT_URL && env.PASSWORD_RESET_SCRIPT_SECRET),
     {
-      message: 'Email reset needs script URL and secret.',
+      message: 'Email reset needs RESEND_API_KEY or script URL and secret.',
       path: ['PASSWORD_RESET_SCRIPT_SECRET'],
     },
   )

@@ -5,7 +5,7 @@ import { BCRYPT_COST } from '../../src/modules/auth/auth.service.js';
 import type { RoleName } from '../../src/modules/auth/permissions.js';
 
 // Local-only accounts; this module is used by the loopback demo launcher.
-export const demoPassword = 'home-check-only';
+export const demoPassword = 'CampusHR@2026';
 const accounts: {
   email: string;
   code: string;
@@ -16,25 +16,25 @@ const accounts: {
   designation: string;
 }[] = [
   {
-    email: 'faculty-check@jcet.test',
+    email: 'asha.patil@jcethbl.edu.in',
     code: 'JCET-CSE-021',
-    first: 'Asha',
+    first: 'Prof. Asha',
     last: 'Patil',
     role: 'Faculty',
     department: 'CSE',
     designation: 'Assistant Professor',
   },
   {
-    email: 'home-check@jcet.test',
+    email: 'hod.cse@jcethbl.edu.in',
     code: 'JCET-CSE-001',
-    first: 'Ramesh',
-    last: 'Kulkarni',
+    first: 'Dr. Ramesh',
+    last: 'K',
     role: 'HOD',
     department: 'CSE',
     designation: 'Professor',
   },
   {
-    email: 'hr-check@jcet.test',
+    email: 'hr.admin@jcethbl.edu.in',
     code: 'JCET-HR-001',
     first: 'Maya',
     last: 'Desai',
@@ -43,10 +43,28 @@ const accounts: {
     designation: 'Assistant Registrar / HR Officer',
   },
   {
-    email: 'coverage-recipient@jcet.test',
+    email: 'priya.kulkarni@jcethbl.edu.in',
     code: 'JCET-CSE-022',
-    first: 'Priya',
+    first: 'Prof. Priya',
     last: 'Kulkarni',
+    role: 'Faculty',
+    department: 'CSE',
+    designation: 'Assistant Professor',
+  },
+  {
+    email: 'rahul.deshpande@jcethbl.edu.in',
+    code: 'JCET-CSE-014',
+    first: 'Dr. Rahul',
+    last: 'Deshpande',
+    role: 'Faculty',
+    department: 'CSE',
+    designation: 'Associate Professor',
+  },
+  {
+    email: 'sneha.patil@jcethbl.edu.in',
+    code: 'JCET-CSE-025',
+    first: 'Prof. Sneha',
+    last: 'Patil',
     role: 'Faculty',
     department: 'CSE',
     designation: 'Assistant Professor',
@@ -104,30 +122,51 @@ export async function seedDemo(prisma: PrismaClient) {
     {
       code: 'CL',
       name: 'Casual Leave',
-      yearlyQuota: 15,
-      allowHalfDay: true,
-      carryForwardMax: 0,
-    },
-    {
-      code: 'DL',
-      name: 'Duty Leave',
-      yearlyQuota: null,
-      allowHalfDay: false,
-      carryForwardMax: 0,
-    },
-    {
-      code: 'RH',
-      name: 'Restricted Holiday',
-      yearlyQuota: 2,
+      yearlyQuota: 12,
       allowHalfDay: true,
       carryForwardMax: 0,
     },
     {
       code: 'EL',
       name: 'Earned Leave',
-      yearlyQuota: 30,
+      yearlyQuota: 10,
       allowHalfDay: false,
       carryForwardMax: 15,
+    },
+    {
+      code: 'SPL_ML',
+      name: 'Special / Medical Leave',
+      yearlyQuota: null,
+      allowHalfDay: false,
+      carryForwardMax: 0,
+    },
+    {
+      code: 'OOD',
+      name: 'On Official Duty',
+      yearlyQuota: 12,
+      allowHalfDay: true,
+      carryForwardMax: 0,
+    },
+    {
+      code: 'ODE',
+      name: 'Official / Examination Duty',
+      yearlyQuota: 12,
+      allowHalfDay: true,
+      carryForwardMax: 0,
+    },
+    {
+      code: 'RH',
+      name: 'Restricted Holiday',
+      yearlyQuota: null,
+      allowHalfDay: false,
+      carryForwardMax: 0,
+    },
+    {
+      code: 'VL',
+      name: 'Vacation Leave',
+      yearlyQuota: null,
+      allowHalfDay: false,
+      carryForwardMax: 0,
     },
   ])
     await prisma.leaveType.upsert({
@@ -139,10 +178,10 @@ export async function seedDemo(prisma: PrismaClient) {
     where: { code: 'CSE' },
   });
   const faculty = people.find(
-    (person) => person.email === 'faculty-check@jcet.test',
+    (person) => person.email === 'asha.patil@jcethbl.edu.in',
   )!;
   const cover = people.find(
-    (person) => person.email === 'coverage-recipient@jcet.test',
+    (person) => person.email === 'priya.kulkarni@jcethbl.edu.in',
   )!;
   const theory = await prisma.subject.upsert({
     where: { code: 'BCS501' },

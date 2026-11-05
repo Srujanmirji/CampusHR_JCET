@@ -9,20 +9,47 @@ export const LEAVE_STATUS_LABEL = {
 } as const;
 export type LeaveStatus = keyof typeof LEAVE_STATUS_LABEL;
 
-const leaveTypeSchema = z.object({
+export const leaveTypeSchema = z.object({
   id: z.number(),
   code: z.string(),
   name: z.string(),
+  description: z.string().optional(),
   yearlyQuota: z.number().nullable(),
-  allowHalfDay: z.boolean(),
+  annualEntitlement: z.number().nullable().optional(),
+  carryForwardAllowed: z.boolean().optional(),
   carryForwardMax: z.number(),
+  allowHalfDay: z.boolean(),
+  attachmentRequired: z.boolean().optional(),
+  reasonRequired: z.boolean().optional(),
+  minimumNoticeDays: z.number().optional(),
+  maximumConsecutiveDays: z.number().optional(),
+  approvalChain: z.array(z.string()).optional(),
+  attendanceStatus: z.string().optional(),
+  affectsTimetable: z.boolean().optional(),
+  requiresCoverage: z.boolean().optional(),
+  applicableEmployeeTypes: z
+    .array(z.enum(['TEACHING', 'NON_TEACHING']))
+    .optional(),
   active: z.boolean(),
+  displayOrder: z.number().optional(),
+  colorToken: z
+    .enum(['blue', 'violet', 'rose', 'teal', 'cyan', 'amber', 'sky'])
+    .optional(),
 });
 export type LeaveType = z.infer<typeof leaveTypeSchema>;
-export type LeaveTypeInput = Omit<LeaveType, 'id'>;
+export type LeaveTypeInput = Partial<Omit<LeaveType, 'id'>> & {
+  code: string;
+  name: string;
+};
 
-const balanceSchema = z.object({
-  leaveType: z.object({ id: z.number(), code: z.string(), name: z.string() }),
+export const balanceSchema = z.object({
+  leaveType: z.object({
+    id: z.number(),
+    code: z.string(),
+    name: z.string(),
+    colorToken: z.string().optional(),
+    attendanceStatus: z.string().optional(),
+  }),
   active: z.boolean(),
   year: z.number(),
   entitled: z.number().nullable(),
@@ -33,7 +60,7 @@ const balanceSchema = z.object({
 });
 export type Balance = z.infer<typeof balanceSchema>;
 
-const requestSchema = z.object({
+export const requestSchema = z.object({
   id: z.string(),
   employee: z.object({
     id: z.string(),
@@ -41,7 +68,13 @@ const requestSchema = z.object({
     name: z.string(),
   }),
   department: z.object({ id: z.number(), code: z.string(), name: z.string() }),
-  leaveType: z.object({ id: z.number(), code: z.string(), name: z.string() }),
+  leaveType: z.object({
+    id: z.number(),
+    code: z.string(),
+    name: z.string(),
+    colorToken: z.string().optional(),
+    attendanceStatus: z.string().optional(),
+  }),
   startDate: z.string(),
   endDate: z.string(),
   halfDay: z.enum(['FIRST', 'SECOND']).nullable(),
@@ -50,6 +83,23 @@ const requestSchema = z.object({
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']),
   approverRoles: z.array(z.string()),
   pendingRole: z.string().nullable(),
+  // Duty & official assignment fields (OOD / ODE)
+  dutyType: z.string().nullable().optional(),
+  organisation: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  referenceNumber: z.string().nullable().optional(),
+  attachmentName: z.string().nullable().optional(),
+  attachmentUrl: z.string().nullable().optional(),
+  restrictedHolidayId: z.string().nullable().optional(),
+  vacationPeriodId: z.string().nullable().optional(),
+  policyId: z.string().nullable().optional(),
+  policyVersion: z.number().nullable().optional(),
+  policySnapshot: z.record(z.string(), z.unknown()).nullable().optional(),
+  employeeCategory: z.string().optional(),
+  affectsTimetable: z.boolean().optional(),
+  coverageRequired: z.boolean().nullable().optional(),
+  operationalCoverageRole: z.string().nullable().optional(),
+  operationalCoverageNote: z.string().nullable().optional(),
   decisions: z.array(
     z.object({
       step: z.number(),
@@ -70,6 +120,17 @@ export interface LeaveApplyInput {
   endDate: string;
   halfDay: 'FIRST' | 'SECOND' | null;
   reason: string;
+  dutyType?: string;
+  organisation?: string;
+  location?: string;
+  referenceNumber?: string;
+  attachmentName?: string;
+  attachmentUrl?: string;
+  restrictedHolidayId?: string;
+  vacationPeriodId?: string;
+  coverageRequired?: boolean;
+  operationalCoverageRole?: string;
+  operationalCoverageNote?: string;
 }
 
 export interface RequestFilters {
@@ -128,13 +189,277 @@ export async function applyLeave(input: LeaveApplyInput) {
 
 export async function decideLeave(
   id: string,
-  action: 'approve' | 'reject' | 'cancel',
+  action: 'approve' | 'reject' | 'cancel' | 'recommend' | 'recommend_coverage',
   note?: string,
 ) {
+  const isApproveType =
+    action === 'approve' ||
+    action === 'recommend' ||
+    action === 'recommend_coverage';
+  const apiEndpoint =
+    action === 'cancel'
+      ? `/leave/requests/${id}/cancel`
+      : isApproveType
+        ? `/leave/requests/${id}/approve`
+        : `/leave/requests/${id}/reject`;
+
+  const finalNote =
+    action === 'recommend_coverage'
+      ? `Recommended with coverage requirement. ${note ?? ''}`.trim()
+      : action === 'recommend'
+        ? `Recommended. ${note ?? ''}`.trim()
+        : note;
+
   return one(requestSchema).parse(
-    await apiRequest(`/leave/requests/${id}/${action}`, {
+    await apiRequest(apiEndpoint, {
       method: 'PATCH',
-      body: action === 'cancel' ? {} : note ? { note } : {},
+      body: action === 'cancel' ? {} : finalNote ? { note: finalNote } : {},
     }),
   ).data;
 }
+
+export interface EmployeeRolloverRecord {
+  employeeId: string;
+  employeeCode: string;
+  name: string;
+  department: { id: number; code: string; name: string };
+  joiningDate: string;
+  balances: Array<{
+    leaveTypeId: number;
+    leaveTypeCode: string;
+    leaveTypeName: string;
+    yearlyQuota: number | null;
+    carryForwardMax: number;
+    closingBalance: number | null;
+    carriedForward: number;
+    lapsed: number;
+    nextYearOpening: number | null;
+  }>;
+}
+
+export interface RolloverSummary {
+  fromYear: number;
+  toYear: number;
+  totalEmployees: number;
+  totalDaysCarriedForward: number;
+  totalDaysLapsed: number;
+  departmentSummaries: Array<{
+    departmentCode: string;
+    departmentName: string;
+    employeeCount: number;
+    carriedForward: number;
+    lapsed: number;
+  }>;
+  records: EmployeeRolloverRecord[];
+}
+
+export interface RolloverQuery {
+  year?: number;
+  targetYear?: number;
+  departmentId?: number;
+}
+
+export interface RolloverExecuteInput {
+  fromYear: number;
+  toYear: number;
+  departmentId?: number;
+  notes?: string;
+}
+
+export async function previewLeaveRollover(
+  query: RolloverQuery = {},
+): Promise<RolloverSummary> {
+  const search = new URLSearchParams();
+  if (query.year) search.set('year', String(query.year));
+  if (query.targetYear) search.set('targetYear', String(query.targetYear));
+  if (query.departmentId)
+    search.set('departmentId', String(query.departmentId));
+
+  const res = await apiRequest(`/leave/rollover/preview?${search}`);
+  return (res as { data: RolloverSummary }).data;
+}
+
+export async function executeLeaveRollover(
+  input: RolloverExecuteInput,
+): Promise<{ success: boolean; executedAt: string; summary: RolloverSummary }> {
+  const res = await apiRequest('/leave/rollover/execute', {
+    method: 'POST',
+    body: input,
+  });
+  return res as {
+    success: boolean;
+    executedAt: string;
+    summary: RolloverSummary;
+  };
+}
+
+export interface LeavePolicyDto {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  policyYear: string;
+  employeeCategory: 'TEACHING' | 'NON_TEACHING';
+  appliesToAllCategories: boolean;
+  employmentType: string | null;
+  departmentId: number | null;
+  department?: { id: number; code: string; name: string } | null;
+  leaveTypeId: number | null;
+  leaveType?: { id: number; code: string; name: string } | null;
+  annualEntitlement: number | null;
+  entitlementUnit: string;
+  carryForwardAllowed: boolean;
+  carryForwardLimit: number | null;
+  carryForwardExpiryMonths: number | null;
+  lapseAtYearEnd: boolean;
+  halfDayAllowed: boolean;
+  minimumNoticeDays: number;
+  maximumConsecutiveDays: number | null;
+  minimumServiceDays: number | null;
+  attachmentRequired: boolean;
+  attachmentRequiredAfterDays: number | null;
+  reasonRequired: boolean;
+  attendanceStatus: string;
+  affectsTimetable: boolean;
+  requiresAcademicCoverage: boolean;
+  requiresOperationalCoverage: boolean;
+  reservePendingBalance: boolean;
+  approvalPolicyKey: string | null;
+  approvalStatus: 'DRAFT' | 'AWAITING_APPROVAL' | 'APPROVED';
+  policyGroupId: string | null;
+  policyGroup?: { id: string; name: string } | null;
+  calendarPolicyKey: string | null;
+  active: boolean;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}
+
+export interface LeaveBalanceAdjustmentDto {
+  id: string;
+  employeeId: string;
+  employee?: { id: string; employeeCode: string; firstName: string; lastName: string };
+  leaveTypeId: number | null;
+  policyId: string | null;
+  leaveCode: string;
+  policyYear: string;
+  adjustmentType: 'CREDIT' | 'DEBIT' | 'OPENING_CORRECTION' | 'CARRY_FORWARD_CORRECTION' | 'LAPSE';
+  days: number;
+  reason: string;
+  actorUserId: string;
+  createdAt: string;
+}
+
+export interface OnDutyDutyMappingDto {
+  id: string;
+  dutyCategory: string;
+  targetLeaveCode: string;
+  title: string;
+  description: string | null;
+  active: boolean;
+  updatedAt: string;
+}
+
+export async function listLeavePolicies(query: {
+  policyYear?: string;
+  employeeCategory?: 'TEACHING' | 'NON_TEACHING';
+  active?: boolean;
+} = {}): Promise<LeavePolicyDto[]> {
+  const search = new URLSearchParams();
+  if (query.policyYear) search.set('policyYear', query.policyYear);
+  if (query.employeeCategory) search.set('employeeCategory', query.employeeCategory);
+  if (query.active !== undefined) search.set('active', String(query.active));
+
+  const res = await apiRequest(`/leave-policies?${search}`);
+  return (res as { data: LeavePolicyDto[] }).data;
+}
+
+export async function getApplicableLeavePolicies(query: {
+  employeeId?: string;
+  policyYear?: string;
+} = {}): Promise<LeavePolicyDto[]> {
+  const search = new URLSearchParams();
+  if (query.employeeId) search.set('employeeId', query.employeeId);
+  if (query.policyYear) search.set('policyYear', query.policyYear);
+
+  const res = await apiRequest(`/leave-policies/applicable?${search}`);
+  return (res as { data: LeavePolicyDto[] }).data;
+}
+
+export async function saveLeavePolicy(
+  id: string | undefined,
+  input: Partial<LeavePolicyDto>,
+): Promise<LeavePolicyDto> {
+  const res = await apiRequest(id ? `/leave-policies/${id}` : '/leave-policies', {
+    method: id ? 'PATCH' : 'POST',
+    body: input,
+  });
+  return (res as { data: LeavePolicyDto }).data;
+}
+
+export async function deleteLeavePolicy(id: string): Promise<LeavePolicyDto> {
+  const res = await apiRequest(`/leave-policies/${id}`, {
+    method: 'DELETE',
+  });
+  return (res as { data: LeavePolicyDto }).data;
+}
+
+export async function listLeaveAdjustments(query: {
+  employeeId?: string;
+  policyYear?: string;
+  leaveCode?: string;
+} = {}): Promise<LeaveBalanceAdjustmentDto[]> {
+  const search = new URLSearchParams();
+  if (query.employeeId) search.set('employeeId', query.employeeId);
+  if (query.policyYear) search.set('policyYear', query.policyYear);
+  if (query.leaveCode) search.set('leaveCode', query.leaveCode);
+
+  const res = await apiRequest(`/leave-adjustments?${search}`);
+  return (res as { data: LeaveBalanceAdjustmentDto[] }).data;
+}
+
+export async function createLeaveAdjustment(input: {
+  employeeId: string;
+  leaveCode: string;
+  policyYear: string;
+  adjustmentType: 'CREDIT' | 'DEBIT' | 'OPENING_CORRECTION' | 'CARRY_FORWARD_CORRECTION' | 'LAPSE';
+  days: number;
+  reason: string;
+}): Promise<LeaveBalanceAdjustmentDto> {
+  const res = await apiRequest('/leave-adjustments', {
+    method: 'POST',
+    body: input,
+  });
+  return (res as { data: LeaveBalanceAdjustmentDto }).data;
+}
+
+export async function getDutyMappings(): Promise<OnDutyDutyMappingDto[]> {
+  const res = await apiRequest('/leave-policies/duty-mappings');
+  return (res as { data: OnDutyDutyMappingDto[] }).data;
+}
+
+export async function fetchPolicyGroups(category?: string): Promise<Array<{
+  id: string;
+  name: string;
+  description: string | null;
+  employeeCategory: 'TEACHING' | 'NON_TEACHING';
+  active: boolean;
+}>> {
+  const search = category ? `?category=${category}` : '';
+  const res = await apiRequest(`/leave-policies/groups${search}`);
+  return (res as { data: Array<{ id: string; name: string; description: string | null; employeeCategory: 'TEACHING' | 'NON_TEACHING'; active: boolean }> }).data;
+}
+
+export async function updateDutyMapping(input: {
+  dutyCategory: string;
+  targetLeaveCode: 'ODE' | 'OOD';
+  title?: string;
+  description?: string;
+  active?: boolean;
+}): Promise<OnDutyDutyMappingDto> {
+  const res = await apiRequest('/leave-policies/duty-mappings', {
+    method: 'PATCH',
+    body: input,
+  });
+  return (res as { data: OnDutyDutyMappingDto }).data;
+}
+

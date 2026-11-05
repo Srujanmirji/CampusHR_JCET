@@ -25,6 +25,28 @@ export function leaveDates(
 export const formatDays = (days: number) =>
   `${days} ${days === 1 ? 'day' : 'days'}`;
 
+/** Format annual entitlement: fixed number or "As per policy" (never "Unlimited"). */
+export function formatEntitlement(quota: number | null | undefined): string {
+  if (quota === null || quota === undefined) return 'As per policy';
+  return `${quota} ${quota === 1 ? 'day' : 'days'}`;
+}
+
+/** Format remaining balance: returns "As per policy" for unmetered/rule-based categories. */
+export function formatRemaining(
+  remaining: number | null | undefined,
+  entitled: number | null | undefined,
+): string {
+  if (
+    remaining === null ||
+    remaining === undefined ||
+    entitled === null ||
+    entitled === undefined
+  ) {
+    return 'As per policy';
+  }
+  return `${remaining} remaining`;
+}
+
 /** Institutional holidays observed at JCET Hubballi (`MM-DD`). */
 export const CAMPUS_HOLIDAYS: Readonly<Record<string, string>> = {
   '01-26': 'Republic Day',
@@ -38,71 +60,207 @@ export const CAMPUS_HOLIDAYS: Readonly<Record<string, string>> = {
 export const holidayName = (iso: string): string | undefined =>
   CAMPUS_HOLIDAYS[iso] ?? CAMPUS_HOLIDAYS[iso.slice(5)];
 
-export interface AcademicTimelineEvent {
+/**
+ * Approved Restricted Holiday (RH) calendar for JCET Hubballi.
+ */
+export interface RestrictedHolidayOption {
   id: string;
+  name: string;
   date: string;
-  title: string;
-  category: 'EXAM' | 'HOLIDAY' | 'ACADEMIC' | 'EVENT';
-  detail: string;
+  dayOfWeek: string;
 }
 
-export const ACADEMIC_TIMELINE_EVENTS: readonly AcademicTimelineEvent[] = [
+export const JCET_RESTRICTED_HOLIDAYS: readonly RestrictedHolidayOption[] = [
   {
-    id: 'cie-1',
-    date: '2026-09-14 – 2026-09-16',
-    title: 'VTU CIE-1 Internal Assessment',
-    category: 'EXAM',
-    detail:
-      'First Continuous Internal Evaluation across Semesters 3, 5, and 7.',
+    id: 'rh-shivaratri',
+    name: 'Maha Shivaratri',
+    date: '2026-02-16',
+    dayOfWeek: 'Monday',
   },
   {
-    id: 'gandhi-jayanti',
-    date: '2026-10-02',
-    title: 'Gandhi Jayanti',
-    category: 'HOLIDAY',
-    detail: 'National Holiday · Campus closed (excluded from leave count).',
+    id: 'rh-ugadi',
+    name: 'Chandramana Ugadi',
+    date: '2026-03-20',
+    dayOfWeek: 'Friday',
   },
   {
-    id: 'cie-2',
-    date: '2026-10-26 – 2026-10-28',
-    title: 'VTU CIE-2 Internal Assessment',
-    category: 'EXAM',
-    detail: 'Second Continuous Internal Evaluation & portion review.',
+    id: 'rh-good-friday',
+    name: 'Good Friday',
+    date: '2026-04-03',
+    dayOfWeek: 'Friday',
   },
   {
-    id: 'rajyotsava',
-    date: '2026-11-01',
-    title: 'Karnataka Rajyotsava',
-    category: 'HOLIDAY',
-    detail: 'State Holiday · JCET Hubballi campus celebration.',
+    id: 'rh-varamahalakshmi',
+    name: 'Varamahalakshmi Vrata',
+    date: '2026-08-28',
+    dayOfWeek: 'Friday',
   },
   {
-    id: 'cie-3',
-    date: '2026-11-23 – 2026-11-25',
-    title: 'VTU CIE-3 & Lab Internals',
-    category: 'EXAM',
-    detail: 'Final IA tests and laboratory internal practical evaluations.',
+    id: 'rh-janmashtami',
+    name: 'Krishna Janmashtami',
+    date: '2026-09-04',
+    dayOfWeek: 'Friday',
   },
   {
-    id: 'last-working-day',
-    date: '2026-12-05',
-    title: 'Odd Semester Last Working Day',
-    category: 'ACADEMIC',
-    detail: 'Final IA marks freeze and attendance shortage submission to VTU.',
+    id: 'rh-guru-nanak',
+    name: 'Guru Nanak Jayanti',
+    date: '2026-11-24',
+    dayOfWeek: 'Tuesday',
   },
   {
-    id: 'christmas',
-    date: '2026-12-25',
-    title: 'Christmas',
-    category: 'HOLIDAY',
-    detail: 'Public Holiday · Campus closed (excluded from leave count).',
+    id: 'rh-christmas-eve',
+    name: 'Christmas Eve',
+    date: '2026-12-24',
+    dayOfWeek: 'Thursday',
   },
 ];
 
 /**
+ * Institutional vacation windows declared by JCET Hubballi / VTU.
+ */
+export interface VacationPeriodOption {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+}
+
+export const JCET_VACATION_PERIODS: readonly VacationPeriodOption[] = [
+  {
+    id: 'vac-summer-2026',
+    name: 'Even Semester Summer Vacation 2026',
+    startDate: '2026-06-15',
+    endDate: '2026-07-15',
+    description:
+      'Annual summer vacation for eligible teaching faculty upon completion of semester exams.',
+  },
+  {
+    id: 'vac-winter-2026',
+    name: 'Odd Semester Winter Vacation 2026',
+    startDate: '2026-12-15',
+    endDate: '2026-12-31',
+    description: 'Winter vacation between odd and even semesters.',
+  },
+];
+
+/** Official Duty options for On Official Duty (OOD). */
+export const OOD_DUTY_TYPES = [
+  'VTU Academic Work',
+  'University Examination Work',
+  'Official Academic Meeting',
+  'Institutional Representation',
+  'Academic Committee Duty',
+  'Official Conference / Workshop',
+  'Official Institutional Visit',
+] as const;
+
+/** Examination duty options for Official Duty / Examination Duty (ODE). */
+export const ODE_DUTY_TYPES = [
+  'VTU Examination Invigilation',
+  'Central Valuation / Evaluation',
+  'Flying Squad / Special Squad',
+  'External Lab Examiner',
+  'Deputy Chief Superintendent',
+] as const;
+
+/**
+ * JCET Leave Color Badges & Tokens:
+ * CL: Blue / Indigo
+ * EL: Violet
+ * SPL_ML: Rose / Coral
+ * OOD: Green / Teal
+ * ODE: Cyan / Teal
+ * RH: Amber
+ * VL: Sky / Cyan
+ */
+export const LEAVE_TYPE_THEMES: Record<
+  string,
+  {
+    bg: string;
+    text: string;
+    border: string;
+    badgeVariant: 'default' | 'secondary' | 'outline' | 'destructive';
+    dotColor: string;
+  }
+> = {
+  CL: {
+    bg: 'bg-blue-50 dark:bg-blue-950/40',
+    text: 'text-blue-700 dark:text-blue-300',
+    border: 'border-blue-200 dark:border-blue-800',
+    badgeVariant: 'outline',
+    dotColor: '#2563eb',
+  },
+  EL: {
+    bg: 'bg-purple-50 dark:bg-purple-950/40',
+    text: 'text-purple-700 dark:text-purple-300',
+    border: 'border-purple-200 dark:border-purple-800',
+    badgeVariant: 'outline',
+    dotColor: '#7c3aed',
+  },
+  SPL_ML: {
+    bg: 'bg-rose-50 dark:bg-rose-950/40',
+    text: 'text-rose-700 dark:text-rose-300',
+    border: 'border-rose-200 dark:border-rose-800',
+    badgeVariant: 'outline',
+    dotColor: '#e11d48',
+  },
+  OOD: {
+    bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    border: 'border-emerald-200 dark:border-emerald-800',
+    badgeVariant: 'outline',
+    dotColor: '#059669',
+  },
+  ODE: {
+    bg: 'bg-cyan-50 dark:bg-cyan-950/40',
+    text: 'text-cyan-700 dark:text-cyan-300',
+    border: 'border-cyan-200 dark:border-cyan-800',
+    badgeVariant: 'outline',
+    dotColor: '#0891b2',
+  },
+  RH: {
+    bg: 'bg-amber-50 dark:bg-amber-950/40',
+    text: 'text-amber-700 dark:text-amber-300',
+    border: 'border-amber-200 dark:border-amber-800',
+    badgeVariant: 'outline',
+    dotColor: '#d97706',
+  },
+  VL: {
+    bg: 'bg-sky-50 dark:bg-sky-950/40',
+    text: 'text-sky-700 dark:text-sky-300',
+    border: 'border-sky-200 dark:border-sky-800',
+    badgeVariant: 'outline',
+    dotColor: '#0284c7',
+  },
+};
+
+export function getLeaveTheme(code: string) {
+  return (
+    LEAVE_TYPE_THEMES[code] ?? {
+      bg: 'bg-muted/50',
+      text: 'text-foreground',
+      border: 'border-border',
+      badgeVariant: 'outline',
+      dotColor: '#64748b',
+    }
+  );
+}
+
+/** Attendance status mapped to each leave category. */
+export const LEAVE_ATTENDANCE_STATUS: Record<string, string> = {
+  CL: 'Leave',
+  EL: 'Leave',
+  SPL_ML: 'Medical / Special Leave',
+  OOD: 'Official Duty',
+  ODE: 'Official / Examination Duty',
+  RH: 'Restricted Holiday',
+  VL: 'Vacation Leave',
+};
+
+/**
  * Working days the server will count (Monday–Saturday, excluding campus
- * holidays), for a preview while applying. The server's count is the one that
- * is saved.
+ * holidays), for a preview while applying.
  */
 export function previewDays(start: string, end: string, halfDay: boolean) {
   if (!start || !end || end < start) return 0;
@@ -148,3 +306,57 @@ export function shiftMonth(month: string, delta: number) {
   date.setUTCMonth(date.getUTCMonth() + delta);
   return date.toISOString().slice(0, 7);
 }
+
+export interface AcademicTimelineEvent {
+  id: string;
+  title: string;
+  date: string;
+  category: 'EXAM' | 'HOLIDAY' | 'ACADEMIC' | 'EVENT';
+  detail: string;
+  description?: string;
+}
+
+export const ACADEMIC_TIMELINE_EVENTS: AcademicTimelineEvent[] = [
+  {
+    id: 'cie-1',
+    title: 'Continuous Internal Evaluation (CIE-I)',
+    date: '2026-03-09 to 2026-03-12',
+    category: 'EXAM',
+    detail: 'Internal assessment for odd & even semester courses.',
+  },
+  {
+    id: 'tech-symp',
+    title: 'JCET TechSparks Annual Technical Symposium',
+    date: '2026-04-10',
+    category: 'EVENT',
+    detail: 'State-level technical paper & coding competition.',
+  },
+  {
+    id: 'cie-2',
+    title: 'Continuous Internal Evaluation (CIE-II)',
+    date: '2026-05-18 to 2026-05-21',
+    category: 'EXAM',
+    detail: 'Second internal test & lab examination review.',
+  },
+  {
+    id: 'vtu-theory',
+    title: 'VTU Semester End Examinations (Theory)',
+    date: '2026-06-15 to 2026-07-04',
+    category: 'EXAM',
+    detail: 'University final theory examination & central evaluation.',
+  },
+  {
+    id: 'vtu-lab',
+    title: 'VTU Practical / Laboratory Examinations',
+    date: '2026-07-06 to 2026-07-18',
+    category: 'EXAM',
+    detail: 'External lab exam invigilation & practical assessment.',
+  },
+  {
+    id: 'summer-vac',
+    title: 'Summer Vacation Period',
+    date: '2026-07-01 to 2026-07-31',
+    category: 'ACADEMIC',
+    detail: 'Eligible faculty vacation window as per JCET regulations.',
+  },
+];
