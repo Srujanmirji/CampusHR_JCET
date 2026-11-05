@@ -405,8 +405,45 @@ function RequestDetails({
         )}
       </section>
 
-      {/* Academic Impact & Timetable Conflict */}
-      {can('timetable.read') && <AffectedClasses request={request} />}
+      {/* Academic Impact & Timetable Conflict (Teaching Faculty only) */}
+      {can('timetable.read') &&
+        (request as unknown as { employeeCategory?: string })
+          ?.employeeCategory !== 'NON_TEACHING' &&
+        (request as unknown as { affectsTimetable?: boolean })
+          ?.affectsTimetable !== false && (
+          <AffectedClasses request={request} />
+        )}
+
+      {/* Operational Coverage Section (Non-Teaching Staff) */}
+      {(request as unknown as { employeeCategory?: string })
+        ?.employeeCategory === 'NON_TEACHING' && (
+        <section
+          aria-label="Operational Coverage"
+          className="flex flex-col gap-2 rounded-xl border bg-card p-3.5 text-xs"
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-muted-foreground uppercase tracking-wider text-[11px]">
+              Operational Staff Coverage
+            </span>
+            {(request as unknown as { coverageRequired?: boolean })
+              ?.coverageRequired ? (
+              <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                Coverage required
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                No coverage required
+              </span>
+            )}
+          </div>
+          <p className="text-muted-foreground text-xs">
+            {(request as unknown as { coverageRequired?: boolean })
+              ?.coverageRequired
+              ? `Operational role: ${(request as unknown as { operationalCoverageRole?: string })?.operationalCoverageRole || 'Staff'}. Departmental coverage coordinated by reporting officer.`
+              : 'Non-teaching leave type exempt from operational coverage requirements.'}
+          </p>
+        </section>
+      )}
 
       {/* Previous Leave History */}
       {previousRequests.length > 0 && (

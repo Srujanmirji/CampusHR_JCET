@@ -74,6 +74,11 @@ interface LeaveApplyModalProps {
     role: string;
   };
   leaveTypes: LeaveTypeDto[];
+  balances?: Array<{
+    leaveType: { id: number; code: string; name: string };
+    requiresOperationalCoverage?: boolean;
+    employeeCategory?: string;
+  }>;
 }
 
 export function LeaveApplyModal({
@@ -83,6 +88,7 @@ export function LeaveApplyModal({
   token,
   currentUser,
   leaveTypes,
+  balances,
 }: LeaveApplyModalProps) {
   const { fontScale } = useWindowDimensions();
   const router = useRouter();
@@ -129,6 +135,11 @@ export function LeaveApplyModal({
   const isRestrictedHoliday = code === 'RH';
   const isVacation = code === 'VL';
   const isNonTeaching = currentUser.role === 'Non-Teaching Staff';
+
+  const selectedBalance = balances?.find((b) => b.leaveType.id === selectedType?.id);
+  const requiresOperationalCoverage = Boolean(
+    selectedBalance?.requiresOperationalCoverage ?? (code === 'CL' || code === 'EL' || code === 'SPL_ML'),
+  );
 
   const timetableQuery = useQuery({
     queryKey: ['timetable', currentUser.id, 'entries'],
@@ -181,6 +192,8 @@ export function LeaveApplyModal({
     }
     return classes;
   }, [timetableQuery.data, startDate, endDate, isNonTeaching]);
+
+  const coverageRequired = isNonTeaching ? requiresOperationalCoverage : affectedClasses.length > 0;
 
   const busy = useRef(false);
   const [blockedIntents, setBlockedIntents] = useState<ReadonlySet<string>>(
@@ -239,7 +252,11 @@ export function LeaveApplyModal({
       attachmentName: attachmentName || undefined,
       restrictedHolidayId: isRestrictedHoliday ? restrictedHolidayId : undefined,
       vacationPeriodId: isVacation ? vacationPeriodId : undefined,
-      coverageRequired: affectedClasses.length > 0,
+      coverageRequired,
+      operationalCoverageRole:
+        isNonTeaching && coverageRequired
+          ? (currentUser.role || 'Staff')
+          : undefined,
     });
     if (!value.success) {
       setError(value.error.issues[0].message);
@@ -902,14 +919,20 @@ export function LeaveApplyModal({
                   {isNonTeaching ? (
                     <>
                       <Text style={styles.impactCount}>
-                        Non-teaching operational coverage
+                        {requiresOperationalCoverage
+                          ? 'Operational staff coverage required'
+                          : 'No operational coverage needed'}
                       </Text>
                       <Text style={styles.affectedMeta}>
-                        Does not affect teaching classes. Operational responsibilities routed to HR Admin.
+                        {requiresOperationalCoverage
+                          ? 'Does not affect teaching classes. Operational staff responsibilities routed to HR Admin and supervisor.'
+                          : 'Non-teaching leave type exempt from operational coverage requirements.'}
                       </Text>
                       <View style={styles.coverageBadge}>
                         <Text style={styles.coverageBadgeText}>
-                          Operational coverage active
+                          {requiresOperationalCoverage
+                            ? 'Operational coverage required'
+                            : 'No coverage needed'}
                         </Text>
                       </View>
                     </>

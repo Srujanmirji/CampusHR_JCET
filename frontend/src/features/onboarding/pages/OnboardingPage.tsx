@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   UserPlus,
   FileCheck2,
@@ -120,7 +120,7 @@ export default function OnboardingPage() {
   );
 
   // Forms
-  const [addForm, setAddForm] = useState({
+  const [addForm, setAddForm] = useState(() => ({
     firstName: '',
     lastName: '',
     email: '',
@@ -134,15 +134,10 @@ export default function OnboardingPage() {
     expectedJoiningDate: new Date(Date.now() + 14 * 86400000)
       .toISOString()
       .slice(0, 10),
-    payScale: 'AICTE 7th CPC Level 10 (₹57,700 - ₹1,82,400)',
-    basicPay: 57700,
-    agp: 0,
-    daPercent: 50,
-    hraPercent: 18,
     probationMonths: 12,
     noticePeriodMonths: 3,
     notes: '',
-  });
+  }));
 
   const [checklistForm, setChecklistForm] = useState({
     degreeCertificate: false,
@@ -150,7 +145,7 @@ export default function OnboardingPage() {
     experienceCertificate: false,
     relievingOrder: false,
     aadhaarPan: false,
-    bankDetails: false,
+    addressProof: false,
     status: 'OFFER_ACCEPTED' as CandidateStatus,
   });
 
@@ -164,15 +159,7 @@ export default function OnboardingPage() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Live computed gross salary for add form
-  const liveGrossSalary = Math.round(
-    addForm.basicPay +
-      addForm.agp +
-      ((addForm.basicPay + addForm.agp) * addForm.daPercent) / 100 +
-      ((addForm.basicPay + addForm.agp) * addForm.hraPercent) / 100,
-  );
-
-  const loadCandidates = async () => {
+  const loadCandidates = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetchCandidates({
@@ -189,16 +176,17 @@ export default function OnboardingPage() {
         accepted: res.meta.accepted,
         onboarded: res.meta.onboarded,
       });
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to load candidates.');
+    } catch (err: unknown) {
+      setActionError((err as Error).message || 'Failed to load candidates.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedStatus, selectedDept, search]);
 
   useEffect(() => {
-    loadCandidates();
-  }, [selectedStatus, selectedDept, search]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadCandidates();
+  }, [loadCandidates]);
 
   useEffect(() => {
     Promise.all([listDepartments(), listDesignations()])
@@ -221,8 +209,8 @@ export default function OnboardingPage() {
       setShowAddModal(false);
       setActionSuccess('Candidate added to onboarding pipeline successfully!');
       loadCandidates();
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to add candidate.');
+    } catch (err: unknown) {
+      setActionError((err as Error).message || 'Failed to add candidate.');
     }
   };
 
@@ -232,8 +220,8 @@ export default function OnboardingPage() {
       setSelectedCandidate(res.data);
       setLetterData(res.data.letter);
       setShowLetterModal(true);
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to load appointment letter.');
+    } catch (err: unknown) {
+      setActionError((err as Error).message || 'Failed to load appointment letter.');
     }
   };
 
@@ -246,8 +234,8 @@ export default function OnboardingPage() {
       setShowLetterModal(true);
       setActionSuccess('Official Appointment Letter generated and issued!');
       loadCandidates();
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to issue appointment letter.');
+    } catch (err: unknown) {
+      setActionError((err as Error).message || 'Failed to issue appointment letter.');
     }
   };
 
@@ -261,7 +249,7 @@ export default function OnboardingPage() {
         candidate.documentsChecklist?.experienceCertificate || false,
       relievingOrder: candidate.documentsChecklist?.relievingOrder || false,
       aadhaarPan: candidate.documentsChecklist?.aadhaarPan || false,
-      bankDetails: candidate.documentsChecklist?.bankDetails || false,
+      addressProof: candidate.documentsChecklist?.addressProof || false,
       status: candidate.status,
     });
     setShowChecklistModal(true);
@@ -278,7 +266,7 @@ export default function OnboardingPage() {
           experienceCertificate: checklistForm.experienceCertificate,
           relievingOrder: checklistForm.relievingOrder,
           aadhaarPan: checklistForm.aadhaarPan,
-          bankDetails: checklistForm.bankDetails,
+          addressProof: checklistForm.addressProof,
         },
       });
 
@@ -291,8 +279,8 @@ export default function OnboardingPage() {
       setShowChecklistModal(false);
       setActionSuccess('Document checklist and candidate status updated.');
       loadCandidates();
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to update checklist.');
+    } catch (err: unknown) {
+      setActionError((err as Error).message || 'Failed to update checklist.');
     }
   };
 
@@ -319,8 +307,8 @@ export default function OnboardingPage() {
         `Onboarding complete! Allocated Employee Code: ${res.data.employee.employeeCode}. Faculty profile created!`,
       );
       loadCandidates();
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to complete onboarding.');
+    } catch (err: unknown) {
+      setActionError((err as Error).message || 'Failed to complete onboarding.');
     }
   };
 
@@ -346,12 +334,11 @@ Dear ${letterData.candidateName},
 The Management of Jain College of Engineering & Technology (JCET), Belagavi is pleased to offer you the post of ${letterData.designation} in the Department of ${letterData.department} on the following terms and conditions:
 
 1. Nature of Appointment: ${letterData.employmentType}
-2. Pay Scale: ${letterData.payScale}
-   - Basic Pay: ₹${letterData.basicPay.toLocaleString('en-IN')}
-   - Academic Grade Pay (AGP): ₹${letterData.agp.toLocaleString('en-IN')}
-   - Dearness Allowance (${letterData.daPercent}%): ₹${Math.round(((letterData.basicPay + letterData.agp) * letterData.daPercent) / 100).toLocaleString('en-IN')}
-   - House Rent Allowance (${letterData.hraPercent}%): ₹${Math.round(((letterData.basicPay + letterData.agp) * letterData.hraPercent) / 100).toLocaleString('en-IN')}
-   - Gross Monthly Emoluments: ₹${letterData.grossSalary.toLocaleString('en-IN')}
+2. Designation: ${letterData.designation}
+3. Department: ${letterData.department}
+4. Reporting Officer: Head of Department (${letterData.department})
+5. Probation Period: ${letterData.probationMonths} months
+6. Notice Period: ${letterData.noticePeriodMonths} months
 
 TERMS & CONDITIONS:
 ${letterData.termsAndConditions.join('\n')}
@@ -570,7 +557,7 @@ Principal & Member Secretary
                 <tr>
                   <th className="px-4 py-3">Candidate</th>
                   <th className="px-4 py-3">Department & Role</th>
-                  <th className="px-4 py-3">Pay Scale & Gross</th>
+                  <th className="px-4 py-3">Service Terms</th>
                   <th className="px-4 py-3">Expected Joining</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Doc Checklist</th>
@@ -614,13 +601,10 @@ Principal & Member Secretary
 
                       <td className="px-4 py-3.5">
                         <div className="font-semibold text-slate-900">
-                          ₹{c.grossSalary.toLocaleString('en-IN')}/mo
+                          {c.probationMonths} mo probation
                         </div>
-                        <div
-                          className="truncate text-[11px] text-slate-400"
-                          title={c.payScale}
-                        >
-                          {c.payScale}
+                        <div className="text-[11px] text-slate-400">
+                          {c.noticePeriodMonths} mo notice
                         </div>
                       </td>
 
@@ -722,7 +706,7 @@ Principal & Member Secretary
                   Add Selected Candidate to Pipeline
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Enter candidate credentials and AICTE pay structure to
+                  Enter candidate credentials and appointment details to
                   generate an appointment letter.
                 </p>
               </div>
@@ -894,25 +878,25 @@ Principal & Member Secretary
                 </div>
               </div>
 
-              {/* Salary Structure Box */}
-              <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-teal-900">
-                  Salary & Pay Scale Structure
+              {/* Service Terms Box */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                  Employment Service Terms
                 </h3>
-                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="text-[11px] font-medium text-slate-600">
-                      Basic Pay (₹)
+                      Probation Period (Months)
                     </label>
                     <input
                       type="number"
                       required
                       min={0}
-                      value={addForm.basicPay}
+                      value={addForm.probationMonths}
                       onChange={(e) =>
                         setAddForm({
                           ...addForm,
-                          basicPay: Number(e.target.value),
+                          probationMonths: Number(e.target.value),
                         })
                       }
                       className="mt-1 w-full rounded-md border border-slate-200 p-1.5 text-sm"
@@ -920,61 +904,22 @@ Principal & Member Secretary
                   </div>
                   <div>
                     <label className="text-[11px] font-medium text-slate-600">
-                      AGP (₹)
+                      Notice Period (Months)
                     </label>
                     <input
                       type="number"
+                      required
                       min={0}
-                      value={addForm.agp}
-                      onChange={(e) =>
-                        setAddForm({ ...addForm, agp: Number(e.target.value) })
-                      }
-                      className="mt-1 w-full rounded-md border border-slate-200 p-1.5 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-600">
-                      DA (%)
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={addForm.daPercent}
+                      value={addForm.noticePeriodMonths}
                       onChange={(e) =>
                         setAddForm({
                           ...addForm,
-                          daPercent: Number(e.target.value),
+                          noticePeriodMonths: Number(e.target.value),
                         })
                       }
                       className="mt-1 w-full rounded-md border border-slate-200 p-1.5 text-sm"
                     />
                   </div>
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-600">
-                      HRA (%)
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={addForm.hraPercent}
-                      onChange={(e) =>
-                        setAddForm({
-                          ...addForm,
-                          hraPercent: Number(e.target.value),
-                        })
-                      }
-                      className="mt-1 w-full rounded-md border border-slate-200 p-1.5 text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between border-t border-teal-200/60 pt-2 text-xs">
-                  <span className="font-medium text-teal-800">
-                    Pay Band: {addForm.payScale}
-                  </span>
-                  <span className="text-sm font-bold text-teal-900">
-                    Gross Monthly Salary: ₹{liveGrossSalary.toLocaleString('en-IN')}
-                  </span>
                 </div>
               </div>
 
@@ -1093,61 +1038,43 @@ Principal & Member Secretary
                   Jain College of Engineering & Technology (JCET), Belagavi.
                 </p>
 
-                {/* Salary Table */}
+                {/* Employment Appointment Summary */}
                 <div className="my-4 overflow-hidden rounded-lg border border-slate-200">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-100 font-semibold text-slate-700">
                       <tr>
-                        <th className="p-2">Salary Component</th>
-                        <th className="p-2 text-right">Monthly Amount (INR)</th>
+                        <th className="p-2">Employment Detail</th>
+                        <th className="p-2">Official Record</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       <tr>
-                        <td className="p-2">Basic Pay</td>
-                        <td className="p-2 text-right font-mono">
-                          ₹{letterData.basicPay.toLocaleString('en-IN')}
-                        </td>
-                      </tr>
-                      {letterData.agp > 0 && (
-                        <tr>
-                          <td className="p-2">Academic Grade Pay (AGP)</td>
-                          <td className="p-2 text-right font-mono">
-                            ₹{letterData.agp.toLocaleString('en-IN')}
-                          </td>
-                        </tr>
-                      )}
-                      <tr>
-                        <td className="p-2">
-                          Dearness Allowance ({letterData.daPercent}%)
-                        </td>
-                        <td className="p-2 text-right font-mono">
-                          ₹
-                          {Math.round(
-                            ((letterData.basicPay + letterData.agp) *
-                              letterData.daPercent) /
-                              100,
-                          ).toLocaleString('en-IN')}
-                        </td>
+                        <td className="p-2 font-medium text-slate-600">Designation</td>
+                        <td className="p-2 font-semibold text-slate-900">{letterData.designation}</td>
                       </tr>
                       <tr>
-                        <td className="p-2">
-                          House Rent Allowance ({letterData.hraPercent}%)
-                        </td>
-                        <td className="p-2 text-right font-mono">
-                          ₹
-                          {Math.round(
-                            ((letterData.basicPay + letterData.agp) *
-                              letterData.hraPercent) /
-                              100,
-                          ).toLocaleString('en-IN')}
-                        </td>
+                        <td className="p-2 font-medium text-slate-600">Department</td>
+                        <td className="p-2 font-semibold text-slate-900">{letterData.department}</td>
                       </tr>
-                      <tr className="bg-slate-50 font-bold text-slate-900">
-                        <td className="p-2">Gross Monthly Emoluments</td>
-                        <td className="p-2 text-right font-mono text-sm text-teal-800">
-                          ₹{letterData.grossSalary.toLocaleString('en-IN')}
-                        </td>
+                      <tr>
+                        <td className="p-2 font-medium text-slate-600">Nature of Appointment</td>
+                        <td className="p-2 text-slate-800">{letterData.employmentType}</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 font-medium text-slate-600">Reporting Officer</td>
+                        <td className="p-2 text-slate-800">Head of Department ({letterData.department})</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 font-medium text-slate-600">Expected Reporting Date</td>
+                        <td className="p-2 font-semibold text-teal-800">{letterData.expectedJoiningDate}</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 font-medium text-slate-600">Probation Period</td>
+                        <td className="p-2 text-slate-800">{letterData.probationMonths} Months</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 font-medium text-slate-600">Notice Period</td>
+                        <td className="p-2 text-slate-800">{letterData.noticePeriodMonths} Months</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1250,8 +1177,8 @@ Principal & Member Secretary
                     label: 'Aadhaar Card & PAN Card Copies',
                   },
                   {
-                    key: 'bankDetails',
-                    label: 'Salary Bank Passbook / Cancelled Cheque',
+                    key: 'addressProof',
+                    label: 'Permanent Address Proof / Domicile Certificate',
                   },
                 ].map((item) => (
                   <label

@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import {
-  calculateGrossSalary,
   createOnboardingService,
   formatAppointmentLetter,
 } from '../src/modules/onboarding/onboarding.service.js';
@@ -10,15 +9,17 @@ import type {
   OnboardingCandidateRecord,
   OnboardingRepository,
 } from '../src/modules/onboarding/onboarding.repository.js';
+import type { Prisma } from '../src/generated/prisma/client.js';
 import type { Access } from '../src/modules/auth/auth.service.js';
 import type { Notifier } from '../src/modules/notifications/notifications.service.js';
+import type { NewNotification } from '../src/modules/notifications/notifications.repository.js';
 
 function createMemoryOnboardingRepository(): {
   repo: OnboardingRepository;
   candidates: OnboardingCandidateRecord[];
   employees: Array<{ id: string; employeeCode: string; email: string }>;
   users: Array<{ id: string; email: string; roleId: number }>;
-  notifications: Array<{ employeeId: string; note: any }>;
+  notifications: Array<{ employeeId: string; note: NewNotification }>;
   notifier: Notifier;
 } {
   const candidates: OnboardingCandidateRecord[] = [];
@@ -26,7 +27,7 @@ function createMemoryOnboardingRepository(): {
     { id: randomUUID(), employeeCode: 'JCET-CSE-001', email: 'existing@jcet.ac.in' },
   ];
   const users: Array<{ id: string; email: string; roleId: number }> = [];
-  const notifications: Array<{ employeeId: string; note: any }> = [];
+  const notifications: Array<{ employeeId: string; note: NewNotification }> = [];
 
   const departments = [
     { id: 1, code: 'CSE', name: 'Computer Science and Engineering' },
@@ -51,13 +52,13 @@ function createMemoryOnboardingRepository(): {
   };
 
   const repo: OnboardingRepository = {
-    async list(where: any, { skip, take }) {
+    async list(where: Prisma.OnboardingCandidateWhereInput, { skip, take }) {
       let filtered = [...candidates];
-      const deptId = where.departmentId ?? where.AND?.[0]?.departmentId;
+      const deptId = typeof where.departmentId === 'number' ? where.departmentId : (where.AND as Array<{ departmentId?: number }> | undefined)?.[0]?.departmentId;
       if (deptId) {
         filtered = filtered.filter((c) => c.departmentId === deptId);
       }
-      const status = where.status ?? where.AND?.[1]?.status;
+      const status = (where.status as string) ?? (where.AND as Array<{ status?: string }> | undefined)?.[1]?.status;
       if (status) {
         filtered = filtered.filter((c) => c.status === status);
       }
@@ -98,9 +99,11 @@ function createMemoryOnboardingRepository(): {
       return `${prefix}${String(nextNum).padStart(3, '0')}`;
     },
 
-    async create(data: any) {
-      const dept = departments.find((d) => d.id === data.department.connect.id)!;
-      const desig = designations.find((d) => d.id === data.designation.connect.id)!;
+    async create(data: Prisma.OnboardingCandidateCreateInput) {
+      const deptId = (data.department as { connect: { id: number } }).connect.id;
+      const desigId = (data.designation as { connect: { id: number } }).connect.id;
+      const dept = departments.find((d) => d.id === deptId)!;
+      const desig = designations.find((d) => d.id === desigId)!;
       const record: OnboardingCandidateRecord = {
         id: randomUUID(),
         appointmentRefNo: data.appointmentRefNo,
@@ -112,21 +115,15 @@ function createMemoryOnboardingRepository(): {
         department: dept,
         designationId: desig.id,
         designation: desig,
-        employmentType: data.employmentType,
+        employmentType: data.employmentType as OnboardingCandidateRecord['employmentType'],
         qualification: data.qualification,
         specialization: data.specialization ?? null,
         experienceYears: data.experienceYears ?? 0,
-        expectedJoiningDate: data.expectedJoiningDate,
-        status: data.status,
-        payScale: data.payScale,
-        basicPay: data.basicPay,
-        agp: data.agp ?? 0,
-        daPercent: data.daPercent ?? 50,
-        hraPercent: data.hraPercent ?? 18,
-        grossSalary: data.grossSalary,
+        expectedJoiningDate: data.expectedJoiningDate as Date,
+        status: data.status as OnboardingCandidateRecord['status'],
         probationMonths: data.probationMonths ?? 12,
         noticePeriodMonths: data.noticePeriodMonths ?? 3,
-        documentsChecklist: data.documentsChecklist,
+        documentsChecklist: (data.documentsChecklist as Record<string, unknown>) ?? null,
         employeeId: null,
         issuedById: null,
         issuedAt: null,
@@ -139,14 +136,21 @@ function createMemoryOnboardingRepository(): {
       return record;
     },
 
-    async update(id, data: any) {
+    async update(id, data: Prisma.OnboardingCandidateUpdateInput) {
       const idx = candidates.findIndex((c) => c.id === id);
       if (idx === -1) throw new Error('Not found');
       const current = candidates[idx]!;
       const updated: OnboardingCandidateRecord = {
         ...current,
-        ...data,
-        issuedById: data.issuedBy?.connect?.id ?? current.issuedById,
+        firstName: (data.firstName as string) ?? current.firstName,
+        lastName: (data.lastName as string) ?? current.lastName,
+        email: (data.email as string) ?? current.email,
+        phone: (data.phone as string) ?? current.phone,
+        status: (data.status as OnboardingCandidateRecord['status']) ?? current.status,
+        documentsChecklist: (data.documentsChecklist as Record<string, unknown>) ?? current.documentsChecklist,
+        issuedById: (data.issuedBy as { connect?: { id?: string } } | undefined)?.connect?.id ?? current.issuedById,
+        issuedAt: data.issuedAt ? (data.issuedAt as Date) : current.issuedAt,
+        notes: (data.notes as string) ?? current.notes,
         updatedAt: new Date(),
       };
       candidates[idx] = updated;
@@ -192,7 +196,7 @@ function createMemoryOnboardingRepository(): {
         users.push({
           id: randomUUID(),
           email: userInput.email,
-          roleId: (userInput as any).role.connect.id,
+          roleId: (userInput as { role: { connect: { id: number } } }).role.connect.id,
         });
       }
 
@@ -213,10 +217,45 @@ function createMemoryOnboardingRepository(): {
   return { repo, candidates, employees, users, notifications, notifier };
 }
 
-test('calculateGrossSalary correctly sums base, DA, and HRA', () => {
-  // basic 57700, agp 0, da 50% = 28850, hra 18% = 10386 -> gross 96936
-  const gross = calculateGrossSalary(57700, 0, 50, 18);
-  assert.equal(gross, 57700 + 28850 + 10386);
+test('formatAppointmentLetter generates non-financial terms without salary details', () => {
+  const candidateRecord: OnboardingCandidateRecord = {
+    id: randomUUID(),
+    appointmentRefNo: 'JCET/APPT/2026/001',
+    firstName: 'Ananya',
+    lastName: 'Bhat',
+    email: 'ananya.bhat@gmail.com',
+    phone: '9876543210',
+    departmentId: 1,
+    department: { id: 1, code: 'CSE', name: 'Computer Science and Engineering' },
+    designationId: 1,
+    designation: { id: 1, name: 'Assistant Professor', category: 'TEACHING' },
+    employmentType: 'PERMANENT',
+    qualification: 'M.Tech, Ph.D (VLSI Design)',
+    specialization: 'Embedded Systems',
+    experienceYears: 4,
+    expectedJoiningDate: new Date('2026-11-20T00:00:00Z'),
+    status: 'OFFER_PENDING',
+    probationMonths: 12,
+    noticePeriodMonths: 3,
+    documentsChecklist: null,
+    employeeId: null,
+    issuedById: null,
+    issuedAt: null,
+    joinedAt: null,
+    notes: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const letter = formatAppointmentLetter(candidateRecord);
+  assert.equal(letter.refNo, 'JCET/APPT/2026/001');
+  assert.equal(letter.candidateName, 'Ananya Bhat');
+  assert.equal(letter.designation, 'Assistant Professor');
+  assert.equal(letter.department, 'Computer Science and Engineering');
+  assert.equal(letter.probationMonths, 12);
+  assert.equal(letter.noticePeriodMonths, 3);
+  assert.ok(letter.termsAndConditions.length >= 4);
+  assert.ok(!JSON.stringify(letter).toLowerCase().includes('salary'));
 });
 
 test('HR Admin can create candidate and issue official appointment letter', async () => {
@@ -242,11 +281,6 @@ test('HR Admin can create candidate and issue official appointment letter', asyn
     specialization: 'Embedded Systems',
     experienceYears: 4,
     expectedJoiningDate: '2026-11-20',
-    payScale: 'AICTE 7th CPC Level 10 (₹57,700 - ₹1,82,400)',
-    basicPay: 57700,
-    agp: 0,
-    daPercent: 50,
-    hraPercent: 18,
     probationMonths: 12,
     noticePeriodMonths: 3,
   });
@@ -254,7 +288,6 @@ test('HR Admin can create candidate and issue official appointment letter', asyn
   assert.equal(created.firstName, 'Ananya');
   assert.equal(created.appointmentRefNo, 'JCET/APPT/2026/001');
   assert.equal(created.status, 'OFFER_PENDING');
-  assert.equal(created.grossSalary, 96936);
 
   // Issue official letter
   const issued = await service.issueLetter(hrAccess, created.id);
@@ -287,8 +320,6 @@ test('HOD is scoped to own department when viewing candidates and cannot create 
     employmentType: 'PERMANENT',
     qualification: 'M.Tech',
     expectedJoiningDate: '2026-11-20',
-    payScale: 'Level 10',
-    basicPay: 57700,
   });
 
   // Add ECE candidate
@@ -302,8 +333,6 @@ test('HOD is scoped to own department when viewing candidates and cannot create 
     employmentType: 'PERMANENT',
     qualification: 'M.Tech',
     expectedJoiningDate: '2026-11-20',
-    payScale: 'Level 10',
-    basicPay: 57700,
   });
 
   const cseHodAccess: Access = {
@@ -331,8 +360,6 @@ test('HOD is scoped to own department when viewing candidates and cannot create 
         employmentType: 'PERMANENT',
         qualification: 'B.E.',
         expectedJoiningDate: '2026-11-20',
-        payScale: 'Level 10',
-        basicPay: 57700,
       }),
     { code: 'FORBIDDEN' },
   );
@@ -360,8 +387,6 @@ test('completing onboarding generates next employee code and creates Employee an
     employmentType: 'PERMANENT',
     qualification: 'Ph.D (Computer Science)',
     expectedJoiningDate: '2026-11-25',
-    payScale: 'AICTE Level 10',
-    basicPay: 57700,
   });
 
   const completion = await service.complete(hrAccess, candidate.id, {

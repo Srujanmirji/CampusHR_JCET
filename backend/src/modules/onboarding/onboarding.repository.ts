@@ -32,15 +32,9 @@ export interface OnboardingCandidateRecord {
     | 'ONBOARDED'
     | 'REJECTED'
     | 'WITHDRAWN';
-  payScale: string;
-  basicPay: number;
-  agp: number;
-  daPercent: number;
-  hraPercent: number;
-  grossSalary: number;
   probationMonths: number;
   noticePeriodMonths: number;
-  documentsChecklist: any;
+  documentsChecklist: Record<string, unknown> | null;
   employeeId: string | null;
   employee?: {
     id: string;

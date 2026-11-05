@@ -14,6 +14,8 @@ ADD COLUMN "policy_group_id" UUID;
 -- AlterTable
 ALTER TABLE "leave_requests"
 ADD COLUMN "policy_id" UUID,
+ADD COLUMN "policy_version" INTEGER,
+ADD COLUMN "policy_snapshot" JSONB,
 ADD COLUMN "duty_type" TEXT,
 ADD COLUMN "organisation" TEXT,
 ADD COLUMN "location" TEXT,
@@ -22,9 +24,25 @@ ADD COLUMN "attachment_name" TEXT,
 ADD COLUMN "attachment_url" TEXT,
 ADD COLUMN "restricted_holiday_id" TEXT,
 ADD COLUMN "vacation_period_id" TEXT,
-ADD COLUMN "coverage_required" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "coverage_required" BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN "operational_coverage_role" TEXT,
 ADD COLUMN "operational_coverage_note" TEXT;
+
+-- Backfill coverage_required and operational_coverage_role for pre-existing leave_requests
+UPDATE "leave_requests"
+SET "coverage_required" = CASE
+  WHEN d."category" = 'TEACHING' THEN true
+  WHEN d."category" = 'NON_TEACHING' AND lt."code" IN ('CL', 'EL', 'SPL_ML') THEN true
+  ELSE false
+END,
+"operational_coverage_role" = CASE
+  WHEN d."category" = 'NON_TEACHING' AND lt."code" IN ('CL', 'EL', 'SPL_ML') THEN d."name"
+  ELSE NULL
+END
+FROM "employees" e, "designations" d, "leave_types" lt
+WHERE "leave_requests"."employee_id" = e."id"
+  AND e."designation_id" = d."id"
+  AND "leave_requests"."leave_type_id" = lt."id";
 
 -- CreateTable
 CREATE TABLE "leave_policies" (
@@ -60,6 +78,7 @@ CREATE TABLE "leave_policies" (
     "approval_policy_key" TEXT DEFAULT 'STANDARD',
     "approval_status" TEXT NOT NULL DEFAULT 'AWAITING_APPROVAL',
     "calendar_policy_key" TEXT DEFAULT 'INSTITUTION_CALENDAR',
+    "version" INTEGER NOT NULL DEFAULT 1,
     "active" BOOLEAN NOT NULL DEFAULT true,
     "effective_from" DATE NOT NULL,
     "effective_to" DATE,
@@ -77,6 +96,7 @@ CREATE TABLE "leave_balance_adjustments" (
     "policy_id" UUID,
     "leave_code" TEXT NOT NULL,
     "policy_year" TEXT NOT NULL,
+    "rollover_from_year" INTEGER,
     "adjustment_type" "leave_adjustment_type" NOT NULL,
     "days" DOUBLE PRECISION NOT NULL,
     "reason" TEXT NOT NULL,
@@ -130,7 +150,10 @@ CREATE INDEX "leave_policies_employee_category_idx" ON "leave_policies"("employe
 CREATE INDEX "leave_policies_active_idx" ON "leave_policies"("active");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "leave_policies_code_policy_year_employee_category_department__key" ON "leave_policies"("code", "policy_year", "employee_category", "department_id", "policy_group_id");
+CREATE UNIQUE INDEX "leave_policies_code_policy_year_employee_category_department__key" ON "leave_policies"("code", "policy_year", "employee_category", "department_id", "policy_group_id", "version");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "leave_balance_adjustments_employee_id_leave_code_policy_yea_key" ON "leave_balance_adjustments"("employee_id", "leave_code", "policy_year", "adjustment_type", "rollover_from_year");
 
 -- CreateIndex
 CREATE INDEX "leave_balance_adjustments_employee_id_policy_year_idx" ON "leave_balance_adjustments"("employee_id", "policy_year");

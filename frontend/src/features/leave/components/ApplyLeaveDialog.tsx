@@ -143,18 +143,32 @@ export function ApplyLeaveDialog({
     }
   }
 
+  const isNonTeaching =
+    session.status === 'signedIn' &&
+    (session.user.role === 'NON_TEACHING' ||
+      (balance as unknown as { employeeCategory?: string })
+        ?.employeeCategory === 'NON_TEACHING');
+
+  const requiresOperationalCoverage = Boolean(
+    (balance as unknown as { requiresOperationalCoverage?: boolean })
+      ?.requiresOperationalCoverage ??
+      (code === 'CL' || code === 'EL' || code === 'SPL_ML'),
+  );
+
   // Academic Impact: query scheduled teaching entries
   const timetableQuery = useQuery({
     queryKey: ['timetable', 'entries', { facultyId: employeeId }],
     queryFn: () => listEntries({ facultyId: employeeId! }),
-    enabled: employeeId !== undefined,
+    enabled: employeeId !== undefined && !isNonTeaching,
   });
 
+  const timetableEntries = timetableQuery.data;
   const affectedClasses = useMemo(() => {
-    if (!timetableQuery.data || !start || !end || end < start) return [];
+    if (isNonTeaching || !timetableEntries || !start || !end || end < start)
+      return [];
     const classes: {
       date: string;
-      entry: (typeof timetableQuery.data)[number];
+      entry: (typeof timetableEntries)[number];
     }[] = [];
     for (
       let at = new Date(`${start}T00:00:00Z`);
@@ -162,14 +176,18 @@ export function ApplyLeaveDialog({
       at = new Date(at.getTime() + 86_400_000)
     ) {
       const day = WEEKDAYS[at.getUTCDay()];
-      for (const entry of timetableQuery.data) {
+      for (const entry of timetableEntries) {
         if (entry.day === day) {
           classes.push({ date: at.toISOString().slice(0, 10), entry });
         }
       }
     }
     return classes;
-  }, [timetableQuery.data, start, end]);
+  }, [timetableEntries, start, end, isNonTeaching]);
+
+  const coverageRequired = isNonTeaching
+    ? requiresOperationalCoverage
+    : affectedClasses.length > 0;
 
   const apply = useMutation({
     mutationFn: () =>
@@ -188,7 +206,11 @@ export function ApplyLeaveDialog({
           ? restrictedHolidayId
           : undefined,
         vacationPeriodId: isVacation ? vacationPeriodId : undefined,
-        coverageRequired: affectedClasses.length > 0,
+        coverageRequired,
+        operationalCoverageRole:
+          isNonTeaching && coverageRequired
+            ? (session.user.role ?? 'Staff')
+            : undefined,
       }),
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: ['leave'] });
@@ -612,14 +634,28 @@ export function ApplyLeaveDialog({
             />
           </Field>
 
-          {/* Academic Impact Preview */}
+          {/* Academic / Operational Impact Preview */}
           {Boolean(start && end && end >= start) && (
             <div className="rounded-xl border bg-card p-3 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Academic Impact
+                  {isNonTeaching
+                    ? 'Operational Staff Coverage'
+                    : 'Academic Impact'}
                 </span>
-                {affectedClasses.length > 0 ? (
+                {isNonTeaching ? (
+                  coverageRequired ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                      <TriangleAlert className="size-3" />
+                      Coverage required
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                      <CalendarCheck2 className="size-3" />
+                      No coverage needed
+                    </span>
+                  )
+                ) : affectedClasses.length > 0 ? (
                   <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
                     <TriangleAlert className="size-3" />
                     Coverage required
@@ -632,7 +668,13 @@ export function ApplyLeaveDialog({
                 )}
               </div>
 
-              {affectedClasses.length > 0 ? (
+              {isNonTeaching ? (
+                <p className="text-xs text-muted-foreground">
+                  {coverageRequired
+                    ? 'Departmental operational coverage required for this leave type as per institutional policy. Coordinated by reporting officer.'
+                    : 'Non-teaching leave type exempt from operational coverage requirements.'}
+                </p>
+              ) : affectedClasses.length > 0 ? (
                 <div className="flex flex-col gap-1.5 mt-1">
                   <p className="text-xs font-medium text-foreground">
                     {affectedClasses.length} scheduled{' '}

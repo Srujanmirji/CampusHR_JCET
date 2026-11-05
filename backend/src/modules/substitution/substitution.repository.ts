@@ -78,7 +78,13 @@ export function createSubstitutionRepository(prisma: PrismaClient) {
     },
     approvedLeave(where: Prisma.LeaveRequestWhereInput) {
       return prisma.leaveRequest.findMany({
-        where: { AND: [where, { status: 'APPROVED' }] },
+        where: {
+          AND: [
+            where,
+            { status: 'APPROVED' },
+            { employee: { designation: { category: 'TEACHING' } } },
+          ],
+        },
         select: leaveSelect,
         orderBy: { startDate: 'asc' },
         // ponytail: newest 300; page when a college has more current leave.
@@ -87,7 +93,11 @@ export function createSubstitutionRepository(prisma: PrismaClient) {
     },
     findApprovedLeave(id: string) {
       return prisma.leaveRequest.findFirst({
-        where: { id, status: 'APPROVED' },
+        where: {
+          id,
+          status: 'APPROVED',
+          employee: { designation: { category: 'TEACHING' } },
+        },
         select: leaveSelect,
       });
     },
@@ -118,6 +128,7 @@ export function createSubstitutionRepository(prisma: PrismaClient) {
           status: 'APPROVED',
           startDate: { lte: date },
           endDate: { gte: date },
+          employee: { designation: { category: 'TEACHING' } },
         },
         select: { employeeId: true },
       });

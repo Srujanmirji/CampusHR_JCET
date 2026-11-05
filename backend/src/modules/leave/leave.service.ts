@@ -4,7 +4,10 @@ import type { Access } from '../auth/auth.service.js';
 import type { RoleName } from '../auth/permissions.js';
 import type { Notifier } from '../notifications/notifications.service.js';
 import type { AcademicCalendarService } from '../academic-calendar/academic-calendar.service.js';
-import type { LeavePolicyService } from './leave-policy.service.js';
+import {
+  toPolicySnapshot,
+  type LeavePolicyService,
+} from './leave-policy.service.js';
 import { APPROVER_CHAIN, countLeaveDays, yearBalance } from './leave.rules.js';
 import type {
   LeaveRepository,
@@ -36,7 +39,6 @@ export interface EmployeeRolloverRecord {
     closingBalance: number | null;
     carriedForward: number;
     lapsed: number;
-    encashed: number;
     nextYearOpening: number | null;
   }>;
 }
@@ -47,14 +49,12 @@ export interface RolloverSummary {
   totalEmployees: number;
   totalDaysCarriedForward: number;
   totalDaysLapsed: number;
-  totalDaysEncashed: number;
   departmentSummaries: Array<{
     departmentCode: string;
     departmentName: string;
     employeeCount: number;
     carriedForward: number;
     lapsed: number;
-    encashed: number;
   }>;
   records: EmployeeRolloverRecord[];
 }
@@ -83,6 +83,10 @@ const isWriteConflict = (error: unknown) =>
 
 export function toRequestDto(request: RequestRecord) {
   const req = request as Record<string, unknown>;
+  const emp = request.employee as Record<string, unknown>;
+  const designation = emp.designation as { category?: string } | undefined;
+  const employeeCategory = designation?.category ?? 'TEACHING';
+
   return {
     id: request.id,
     employee: {
@@ -90,8 +94,13 @@ export function toRequestDto(request: RequestRecord) {
       employeeCode: request.employee.employeeCode,
       name: `${request.employee.firstName} ${request.employee.lastName}`,
     },
+    employeeCategory,
     department: request.department,
     leaveType: request.leaveType,
+    policyId: (req.policyId as string | null) ?? null,
+    policyVersion: (req.policyVersion as number | null) ?? null,
+    policySnapshot:
+      (req.policySnapshot as Record<string, unknown> | null) ?? null,
     startDate: isoDate(request.startDate),
     endDate: isoDate(request.endDate),
     halfDay: request.halfDay,
@@ -100,15 +109,22 @@ export function toRequestDto(request: RequestRecord) {
     status: request.status,
     approverRoles: request.approverRoles,
     pendingRole: request.pendingRole,
-    dutyType: req.dutyType ?? null,
-    organisation: req.organisation ?? null,
-    location: req.location ?? null,
-    referenceNumber: req.referenceNumber ?? null,
-    attachmentName: req.attachmentName ?? null,
-    attachmentUrl: req.attachmentUrl ?? null,
-    restrictedHolidayId: req.restrictedHolidayId ?? null,
-    vacationPeriodId: req.vacationPeriodId ?? null,
-    coverageRequired: req.coverageRequired ?? true,
+    dutyType: (req.dutyType as string | null) ?? null,
+    organisation: (req.organisation as string | null) ?? null,
+    location: (req.location as string | null) ?? null,
+    referenceNumber: (req.referenceNumber as string | null) ?? null,
+    attachmentName: (req.attachmentName as string | null) ?? null,
+    attachmentUrl: (req.attachmentUrl as string | null) ?? null,
+    restrictedHolidayId: (req.restrictedHolidayId as string | null) ?? null,
+    vacationPeriodId: (req.vacationPeriodId as string | null) ?? null,
+    coverageRequired:
+      (req.coverageRequired as boolean | undefined) ??
+      employeeCategory === 'TEACHING',
+    operationalCoverageRole:
+      (req.operationalCoverageRole as string | null) ?? null,
+    operationalCoverageNote:
+      (req.operationalCoverageNote as string | null) ?? null,
+    affectsTimetable: employeeCategory === 'TEACHING',
     decisions: request.decisions.map((decision) => ({
       step: decision.step,
       role: decision.role,
@@ -297,13 +313,33 @@ export function createLeaveService(
 
       // Policy checks
       let resolvedPolicyId: string | null = null;
-      let coverageRequired = input.coverageRequired ?? true;
+      let resolvedPolicyVersion: number | null = null;
+      let resolvedPolicySnapshot: Record<string, unknown> | null = null;
+      let coverageRequired = input.coverageRequired ?? category === 'TEACHING';
 
       if (policyService) {
-        const policies = await policyService.getApplicablePolicies(access, employee.id, String(year));
+        const policies = await policyService.getApplicablePolicies(
+          access,
+          employee.id,
+          String(year),
+          start,
+        );
         const policy = policies.find((p) => p.code === type.code);
         if (policy) {
+          if (
+            start < policy.effectiveFrom ||
+            (policy.effectiveTo && end > policy.effectiveTo)
+          ) {
+            throw invalid(
+              `Leave application dates fall outside the active policy window for ${policy.name} (${isoDate(policy.effectiveFrom)} to ${policy.effectiveTo ? isoDate(policy.effectiveTo) : 'open'}).`,
+            );
+          }
+
           resolvedPolicyId = policy.id;
+          resolvedPolicyVersion = policy.version;
+          resolvedPolicySnapshot = toPolicySnapshot(
+            policy as Parameters<typeof toPolicySnapshot>[0],
+          );
           if (!policy.active) {
             throw invalid(`${policy.name} is currently inactive for your role.`);
           }
@@ -313,32 +349,65 @@ export function createLeaveService(
           if (policy.minimumNoticeDays > 0) {
             const today = new Date();
             today.setUTCHours(0, 0, 0, 0);
-            const noticeDays = Math.floor((start.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+            const noticeDays = Math.floor(
+              (start.getTime() - today.getTime()) / (24 * 60 * 60 * 1000),
+            );
             if (noticeDays < policy.minimumNoticeDays) {
-              throw invalid(`${policy.name} requires at least ${policy.minimumNoticeDays} days of advance notice.`);
+              throw invalid(
+                `${policy.name} requires at least ${policy.minimumNoticeDays} days of advance notice.`,
+              );
             }
           }
-          if (policy.maximumConsecutiveDays !== null && days > policy.maximumConsecutiveDays) {
-            throw invalid(`${policy.name} allows at most ${policy.maximumConsecutiveDays} consecutive days.`);
+          if (
+            policy.maximumConsecutiveDays !== null &&
+            days > policy.maximumConsecutiveDays
+          ) {
+            throw invalid(
+              `${policy.name} allows at most ${policy.maximumConsecutiveDays} consecutive days.`,
+            );
           }
-          if (policy.attachmentRequired && !input.attachmentName && !input.attachmentUrl) {
-            throw invalid(`Supporting document/attachment is mandatory for ${policy.name}.`);
+          if (
+            policy.attachmentRequired &&
+            !input.attachmentName &&
+            !input.attachmentUrl
+          ) {
+            throw invalid(
+              `Supporting document/attachment is mandatory for ${policy.name}.`,
+            );
           }
           if (policy.code === 'RH' && calendarService) {
-            const rhs = await calendarService.getRestrictedHolidays(year, { employeeType: category });
+            const rhs = await calendarService.getRestrictedHolidays(year, {
+              employeeType: category,
+            });
             const sIso = isoDate(start);
             const isRh = rhs.some((rh) => {
-              const dStr = typeof rh.date === 'string' ? rh.date : (rh.date as Date).toISOString().slice(0, 10);
+              const dStr =
+                typeof rh.date === 'string'
+                  ? rh.date
+                  : (rh.date as Date).toISOString().slice(0, 10);
               return dStr === sIso && rh.active;
             });
             if (!isRh) {
-              throw invalid(`${sIso} is not an approved restricted holiday for ${year}.`);
+              throw invalid(
+                `${sIso} is not an approved restricted holiday for ${year}.`,
+              );
             }
           }
           if (category === 'TEACHING') {
             coverageRequired = policy.requiresAcademicCoverage;
           } else {
             coverageRequired = policy.requiresOperationalCoverage;
+          }
+        } else {
+          const allYearPolicies = await policyService.getApplicablePolicies(
+            access,
+            employee.id,
+            String(year),
+          );
+          if (allYearPolicies.some((p) => p.code === type.code)) {
+            throw invalid(
+              `No active policy covers the requested date ${isoDate(start)} for ${type.name}.`,
+            );
           }
         }
       }
@@ -350,6 +419,8 @@ export function createLeaveService(
             departmentId: employee.departmentId,
             leaveTypeId: type.id,
             policyId: resolvedPolicyId,
+            policyVersion: resolvedPolicyVersion,
+            policySnapshot: resolvedPolicySnapshot,
             startDate: start,
             endDate: end,
             halfDay: input.halfDay,
@@ -366,7 +437,14 @@ export function createLeaveService(
             restrictedHolidayId: input.restrictedHolidayId,
             vacationPeriodId: input.vacationPeriodId,
             coverageRequired,
-            operationalCoverageRole: category === 'NON_TEACHING' ? (user.role.name || 'Staff') : null,
+            operationalCoverageRole:
+              category === 'NON_TEACHING' && coverageRequired
+                ? (input.operationalCoverageRole ?? user.role.name ?? 'Staff')
+                : null,
+            operationalCoverageNote:
+              category === 'NON_TEACHING' && coverageRequired
+                ? (input.operationalCoverageNote ?? null)
+                : null,
           } as Parameters<typeof repo.submit>[0],
           async (taken) => {
             const overlap = taken.find(
@@ -630,7 +708,6 @@ export function createLeaveService(
 
       const fromYear = query.year;
       const toYear = query.targetYear ?? fromYear + 1;
-      const encashSurplusEL = Boolean(query.encashSurplusEL);
 
       const [types, employees] = await Promise.all([
         repo.types(),
@@ -659,7 +736,6 @@ export function createLeaveService(
 
       let totalDaysCarriedForward = 0;
       let totalDaysLapsed = 0;
-      let totalDaysEncashed = 0;
 
       const deptMap = new Map<
         string,
@@ -669,7 +745,6 @@ export function createLeaveService(
           employeeCount: number;
           carriedForward: number;
           lapsed: number;
-          encashed: number;
         }
       >();
 
@@ -698,7 +773,6 @@ export function createLeaveService(
               let closingBalance: number | null = null;
               let carriedForward = 0;
               let lapsed = 0;
-              let encashed = 0;
               let nextYearOpening: number | null = null;
 
               if (polFrom.annualEntitlement !== null) {
@@ -711,30 +785,35 @@ export function createLeaveService(
 
                 closingBalance = Math.max(
                   0,
-                  balFrom.entitled !== null ? balFrom.entitled - balFrom.used : 0,
+                  balFrom.entitled !== null
+                    ? balFrom.entitled - balFrom.used
+                    : 0,
                 );
 
-                const carryForwardAllowed = polTo ? polTo.carryForwardAllowed : polFrom.carryForwardAllowed;
-                const carryForwardCap = (polTo ? polTo.carryForwardLimit : polFrom.carryForwardLimit) ?? 0;
-                carriedForward = carryForwardAllowed ? Math.min(carryForwardCap, closingBalance) : 0;
+                const carryForwardAllowed = polTo
+                  ? polTo.carryForwardAllowed
+                  : polFrom.carryForwardAllowed;
+                const carryForwardCap =
+                  (polTo ? polTo.carryForwardLimit : polFrom.carryForwardLimit) ??
+                  0;
+                carriedForward = carryForwardAllowed
+                  ? Math.min(carryForwardCap, closingBalance)
+                  : 0;
                 const surplus = Math.max(0, closingBalance - carriedForward);
+                const lapseAtYearEnd = polTo
+                  ? polTo.lapseAtYearEnd
+                  : polFrom.lapseAtYearEnd;
+                lapsed =
+                  lapseAtYearEnd || carryForwardAllowed ? surplus : 0;
 
-                if (encashSurplusEL && polFrom.code === 'EL') {
-                  encashed = surplus;
-                  lapsed = 0;
-                } else {
-                  encashed = 0;
-                  const lapseAtYearEnd = polTo ? polTo.lapseAtYearEnd : polFrom.lapseAtYearEnd;
-                  lapsed = (lapseAtYearEnd || carryForwardAllowed) ? surplus : 0;
-                }
-
-                const toEntitlement = polTo?.annualEntitlement ?? polFrom.annualEntitlement;
-                nextYearOpening = toEntitlement !== null ? toEntitlement + carriedForward : null;
+                const toEntitlement =
+                  polTo?.annualEntitlement ?? polFrom.annualEntitlement;
+                nextYearOpening =
+                  toEntitlement !== null ? toEntitlement + carriedForward : null;
               }
 
               totalDaysCarriedForward += carriedForward;
               totalDaysLapsed += lapsed;
-              totalDaysEncashed += encashed;
 
               return {
                 leaveTypeId: type?.id ?? 0,
@@ -745,7 +824,6 @@ export function createLeaveService(
                 closingBalance,
                 carriedForward,
                 lapsed,
-                encashed,
                 nextYearOpening,
               };
             }),
@@ -764,7 +842,6 @@ export function createLeaveService(
               let closingBalance: number | null = null;
               let carriedForward = 0;
               let lapsed = 0;
-              let encashed = 0;
               let nextYearOpening: number | null = null;
 
               if (type.yearlyQuota !== null && type.yearlyQuota !== undefined) {
@@ -774,20 +851,12 @@ export function createLeaveService(
                 );
                 carriedForward = balTo.carriedIn;
                 const surplus = Math.max(0, closingBalance - carriedForward);
-
-                if (encashSurplusEL && type.code === 'EL') {
-                  encashed = surplus;
-                  lapsed = 0;
-                } else {
-                  encashed = 0;
-                  lapsed = surplus;
-                }
+                lapsed = surplus;
                 nextYearOpening = balTo.entitled;
               }
 
               totalDaysCarriedForward += carriedForward;
               totalDaysLapsed += lapsed;
-              totalDaysEncashed += encashed;
 
               return {
                 leaveTypeId: type.id,
@@ -798,7 +867,6 @@ export function createLeaveService(
                 closingBalance,
                 carriedForward,
                 lapsed,
-                encashed,
                 nextYearOpening,
               };
             });
@@ -809,7 +877,6 @@ export function createLeaveService(
           0,
         );
         const empLapsed = balances.reduce((sum, b) => sum + b.lapsed, 0);
-        const empEncashed = balances.reduce((sum, b) => sum + b.encashed, 0);
 
         let deptSummary = deptMap.get(emp.department.code);
         if (!deptSummary) {
@@ -819,14 +886,12 @@ export function createLeaveService(
             employeeCount: 0,
             carriedForward: 0,
             lapsed: 0,
-            encashed: 0,
           };
           deptMap.set(emp.department.code, deptSummary);
         }
         deptSummary.employeeCount++;
         deptSummary.carriedForward += empCarried;
         deptSummary.lapsed += empLapsed;
-        deptSummary.encashed += empEncashed;
 
         records.push({
           employeeId: emp.id,
@@ -844,7 +909,6 @@ export function createLeaveService(
         totalEmployees: employees.length,
         totalDaysCarriedForward,
         totalDaysLapsed,
-        totalDaysEncashed,
         departmentSummaries: Array.from(deptMap.values()),
         records,
       };
@@ -865,36 +929,27 @@ export function createLeaveService(
         );
       }
 
-      if (policyService) {
-        const rolloverTag = `[ANNUAL_ROLLOVER_${input.fromYear}_${input.toYear}]`;
-        const existingAdjustments = await policyService.listAdjustments(access, {
-          policyYear: String(input.toYear),
-        });
-        const alreadyExecuted = existingAdjustments.some((adj) =>
-          adj.reason.startsWith(rolloverTag),
-        );
-        if (alreadyExecuted) {
-          throw new HttpError(
-            409,
-            'ROLLOVER_ALREADY_EXECUTED',
-            `Annual leave rollover from ${input.fromYear} to ${input.toYear} has already been executed.`,
-          );
-        }
-      }
-
       const summary = await this.previewRollover(access, {
         year: input.fromYear,
         targetYear: input.toYear,
         departmentId: input.departmentId,
-        encashSurplusEL: input.encashSurplusEL,
       });
 
       if (policyService) {
         const rolloverTag = `[ANNUAL_ROLLOVER_${input.fromYear}_${input.toYear}]`;
+        const adjustmentEntries: Array<{
+          employeeId: string;
+          leaveCode: string;
+          policyYear: string;
+          adjustmentType: 'CARRY_FORWARD_CORRECTION' | 'LAPSE';
+          days: number;
+          reason: string;
+        }> = [];
+
         for (const record of summary.records) {
           for (const b of record.balances) {
             if (b.carriedForward > 0) {
-              await policyService.createAdjustment(access, {
+              adjustmentEntries.push({
                 employeeId: record.employeeId,
                 leaveCode: b.leaveTypeCode,
                 policyYear: String(input.toYear),
@@ -904,7 +959,7 @@ export function createLeaveService(
               });
             }
             if (b.lapsed > 0) {
-              await policyService.createAdjustment(access, {
+              adjustmentEntries.push({
                 employeeId: record.employeeId,
                 leaveCode: b.leaveTypeCode,
                 policyYear: String(input.toYear),
@@ -915,6 +970,13 @@ export function createLeaveService(
             }
           }
         }
+
+        await policyService.executeRolloverLedger(
+          access,
+          input.fromYear,
+          input.toYear,
+          adjustmentEntries,
+        );
       }
 
       if (notifier) {
@@ -951,7 +1013,6 @@ export function createLeaveService(
         `Year ${summary.fromYear} Closing Balance`,
         `Carried Forward into ${summary.toYear}`,
         `Lapsed Days`,
-        `Encashed Days`,
         `Year ${summary.toYear} Opening Balance`,
       ];
 
@@ -968,7 +1029,6 @@ export function createLeaveService(
             b.closingBalance !== null ? String(b.closingBalance) : '—',
             String(b.carriedForward),
             String(b.lapsed),
-            String(b.encashed),
             b.nextYearOpening !== null
               ? String(b.nextYearOpening)
               : 'As per policy',

@@ -77,8 +77,10 @@ export const leaveApplySchema = z
     restrictedHolidayId: z.string().trim().max(100).optional(),
     // Eligible selection for Vacation Leave (VL)
     vacationPeriodId: z.string().trim().max(100).optional(),
-    // Smart coverage indicator
+    // Smart coverage indicator & non-teaching operational coverage
     coverageRequired: z.boolean().optional(),
+    operationalCoverageRole: z.string().trim().max(100).optional(),
+    operationalCoverageNote: z.string().trim().max(500).optional(),
   })
   .strict()
   .refine((input) => input.startDate <= input.endDate, {
@@ -143,7 +145,6 @@ export const rolloverQuerySchema = z.object({
     .default(new Date().getUTCFullYear()),
   targetYear: z.coerce.number().int().min(2020).max(2100).optional(),
   departmentId: z.coerce.number().int().positive().optional(),
-  encashSurplusEL: z.coerce.boolean().default(false),
 });
 export type RolloverQuery = z.infer<typeof rolloverQuerySchema>;
 
@@ -152,7 +153,6 @@ export const rolloverExecuteSchema = z
     fromYear: z.number().int().min(2020).max(2100),
     toYear: z.number().int().min(2020).max(2100),
     departmentId: z.number().int().positive().optional(),
-    encashSurplusEL: z.boolean().default(false),
     notes: z.string().trim().max(500).optional(),
   })
   .strict();

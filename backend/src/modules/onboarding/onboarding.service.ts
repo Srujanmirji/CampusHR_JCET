@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import { HttpError } from '../../common/http-error.js';
-import type { Prisma } from '../../generated/prisma/client.js';
+import { Prisma } from '../../generated/prisma/client.js';
 import type { Access } from '../auth/auth.service.js';
 import { BCRYPT_COST } from '../auth/auth.service.js';
 import type { Notifier } from '../notifications/notifications.service.js';
@@ -22,18 +22,6 @@ import type {
   OnboardingRepository,
 } from './onboarding.repository.js';
 
-export function calculateGrossSalary(
-  basicPay: number,
-  agp: number,
-  daPercent: number,
-  hraPercent: number,
-): number {
-  const base = basicPay + agp;
-  const da = Math.round((base * daPercent) / 100);
-  const hra = Math.round((base * hraPercent) / 100);
-  return base + da + hra;
-}
-
 export function formatAppointmentLetter(candidate: OnboardingCandidateRecord) {
   const issueDate = candidate.issuedAt
     ? candidate.issuedAt.toISOString().slice(0, 10)
@@ -51,12 +39,6 @@ export function formatAppointmentLetter(candidate: OnboardingCandidateRecord) {
     designation: candidate.designation.name,
     category: candidate.designation.category,
     employmentType: candidate.employmentType,
-    payScale: candidate.payScale,
-    basicPay: candidate.basicPay,
-    agp: candidate.agp,
-    daPercent: candidate.daPercent,
-    hraPercent: candidate.hraPercent,
-    grossSalary: candidate.grossSalary,
     probationMonths: candidate.probationMonths,
     noticePeriodMonths: candidate.noticePeriodMonths,
     expectedJoiningDate: joiningDate,
@@ -68,10 +50,9 @@ export function formatAppointmentLetter(candidate: OnboardingCandidateRecord) {
     },
     termsAndConditions: [
       `1. You will be placed on probation for a period of ${candidate.probationMonths} months from the date of joining.`,
-      `2. You will be paid gross salary of ₹${candidate.grossSalary.toLocaleString('en-IN')} per month under the pay band: ${candidate.payScale}.`,
-      `3. You will be required to give ${candidate.noticePeriodMonths} months' notice or pay equivalent salary in lieu thereof prior to resignation.`,
-      '4. Your appointment is subject to submission of original educational credentials, proof of age, and satisfactory background verification.',
-      '5. You will strictly abide by the rules, code of ethics, and academic regulations of JCET, VTU, and AICTE.',
+      `2. You will be required to give ${candidate.noticePeriodMonths} months' notice prior to resignation.`,
+      '3. Your appointment is subject to submission of original educational credentials, proof of age, and satisfactory background verification.',
+      '4. You will strictly abide by the rules, code of ethics, and academic regulations of JCET, VTU, and AICTE.',
     ],
   };
 }
@@ -209,12 +190,6 @@ export function createOnboardingService(
 
       const currentYear = new Date().getFullYear();
       const appointmentRefNo = await repo.nextRefNo(currentYear);
-      const grossSalary = calculateGrossSalary(
-        input.basicPay,
-        input.agp,
-        input.daPercent,
-        input.hraPercent,
-      );
 
       const created = await repo.create({
         appointmentRefNo,
@@ -230,12 +205,6 @@ export function createOnboardingService(
         experienceYears: input.experienceYears,
         expectedJoiningDate: new Date(`${input.expectedJoiningDate}T00:00:00Z`),
         status: 'OFFER_PENDING',
-        payScale: input.payScale,
-        basicPay: input.basicPay,
-        agp: input.agp,
-        daPercent: input.daPercent,
-        hraPercent: input.hraPercent,
-        grossSalary,
         probationMonths: input.probationMonths,
         noticePeriodMonths: input.noticePeriodMonths,
         documentsChecklist: {
@@ -244,7 +213,7 @@ export function createOnboardingService(
           experienceCertificate: false,
           relievingOrder: false,
           aadhaarPan: false,
-          bankDetails: false,
+          addressProof: false,
         },
         notes: input.notes,
       });
@@ -272,12 +241,6 @@ export function createOnboardingService(
         }
       }
 
-      const basicPay = input.basicPay ?? existing.basicPay;
-      const agp = input.agp ?? existing.agp;
-      const daPercent = input.daPercent ?? existing.daPercent;
-      const hraPercent = input.hraPercent ?? existing.hraPercent;
-      const grossSalary = calculateGrossSalary(basicPay, agp, daPercent, hraPercent);
-
       const mergedChecklist = input.documentsChecklist
         ? { ...(existing.documentsChecklist || {}), ...input.documentsChecklist }
         : existing.documentsChecklist;
@@ -296,15 +259,11 @@ export function createOnboardingService(
         expectedJoiningDate: input.expectedJoiningDate
           ? new Date(`${input.expectedJoiningDate}T00:00:00Z`)
           : undefined,
-        payScale: input.payScale,
-        basicPay,
-        agp,
-        daPercent,
-        hraPercent,
-        grossSalary,
         probationMonths: input.probationMonths,
         noticePeriodMonths: input.noticePeriodMonths,
-        documentsChecklist: mergedChecklist,
+        documentsChecklist: mergedChecklist
+          ? (mergedChecklist as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
         notes: input.notes,
       });
 
@@ -391,7 +350,7 @@ export function createOnboardingService(
       };
 
       let userInput: Prisma.UserCreateInput | undefined;
-      let generatedPassword = input.temporaryPassword || 'Jcet@Welcome2026!';
+      const generatedPassword = input.temporaryPassword || 'Jcet@Welcome2026!';
 
       if (input.createLoginAccount) {
         // Map designation category to role name
