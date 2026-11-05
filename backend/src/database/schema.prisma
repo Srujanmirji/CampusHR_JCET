@@ -70,6 +70,7 @@ model User {
   onDutyHodReviews      OnDutyRequest[]        @relation("OnDutyHodReview")
   onDutyFinalApprovals  OnDutyRequest[]        @relation("OnDutyFinalApproval")
   calendarDaysCreated   CalendarDay[]          @relation("CalendarDayCreatedBy")
+  balanceAdjustmentsMade LeaveBalanceAdjustment[] @relation("BalanceAdjuster")
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt             DateTime         @updatedAt @map("updated_at")
   passwordResets        PasswordResetChallenge[]
@@ -139,6 +140,7 @@ model Department {
   circulars     Circular[]       @relation("DepartmentCirculars")
   onboardingCandidates OnboardingCandidate[]
   calendarDays  CalendarDay[]    @relation("DepartmentCalendarDays")
+  leavePolicies LeavePolicy[]    @relation("DepartmentLeavePolicies")
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
@@ -192,6 +194,7 @@ model Employee {
   workAssignedTo        WorkAssignment[]       @relation("WorkAssignedTo")
   onboardingRecord      OnboardingCandidate?   @relation("OnboardedCandidate")
   onDutyRequests        OnDutyRequest[]
+  balanceAdjustments    LeaveBalanceAdjustment[] @relation("EmployeeBalanceAdjustments")
 
   @@index([departmentId])
   @@index([status])
@@ -339,6 +342,8 @@ model LeaveType {
   // Retired types stay for history but take no new requests.
   active          Boolean        @default(true)
   requests        LeaveRequest[]
+  policies        LeavePolicy[]  @relation("LeaveTypePolicies")
+  adjustments     LeaveBalanceAdjustment[] @relation("LeaveTypeAdjustments")
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
 
@@ -382,6 +387,19 @@ model LeaveRequest {
   approverRoles String[]        @map("approver_roles")
   // Role that acts next; null once the request is decided or cancelled.
   pendingRole   String?         @map("pending_role")
+  policyId      String?         @map("policy_id") @db.Uuid
+  policy        LeavePolicy?    @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  dutyType      String?         @map("duty_type")
+  organisation  String?
+  location      String?
+  referenceNumber String?       @map("reference_number")
+  attachmentName String?        @map("attachment_name")
+  attachmentUrl String?         @map("attachment_url")
+  restrictedHolidayId String?   @map("restricted_holiday_id")
+  vacationPeriodId String?      @map("vacation_period_id")
+  coverageRequired Boolean      @default(true) @map("coverage_required")
+  operationalCoverageRole String? @map("operational_coverage_role")
+  operationalCoverageNote String? @map("operational_coverage_note")
   decisions     LeaveDecision[]
   substitutions Substitution[]
   createdAt     DateTime        @default(now()) @map("created_at")
@@ -1134,6 +1152,114 @@ model WeeklyWorkingPattern {
 
   @@map("weekly_working_patterns")
 }
+
+// Configurable Leave Policy Engine
+enum LeaveAdjustmentType {
+  CREDIT
+  DEBIT
+  OPENING_CORRECTION
+  CARRY_FORWARD_CORRECTION
+  LAPSE
+
+  @@map("leave_adjustment_type")
+}
+
+model LeavePolicy {
+  id                          String                  @id @default(uuid()) @db.Uuid
+  code                        String                  // CL, EL, SPL_ML, OOD, ODE, RH, VL
+  name                        String
+  description                 String?                 @db.Text
+  policyYear                  String                  @map("policy_year") // e.g. "2026", "2026-27"
+  employeeCategory            StaffCategory           @map("employee_category") // TEACHING | NON_TEACHING
+  appliesToAllCategories      Boolean                 @default(false) @map("applies_to_all_categories")
+  employmentType              EmploymentType?         @map("employment_type") // null = ALL
+  departmentId                Int?                    @map("department_id")
+  department                  Department?             @relation("DepartmentLeavePolicies", fields: [departmentId], references: [id], onDelete: SetNull)
+  leaveTypeId                 Int?                    @map("leave_type_id")
+  leaveType                   LeaveType?              @relation("LeaveTypePolicies", fields: [leaveTypeId], references: [id], onDelete: SetNull)
+  annualEntitlement           Float?                  @map("annual_entitlement") // null = "As per policy" / unfixed
+  entitlementUnit             String                  @default("DAYS") @map("entitlement_unit")
+  carryForwardAllowed         Boolean                 @default(false) @map("carry_forward_allowed")
+  carryForwardLimit           Float                   @default(0) @map("carry_forward_limit")
+  carryForwardExpiryMonths    Int?                    @map("carry_forward_expiry_months")
+  lapseAtYearEnd              Boolean                 @default(true) @map("lapse_at_year_end")
+  halfDayAllowed              Boolean                 @default(false) @map("half_day_allowed")
+  minimumNoticeDays           Int                     @default(0) @map("minimum_notice_days")
+  maximumConsecutiveDays      Int?                    @map("maximum_consecutive_days")
+  minimumServiceDays          Int?                    @map("minimum_service_days")
+  attachmentRequired          Boolean                 @default(false) @map("attachment_required")
+  attachmentRequiredAfterDays Float?                  @map("attachment_required_after_days")
+  reasonRequired              Boolean                 @default(true) @map("reason_required")
+  attendanceStatus            String                  @default("ON_LEAVE") @map("attendance_status")
+  affectsTimetable            Boolean                 @default(true) @map("affects_timetable")
+  requiresAcademicCoverage    Boolean                 @default(true) @map("requires_academic_coverage")
+  requiresOperationalCoverage Boolean                 @default(false) @map("requires_operational_coverage")
+  reservePendingBalance       Boolean                 @default(true) @map("reserve_pending_balance")
+  approvalPolicyKey           String?                 @default("STANDARD") @map("approval_policy_key")
+  calendarPolicyKey           String?                 @default("INSTITUTION_CALENDAR") @map("calendar_policy_key")
+  active                      Boolean                 @default(true)
+  effectiveFrom               DateTime                @map("effective_from") @db.Date
+  effectiveTo                 DateTime?               @map("effective_to") @db.Date
+  requests                    LeaveRequest[]
+  adjustments                 LeaveBalanceAdjustment[]
+  createdAt                   DateTime                @default(now()) @map("created_at")
+  updatedAt                   DateTime                @updatedAt @map("updated_at")
+
+  @@unique([code, policyYear, employeeCategory, departmentId])
+  @@index([policyYear])
+  @@index([employeeCategory])
+  @@index([active])
+  @@map("leave_policies")
+}
+
+model LeaveBalanceAdjustment {
+  id              String              @id @default(uuid()) @db.Uuid
+  employeeId      String              @map("employee_id") @db.Uuid
+  employee        Employee            @relation("EmployeeBalanceAdjustments", fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId     Int?                @map("leave_type_id")
+  leaveType       LeaveType?          @relation("LeaveTypeAdjustments", fields: [leaveTypeId], references: [id], onDelete: SetNull)
+  policyId        String?             @map("policy_id") @db.Uuid
+  policy          LeavePolicy?        @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  leaveCode       String              @map("leave_code")
+  policyYear      String              @map("policy_year")
+  adjustmentType  LeaveAdjustmentType @map("adjustment_type")
+  days            Float
+  reason          String              @db.Text
+  actorUserId     String              @map("actor_user_id") @db.Uuid
+  actorUser       User                @relation("BalanceAdjuster", fields: [actorUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  @@index([employeeId, policyYear])
+  @@index([leaveCode])
+  @@map("leave_balance_adjustments")
+}
+
+model EmployeePolicyGroup {
+  id               String        @id @default(uuid()) @db.Uuid
+  name             String        @unique
+  description      String?       @db.Text
+  employeeCategory StaffCategory @map("employee_category")
+  calendarPolicy   String?       @default("INSTITUTION_CALENDAR") @map("calendar_policy")
+  attendancePolicy String?       @default("STANDARD") @map("attendance_policy")
+  active           Boolean       @default(true)
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  @@map("employee_policy_groups")
+}
+
+model OnDutyDutyMapping {
+  id              String   @id @default(uuid()) @db.Uuid
+  dutyCategory    String   @unique @map("duty_category")
+  targetLeaveCode String   @map("target_leave_code")
+  title           String
+  description     String?  @db.Text
+  active          Boolean  @default(true)
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("on_duty_duty_mappings")
+}
+
 
 
 

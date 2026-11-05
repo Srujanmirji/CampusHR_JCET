@@ -33,6 +33,8 @@ export const MATRIX: Record<string, [Cell, Cell, Cell, Cell, Cell, Cell]> = {
   'leave.cancel': ['-', 'O', 'O', 'O', 'O', 'O'],
   'leave.approve': ['A', 'A', 'A', 'D', '-', '-'],
   'leave_type.manage': ['A', 'A', '-', '-', '-', '-'],
+  'leave_policy.read': ['A', 'A', 'A', 'D', 'O', 'O'],
+  'leave_policy.manage': ['A', 'A', '-', '-', '-', '-'],
   'on_duty.apply': ['-', 'O', 'O', 'O', 'O', 'O'],
   'on_duty.read': ['A', 'A', 'A', 'D', 'O', 'O'],
   'on_duty.approve': ['A', 'A', 'A', 'D', '-', '-'],

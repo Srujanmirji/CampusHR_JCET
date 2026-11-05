@@ -24,6 +24,14 @@ export interface LeaveBalanceDto {
   used: number;
   pending: number;
   remaining: number | null;
+  adjustments?: number;
+  allowHalfDay?: boolean;
+  attachmentRequired?: boolean;
+  requiresAcademicCoverage?: boolean;
+  requiresOperationalCoverage?: boolean;
+  attendanceStatus?: string;
+  employeeCategory?: 'TEACHING' | 'NON_TEACHING';
+  isPolicyBased?: boolean;
 }
 
 export interface LeaveDecisionDto {
@@ -112,7 +120,7 @@ const balanceSchema = z.object({
   used: z.number().nonnegative(),
   pending: z.number().nonnegative(),
   remaining: z.number().nullable(),
-});
+}).passthrough();
 export const requestSchema = z.object({
   id: z.uuid(),
   employee: z.object({
@@ -767,4 +775,46 @@ export async function getLeaveRequest(token: string | null, id: string) {
     .parse(await response.json()).data;
   if (data.id !== id) throw new Error('The server returned another request.');
   return data;
+}
+
+export interface LeavePolicyDto {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  policyYear: string;
+  employeeCategory: 'TEACHING' | 'NON_TEACHING';
+  appliesToAllCategories: boolean;
+  employmentType: string | null;
+  departmentId: number | null;
+  leaveTypeId: number | null;
+  leaveType?: { id: number; code: string; name: string } | null;
+  annualEntitlement: number | null;
+  entitlementUnit: string;
+  carryForwardAllowed: boolean;
+  carryForwardLimit: number;
+  carryForwardExpiryMonths: number | null;
+  lapseAtYearEnd: boolean;
+  halfDayAllowed: boolean;
+  minimumNoticeDays: number;
+  maximumConsecutiveDays: number | null;
+  minimumServiceDays: number | null;
+  attachmentRequired: boolean;
+  attachmentRequiredAfterDays: number | null;
+  reasonRequired: boolean;
+  attendanceClassification: string;
+  requiresAcademicCoverage: boolean;
+  requiresOperationalCoverage: boolean;
+  affectsTimetable: boolean;
+  countsAsWorkingDay: boolean;
+  approvalPolicyKey: string | null;
+  isActive: boolean;
+  version: number;
+}
+
+export async function fetchApplicablePolicies(policyYear?: string): Promise<LeavePolicyDto[]> {
+  const search = policyYear ? `?policyYear=${policyYear}` : '';
+  const response = await apiFetch(`/leave-policies/applicable${search}`);
+  const json = (await response.json()) as { data: LeavePolicyDto[] };
+  return json.data;
 }
