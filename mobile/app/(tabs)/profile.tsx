@@ -176,6 +176,24 @@ export default function ProfileTab() {
             onPress={() => router.push('/calendar' as any)}
           />
           <ProfileListRow
+            label="Digital circulars & notices"
+            detail="Institutional orders, VTU notifications & announcements"
+            icon="document"
+            onPress={() => router.push('/circulars' as any)}
+          />
+          <ProfileListRow
+            label="Work delegation & tasks"
+            detail="Department assignments, NBA/NAAC criteria & submissions"
+            icon="workload"
+            onPress={() => router.push('/work-assignments' as any)}
+          />
+          <ProfileListRow
+            label="Exam duty allotment"
+            detail="VTU invigilation, room allocations & duty swap requests"
+            icon="timetable"
+            onPress={() => router.push('/exam-duty' as any)}
+          />
+          <ProfileListRow
             label="Official On-Duty & Valuation"
             detail="OD applications, VTU duties & attendance certificates"
             icon="workload"

@@ -518,6 +518,69 @@ function FacultyHome() {
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          onPress={() => router.push('/circulars' as any)}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.blueContainer },
+            ]}
+          >
+            <Icon name="document" color={theme.colors.primary} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Digital Circulars</Text>
+            <Text style={styles.detail}>
+              Review official announcements, VTU notices & institutional orders
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/work-assignments' as any)}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.violetContainer },
+            ]}
+          >
+            <Icon name="workload" color={theme.colors.violet} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Work Delegation</Text>
+            <Text style={styles.detail}>
+              Track department tasks, NBA/NAAC deliverables & deadlines
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/exam-duty' as any)}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.blueContainer },
+            ]}
+          >
+            <Icon name="timetable" color={theme.colors.brandBlue} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Exam Duty Allotment</Text>
+            <Text style={styles.detail}>
+              View VTU exam dates, room duties & request swaps
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
           onPress={() => router.push('/on-duty' as any)}
           style={styles.updateRow}
         >
