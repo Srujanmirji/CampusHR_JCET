@@ -971,6 +971,7 @@ function LeaveRecords({
             role: user.role,
           }}
           leaveTypes={activeTypes}
+          balances={balances.data ?? []}
         />
       )}
 

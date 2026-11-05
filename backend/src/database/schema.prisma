@@ -391,6 +391,8 @@ model LeaveRequest {
   pendingRole   String?         @map("pending_role")
   policyId      String?         @map("policy_id") @db.Uuid
   policy        LeavePolicy?    @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  policyVersion Int?            @map("policy_version")
+  policySnapshot Json?          @map("policy_snapshot")
   dutyType      String?         @map("duty_type")
   organisation  String?
   location      String?
@@ -399,7 +401,7 @@ model LeaveRequest {
   attachmentUrl String?         @map("attachment_url")
   restrictedHolidayId String?   @map("restricted_holiday_id")
   vacationPeriodId String?      @map("vacation_period_id")
-  coverageRequired Boolean      @default(true) @map("coverage_required")
+  coverageRequired Boolean      @default(false) @map("coverage_required")
   operationalCoverageRole String? @map("operational_coverage_role")
   operationalCoverageNote String? @map("operational_coverage_note")
   decisions     LeaveDecision[]
@@ -1202,6 +1204,7 @@ model LeavePolicy {
   policyGroupId               String?                 @map("policy_group_id") @db.Uuid
   policyGroup                 EmployeePolicyGroup?    @relation("PolicyGroupLeavePolicies", fields: [policyGroupId], references: [id], onDelete: SetNull)
   calendarPolicyKey           String?                 @default("INSTITUTION_CALENDAR") @map("calendar_policy_key")
+  version                     Int                     @default(1)
   active                      Boolean                 @default(true)
   effectiveFrom               DateTime                @map("effective_from") @db.Date
   effectiveTo                 DateTime?               @map("effective_to") @db.Date
@@ -1210,7 +1213,7 @@ model LeavePolicy {
   createdAt                   DateTime                @default(now()) @map("created_at")
   updatedAt                   DateTime                @updatedAt @map("updated_at")
 
-  @@unique([code, policyYear, employeeCategory, departmentId, policyGroupId])
+  @@unique([code, policyYear, employeeCategory, departmentId, policyGroupId, version])
   @@index([policyYear])
   @@index([employeeCategory])
   @@index([active])
@@ -1218,22 +1221,24 @@ model LeavePolicy {
 }
 
 model LeaveBalanceAdjustment {
-  id              String              @id @default(uuid()) @db.Uuid
-  employeeId      String              @map("employee_id") @db.Uuid
-  employee        Employee            @relation("EmployeeBalanceAdjustments", fields: [employeeId], references: [id], onDelete: Cascade)
-  leaveTypeId     Int?                @map("leave_type_id")
-  leaveType       LeaveType?          @relation("LeaveTypeAdjustments", fields: [leaveTypeId], references: [id], onDelete: SetNull)
-  policyId        String?             @map("policy_id") @db.Uuid
-  policy          LeavePolicy?        @relation(fields: [policyId], references: [id], onDelete: SetNull)
-  leaveCode       String              @map("leave_code")
-  policyYear      String              @map("policy_year")
-  adjustmentType  LeaveAdjustmentType @map("adjustment_type")
-  days            Float
-  reason          String              @db.Text
-  actorUserId     String              @map("actor_user_id") @db.Uuid
-  actorUser       User                @relation("BalanceAdjuster", fields: [actorUserId], references: [id], onDelete: Restrict)
-  createdAt       DateTime            @default(now()) @map("created_at")
+  id               String              @id @default(uuid()) @db.Uuid
+  employeeId       String              @map("employee_id") @db.Uuid
+  employee         Employee            @relation("EmployeeBalanceAdjustments", fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId      Int?                @map("leave_type_id")
+  leaveType        LeaveType?          @relation("LeaveTypeAdjustments", fields: [leaveTypeId], references: [id], onDelete: SetNull)
+  policyId         String?             @map("policy_id") @db.Uuid
+  policy           LeavePolicy?        @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  leaveCode        String              @map("leave_code")
+  policyYear       String              @map("policy_year")
+  rolloverFromYear Int?                @map("rollover_from_year")
+  adjustmentType   LeaveAdjustmentType @map("adjustment_type")
+  days             Float
+  reason           String              @db.Text
+  actorUserId      String              @map("actor_user_id") @db.Uuid
+  actorUser        User                @relation("BalanceAdjuster", fields: [actorUserId], references: [id], onDelete: Restrict)
+  createdAt        DateTime            @default(now()) @map("created_at")
 
+  @@unique([employeeId, leaveCode, policyYear, adjustmentType, rolloverFromYear])
   @@index([employeeId, policyYear])
   @@index([leaveCode])
   @@map("leave_balance_adjustments")

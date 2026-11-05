@@ -1,5 +1,33 @@
-import type { Prisma, PrismaClient } from '../../generated/prisma/client.js';
+import { HttpError } from '../../common/http-error.js';
+import { Prisma, type PrismaClient } from '../../generated/prisma/client.js';
 import type { StaffCategoryType } from './leave-policy.schema.js';
+
+export interface LeavePolicySnapshot {
+  [key: string]: unknown;
+  policyId: string;
+  version: number;
+  code: string;
+  name: string;
+  policyYear: string;
+  employeeCategory: StaffCategoryType;
+  annualEntitlement: number | null;
+  carryForwardAllowed: boolean;
+  carryForwardLimit: number | null;
+  lapseAtYearEnd: boolean;
+  halfDayAllowed: boolean;
+  minimumNoticeDays: number;
+  maximumConsecutiveDays: number | null;
+  attachmentRequired: boolean;
+  attachmentRequiredAfterDays: number | null;
+  attendanceStatus: string;
+  affectsTimetable: boolean;
+  requiresAcademicCoverage: boolean;
+  requiresOperationalCoverage: boolean;
+  reservePendingBalance: boolean;
+  approvalPolicyKey: string | null;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}
 
 export interface LeavePolicyRecord {
   id: string;
@@ -37,6 +65,7 @@ export interface LeavePolicyRecord {
   policyGroupId: string | null;
   policyGroup?: { id: string; name: string } | null;
   calendarPolicyKey: string | null;
+  version: number;
   active: boolean;
   effectiveFrom: Date;
   effectiveTo: Date | null;
@@ -52,6 +81,7 @@ export interface LeaveBalanceAdjustmentRecord {
   policyId: string | null;
   leaveCode: string;
   policyYear: string;
+  rolloverFromYear: number | null;
   adjustmentType: string;
   days: number;
   reason: string;
@@ -106,6 +136,7 @@ export interface LeavePolicyRepository {
     employeeCategory: StaffCategoryType,
     departmentId?: number | null,
     policyGroupId?: string | null,
+    referenceDate?: Date,
   ): Promise<LeavePolicyRecord | null>;
   findPolicyGroups(category?: StaffCategoryType): Promise<Array<{
     id: string;
@@ -120,6 +151,11 @@ export interface LeavePolicyRepository {
   findEmployee(id: string): Promise<EmployeeWithCategoryRecord | null>;
   findActiveEmployees(departmentId?: number): Promise<EmployeeWithCategoryRecord[]>;
   createAdjustment(data: Prisma.LeaveBalanceAdjustmentUncheckedCreateInput): Promise<LeaveBalanceAdjustmentRecord>;
+  executeRolloverAdjustments?(
+    fromYear: number,
+    toYear: number,
+    entries: Prisma.LeaveBalanceAdjustmentUncheckedCreateInput[],
+  ): Promise<LeaveBalanceAdjustmentRecord[]>;
   findAdjustments(where: Prisma.LeaveBalanceAdjustmentWhereInput): Promise<LeaveBalanceAdjustmentRecord[]>;
   findDutyMappings(): Promise<OnDutyDutyMappingRecord[]>;
   findDutyMappingByCategory(dutyCategory: string): Promise<OnDutyDutyMappingRecord | null>;
@@ -161,7 +197,15 @@ export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRe
       employeeCategory: StaffCategoryType,
       departmentId?: number | null,
       policyGroupId?: string | null,
+      referenceDate?: Date,
     ) {
+      const dateFilter: Prisma.LeavePolicyWhereInput = referenceDate
+        ? {
+            effectiveFrom: { lte: referenceDate },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gte: referenceDate } }],
+          }
+        : {};
+
       // 1. Check group-specific policy first (with department if available)
       if (policyGroupId) {
         if (departmentId) {
@@ -173,8 +217,10 @@ export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRe
               policyGroupId,
               departmentId,
               active: true,
+              ...dateFilter,
             },
             include: policyInclude,
+            orderBy: { version: 'desc' },
           });
           if (groupDeptPolicy) return groupDeptPolicy as unknown as LeavePolicyRecord;
         }
@@ -187,8 +233,10 @@ export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRe
             policyGroupId,
             departmentId: null,
             active: true,
+            ...dateFilter,
           },
           include: policyInclude,
+          orderBy: { version: 'desc' },
         });
         if (groupPolicy) return groupPolicy as unknown as LeavePolicyRecord;
       }
@@ -203,8 +251,10 @@ export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRe
             departmentId,
             policyGroupId: null,
             active: true,
+            ...dateFilter,
           },
           include: policyInclude,
+          orderBy: { version: 'desc' },
         });
         if (deptPolicy) return deptPolicy as unknown as LeavePolicyRecord;
       }
@@ -218,8 +268,10 @@ export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRe
           departmentId: null,
           policyGroupId: null,
           active: true,
+          ...dateFilter,
         },
         include: policyInclude,
+        orderBy: { version: 'desc' },
       });
 
       if (instPolicy) return instPolicy as unknown as LeavePolicyRecord;
@@ -231,8 +283,10 @@ export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRe
           policyYear,
           appliesToAllCategories: true,
           active: true,
+          ...dateFilter,
         },
         include: policyInclude,
+        orderBy: { version: 'desc' },
       });
 
       return genericPolicy as unknown as LeavePolicyRecord | null;
@@ -304,6 +358,59 @@ export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRe
           actorUser: { select: { id: true, email: true } },
         },
       })) as unknown as LeaveBalanceAdjustmentRecord;
+    },
+
+    async executeRolloverAdjustments(
+      fromYear: number,
+      toYear: number,
+      entries: Prisma.LeaveBalanceAdjustmentUncheckedCreateInput[],
+    ) {
+      const rolloverTag = `[ANNUAL_ROLLOVER_${fromYear}_${toYear}]`;
+      try {
+        return await prisma.$transaction(
+          async (tx) => {
+            const existing = await tx.leaveBalanceAdjustment.findFirst({
+              where: {
+                OR: [
+                  { policyYear: String(toYear), rolloverFromYear: fromYear },
+                  { policyYear: String(toYear), reason: { startsWith: rolloverTag } },
+                ],
+              },
+            });
+            if (existing) {
+              throw new HttpError(
+                409,
+                'ROLLOVER_ALREADY_EXECUTED',
+                `Annual leave rollover from ${fromYear} to ${toYear} has already been executed.`,
+              );
+            }
+            const created: LeaveBalanceAdjustmentRecord[] = [];
+            for (const entry of entries) {
+              const row = await tx.leaveBalanceAdjustment.create({
+                data: entry,
+                include: {
+                  employee: { select: { id: true, employeeCode: true, firstName: true, lastName: true } },
+                  actorUser: { select: { id: true, email: true } },
+                },
+              });
+              created.push(row as unknown as LeaveBalanceAdjustmentRecord);
+            }
+            return created;
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        );
+      } catch (err) {
+        if (err instanceof HttpError) throw err;
+        const code = (err as { code?: string })?.code;
+        if (code === 'P2002' || code === 'P2034') {
+          throw new HttpError(
+            409,
+            'ROLLOVER_ALREADY_EXECUTED',
+            `Annual leave rollover from ${fromYear} to ${toYear} has already been executed.`,
+          );
+        }
+        throw err;
+      }
     },
 
     async findAdjustments(where: Prisma.LeaveBalanceAdjustmentWhereInput) {

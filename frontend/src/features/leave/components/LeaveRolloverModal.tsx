@@ -10,7 +10,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -46,7 +45,6 @@ export function LeaveRolloverModal({
   const [fromYear, setFromYear] = useState<number>(currentYear);
   const [toYear, setToYear] = useState<number>(currentYear + 1);
   const [deptFilter, setDeptFilter] = useState<string>('ALL');
-  const [encashSurplus, setEncashSurplus] = useState<boolean>(false);
   const [search, setSearch] = useState<string>('');
   const [confirmingExecute, setConfirmingExecute] = useState(false);
 
@@ -70,20 +68,12 @@ export function LeaveRolloverModal({
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: [
-      'leave',
-      'rollover',
-      fromYear,
-      toYear,
-      selectedDeptId,
-      encashSurplus,
-    ],
+    queryKey: ['leave', 'rollover', fromYear, toYear, selectedDeptId],
     queryFn: () =>
       previewLeaveRollover({
         year: fromYear,
         targetYear: toYear,
         departmentId: selectedDeptId,
-        encashSurplusEL: encashSurplus,
       }),
     enabled: open,
   });
@@ -95,7 +85,6 @@ export function LeaveRolloverModal({
         fromYear,
         toYear,
         departmentId: selectedDeptId,
-        encashSurplusEL: encashSurplus,
         notes: `Annual institutional rollover from ${fromYear} to ${toYear}`,
       }),
     onSuccess: (data) => {
@@ -127,7 +116,6 @@ export function LeaveRolloverModal({
       `${fromYear} Closing Balance`,
       `Carried Forward to ${toYear}`,
       'Lapsed Days',
-      'Encashed Days',
       `${toYear} Opening Balance`,
     ];
 
@@ -143,7 +131,6 @@ export function LeaveRolloverModal({
           b.closingBalance !== null ? String(b.closingBalance) : '—',
           String(b.carriedForward),
           String(b.lapsed),
-          String(b.encashed),
           b.nextYearOpening !== null
             ? String(b.nextYearOpening)
             : 'As per policy',
@@ -263,25 +250,10 @@ export function LeaveRolloverModal({
               </Button>
             </div>
           </div>
-
-          <div className="flex items-center gap-2 pt-1 border-t text-xs text-foreground">
-            <Checkbox
-              id="encash-surplus"
-              checked={encashSurplus}
-              onCheckedChange={(checked) => setEncashSurplus(Boolean(checked))}
-            />
-            <label
-              htmlFor="encash-surplus"
-              className="cursor-pointer select-none text-muted-foreground"
-            >
-              Optionally encash surplus Earned Leave (EL) beyond the 15-day
-              carry-forward limit instead of lapsing
-            </label>
-          </div>
         </div>
 
         {/* Metric Summary Cards */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <div className="p-3 border rounded-xl bg-card">
             <span className="text-[11px] text-muted-foreground block font-medium">
               Staff Evaluated
@@ -305,14 +277,6 @@ export function LeaveRolloverModal({
             </span>
             <span className="text-xl font-bold text-rose-600">
               {isLoading ? '...' : (summary?.totalDaysLapsed ?? 0)}
-            </span>
-          </div>
-          <div className="p-3 border rounded-xl bg-card">
-            <span className="text-[11px] text-muted-foreground block font-medium">
-              {encashSurplus ? 'Days Encashed' : 'Surplus Encashable'}
-            </span>
-            <span className="text-xl font-bold text-amber-600">
-              {isLoading ? '...' : (summary?.totalDaysEncashed ?? 0)}
             </span>
           </div>
         </div>

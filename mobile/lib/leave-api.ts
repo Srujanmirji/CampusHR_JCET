@@ -81,6 +81,13 @@ export interface LeaveRequestDto {
   restrictedHolidayId?: string | null;
   vacationPeriodId?: string | null;
   coverageRequired?: boolean;
+  operationalCoverageRole?: string | null;
+  operationalCoverageNote?: string | null;
+  policyId?: string | null;
+  policyVersion?: number | null;
+  policySnapshot?: Record<string, unknown> | null;
+  employeeCategory?: string;
+  affectsTimetable?: boolean;
 }
 
 export interface LeaveApplyPayload {
@@ -158,6 +165,13 @@ export const requestSchema = z.object({
   restrictedHolidayId: z.string().nullable().optional(),
   vacationPeriodId: z.string().nullable().optional(),
   coverageRequired: z.boolean().optional(),
+  operationalCoverageRole: z.string().nullable().optional(),
+  operationalCoverageNote: z.string().nullable().optional(),
+  policyId: z.string().nullable().optional(),
+  policyVersion: z.number().nullable().optional(),
+  policySnapshot: z.record(z.string(), z.unknown()).nullable().optional(),
+  employeeCategory: z.string().optional(),
+  affectsTimetable: z.boolean().optional(),
 });
 export const leaveInputSchema = z
   .object({
@@ -179,6 +193,8 @@ export const leaveInputSchema = z
     restrictedHolidayId: z.string().trim().optional(),
     vacationPeriodId: z.string().trim().optional(),
     coverageRequired: z.boolean().optional(),
+    operationalCoverageRole: z.string().trim().optional(),
+    operationalCoverageNote: z.string().trim().optional(),
   })
   .superRefine((value, ctx) => {
     const fail = (message: string) => ctx.addIssue({ code: 'custom', message });

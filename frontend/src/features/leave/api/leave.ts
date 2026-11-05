@@ -92,7 +92,14 @@ export const requestSchema = z.object({
   attachmentUrl: z.string().nullable().optional(),
   restrictedHolidayId: z.string().nullable().optional(),
   vacationPeriodId: z.string().nullable().optional(),
+  policyId: z.string().nullable().optional(),
+  policyVersion: z.number().nullable().optional(),
+  policySnapshot: z.record(z.string(), z.unknown()).nullable().optional(),
+  employeeCategory: z.string().optional(),
+  affectsTimetable: z.boolean().optional(),
   coverageRequired: z.boolean().nullable().optional(),
+  operationalCoverageRole: z.string().nullable().optional(),
+  operationalCoverageNote: z.string().nullable().optional(),
   decisions: z.array(
     z.object({
       step: z.number(),
@@ -122,6 +129,8 @@ export interface LeaveApplyInput {
   restrictedHolidayId?: string;
   vacationPeriodId?: string;
   coverageRequired?: boolean;
+  operationalCoverageRole?: string;
+  operationalCoverageNote?: string;
 }
 
 export interface RequestFilters {
@@ -224,7 +233,6 @@ export interface EmployeeRolloverRecord {
     closingBalance: number | null;
     carriedForward: number;
     lapsed: number;
-    encashed: number;
     nextYearOpening: number | null;
   }>;
 }
@@ -235,14 +243,12 @@ export interface RolloverSummary {
   totalEmployees: number;
   totalDaysCarriedForward: number;
   totalDaysLapsed: number;
-  totalDaysEncashed: number;
   departmentSummaries: Array<{
     departmentCode: string;
     departmentName: string;
     employeeCount: number;
     carriedForward: number;
     lapsed: number;
-    encashed: number;
   }>;
   records: EmployeeRolloverRecord[];
 }
@@ -251,14 +257,12 @@ export interface RolloverQuery {
   year?: number;
   targetYear?: number;
   departmentId?: number;
-  encashSurplusEL?: boolean;
 }
 
 export interface RolloverExecuteInput {
   fromYear: number;
   toYear: number;
   departmentId?: number;
-  encashSurplusEL?: boolean;
   notes?: string;
 }
 
@@ -270,7 +274,6 @@ export async function previewLeaveRollover(
   if (query.targetYear) search.set('targetYear', String(query.targetYear));
   if (query.departmentId)
     search.set('departmentId', String(query.departmentId));
-  if (query.encashSurplusEL) search.set('encashSurplusEL', 'true');
 
   const res = await apiRequest(`/leave/rollover/preview?${search}`);
   return (res as { data: RolloverSummary }).data;

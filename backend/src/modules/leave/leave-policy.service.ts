@@ -17,6 +17,7 @@ import type {
   LeaveBalanceAdjustmentRecord,
   LeavePolicyRecord,
   LeavePolicyRepository,
+  LeavePolicySnapshot,
   OnDutyDutyMappingRecord,
 } from './leave-policy.repository.js';
 import type { LeaveRepository } from './leave.repository.js';
@@ -24,6 +25,48 @@ import type { LeaveRepository } from './leave.repository.js';
 const invalid = (message: string) => new HttpError(400, 'VALIDATION_ERROR', message);
 const forbidden = (message: string) => new HttpError(403, 'FORBIDDEN', message);
 const notFound = (message = 'Resource not found') => new HttpError(404, 'NOT_FOUND', message);
+
+export function toPolicySnapshot(policy: LeavePolicyRecord): LeavePolicySnapshot {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return {
+    policyId: policy.id,
+    version: policy.version ?? 1,
+    code: policy.code,
+    name: policy.name,
+    policyYear: policy.policyYear,
+    employeeCategory: policy.employeeCategory,
+    annualEntitlement: policy.annualEntitlement,
+    carryForwardAllowed: policy.carryForwardAllowed,
+    carryForwardLimit: policy.carryForwardLimit,
+    lapseAtYearEnd: policy.lapseAtYearEnd,
+    halfDayAllowed: policy.halfDayAllowed,
+    minimumNoticeDays: policy.minimumNoticeDays,
+    maximumConsecutiveDays: policy.maximumConsecutiveDays,
+    attachmentRequired: policy.attachmentRequired,
+    attachmentRequiredAfterDays: policy.attachmentRequiredAfterDays,
+    attendanceStatus: policy.attendanceStatus,
+    affectsTimetable: policy.affectsTimetable,
+    requiresAcademicCoverage: policy.requiresAcademicCoverage,
+    requiresOperationalCoverage: policy.requiresOperationalCoverage,
+    reservePendingBalance: policy.reservePendingBalance,
+    approvalPolicyKey: policy.approvalPolicyKey,
+    effectiveFrom: iso(policy.effectiveFrom),
+    effectiveTo: policy.effectiveTo ? iso(policy.effectiveTo) : null,
+  };
+}
+
+function rangesOverlap(
+  fromA: Date,
+  toA: Date | null,
+  fromB: Date,
+  toB: Date | null,
+): boolean {
+  const startA = fromA.getTime();
+  const endA = toA ? toA.getTime() : Number.POSITIVE_INFINITY;
+  const startB = fromB.getTime();
+  const endB = toB ? toB.getTime() : Number.POSITIVE_INFINITY;
+  return startA <= endB && startB <= endA;
+}
 
 export interface ComputedLeaveBalance {
   leaveCode: string;
@@ -47,7 +90,12 @@ export interface ComputedLeaveBalance {
 
 export interface LeavePolicyService {
   listPolicies(access: Access, query: QueryLeavePolicyInput): Promise<LeavePolicyRecord[]>;
-  getApplicablePolicies(access: Access, employeeId?: string, policyYear?: string): Promise<LeavePolicyRecord[]>;
+  getApplicablePolicies(
+    access: Access,
+    employeeId?: string,
+    policyYear?: string,
+    referenceDate?: Date,
+  ): Promise<LeavePolicyRecord[]>;
   getPolicyById(access: Access, id: string): Promise<LeavePolicyRecord>;
   createPolicy(access: Access, input: CreateLeavePolicyInput): Promise<LeavePolicyRecord>;
   updatePolicy(access: Access, id: string, input: UpdateLeavePolicyInput): Promise<LeavePolicyRecord>;
@@ -65,6 +113,19 @@ export interface LeavePolicyService {
     policyYear?: string,
   ): Promise<ComputedLeaveBalance[]>;
   createAdjustment(access: Access, input: CreateLeaveBalanceAdjustmentInput): Promise<LeaveBalanceAdjustmentRecord>;
+  executeRolloverLedger(
+    access: Access,
+    fromYear: number,
+    toYear: number,
+    entries: Array<{
+      employeeId: string;
+      leaveCode: string;
+      policyYear: string;
+      adjustmentType: 'CARRY_FORWARD_CORRECTION' | 'LAPSE';
+      days: number;
+      reason: string;
+    }>,
+  ): Promise<LeaveBalanceAdjustmentRecord[]>;
   listAdjustments(access: Access, query: QueryLeaveBalanceAdjustmentInput): Promise<LeaveBalanceAdjustmentRecord[]>;
   getPolicyGroups(access: Access, category?: StaffCategoryType): Promise<Array<{
     id: string;
@@ -107,6 +168,8 @@ export function createLeavePolicyService(
     }
   }
 
+  const inFlightRollovers = new Set<string>();
+
   return {
     async listPolicies(access: Access, query: QueryLeavePolicyInput) {
       const where: Parameters<typeof policyRepo.findPolicies>[0] = {};
@@ -127,7 +190,12 @@ export function createLeavePolicyService(
       return policyRepo.findPolicies(where);
     },
 
-    async getApplicablePolicies(access: Access, employeeId?: string, policyYear?: string) {
+    async getApplicablePolicies(
+      access: Access,
+      employeeId?: string,
+      policyYear?: string,
+      referenceDate?: Date,
+    ) {
       const targetId = employeeId ?? access.employeeId;
       const employee = await resolveEmployee(targetId);
 
@@ -176,9 +244,17 @@ export function createLeavePolicyService(
         ],
       });
 
+      const dateMatched = referenceDate
+        ? policies.filter(
+            (pol) =>
+              pol.effectiveFrom.getTime() <= referenceDate.getTime() &&
+              (!pol.effectiveTo || pol.effectiveTo.getTime() >= referenceDate.getTime()),
+          )
+        : policies;
+
       // Filter and pick group-specific or department-specific if both exist for same code
       const uniqueByCode = new Map<string, LeavePolicyRecord>();
-      for (const pol of policies) {
+      for (const pol of dateMatched) {
         const existing = uniqueByCode.get(pol.code);
         if (!existing) {
           uniqueByCode.set(pol.code, pol);
@@ -187,6 +263,8 @@ export function createLeavePolicyService(
           uniqueByCode.set(pol.code, pol);
         } else if (pol.departmentId && !existing.departmentId) {
           // Department specific overrides generic
+          uniqueByCode.set(pol.code, pol);
+        } else if ((pol.version ?? 1) > (existing.version ?? 1)) {
           uniqueByCode.set(pol.code, pol);
         }
       }
@@ -204,28 +282,37 @@ export function createLeavePolicyService(
       assertManage(access);
       const input = createLeavePolicySchema.parse(rawInput);
 
-      if (input.effectiveTo && new Date(input.effectiveTo) < new Date(input.effectiveFrom)) {
+      const newFrom = new Date(`${input.effectiveFrom}T00:00:00Z`);
+      const newTo = input.effectiveTo ? new Date(`${input.effectiveTo}T00:00:00Z`) : null;
+
+      if (newTo && newTo < newFrom) {
         throw invalid('effectiveTo date cannot be earlier than effectiveFrom date');
       }
 
-      // Check duplicate
+      // Check duplicate or overlapping effective date range in same scope
       const policies = await policyRepo.findPolicies({
         code: input.code,
         policyYear: input.policyYear,
         employeeCategory: input.employeeCategory,
       });
-      const duplicate = policies.find(
+      const sameScope = policies.filter(
         (p) =>
           (p.departmentId ?? null) === (input.departmentId ?? null) &&
           (p.policyGroupId ?? null) === (input.policyGroupId ?? null),
       );
-      if (duplicate) {
+      const overlapping = sameScope.find(
+        (p) => p.active && rangesOverlap(newFrom, newTo, p.effectiveFrom, p.effectiveTo),
+      );
+      if (overlapping) {
         throw new HttpError(
           409,
           'DUPLICATE_POLICY',
-          `Policy for code ${input.code} already exists for year ${input.policyYear}, category ${input.employeeCategory}${input.policyGroupId ? ` and group ${input.policyGroupId}` : ''}`,
+          `Policy for code ${input.code} already exists or has overlapping effective dates for year ${input.policyYear}, category ${input.employeeCategory}${input.policyGroupId ? ` and group ${input.policyGroupId}` : ''}`,
         );
       }
+
+      const maxVersion = sameScope.reduce((max, p) => Math.max(max, p.version ?? 1), 0);
+      const nextVersion = maxVersion + 1;
 
       return policyRepo.createPolicy({
         code: input.code,
@@ -259,9 +346,10 @@ export function createLeavePolicyService(
         reservePendingBalance: input.reservePendingBalance ?? true,
         approvalPolicyKey: input.approvalPolicyKey ?? 'STANDARD',
         calendarPolicyKey: input.calendarPolicyKey ?? 'INSTITUTION_CALENDAR',
+        version: nextVersion,
         active: input.active ?? true,
-        effectiveFrom: new Date(`${input.effectiveFrom}T00:00:00Z`),
-        effectiveTo: input.effectiveTo ? new Date(`${input.effectiveTo}T00:00:00Z`) : null,
+        effectiveFrom: newFrom,
+        effectiveTo: newTo,
       });
     },
 
@@ -270,13 +358,50 @@ export function createLeavePolicyService(
       const existing = await policyRepo.findPolicyById(id);
       if (!existing) throw notFound('Leave policy not found');
 
-      if (input.effectiveFrom && input.effectiveTo) {
-        if (new Date(input.effectiveTo) < new Date(input.effectiveFrom)) {
-          throw invalid('effectiveTo date cannot be earlier than effectiveFrom date');
+      const nextFrom = input.effectiveFrom
+        ? new Date(`${input.effectiveFrom}T00:00:00Z`)
+        : existing.effectiveFrom;
+      const nextTo =
+        input.effectiveTo !== undefined
+          ? input.effectiveTo
+            ? new Date(`${input.effectiveTo}T00:00:00Z`)
+            : null
+          : existing.effectiveTo;
+
+      if (nextTo && nextTo < nextFrom) {
+        throw invalid('effectiveTo date cannot be earlier than effectiveFrom date');
+      }
+
+      const nextGroupId =
+        input.policyGroupId !== undefined ? input.policyGroupId : existing.policyGroupId;
+      const nextActive = input.active !== undefined ? input.active : existing.active;
+
+      if (nextActive) {
+        const siblings = await policyRepo.findPolicies({
+          code: existing.code,
+          policyYear: existing.policyYear,
+          employeeCategory: existing.employeeCategory,
+        });
+        const overlapping = siblings.find(
+          (p) =>
+            p.id !== id &&
+            p.active &&
+            (p.departmentId ?? null) === (existing.departmentId ?? null) &&
+            (p.policyGroupId ?? null) === (nextGroupId ?? null) &&
+            rangesOverlap(nextFrom, nextTo, p.effectiveFrom, p.effectiveTo),
+        );
+        if (overlapping) {
+          throw new HttpError(
+            409,
+            'DUPLICATE_POLICY',
+            `Updated effective dates overlap with another active policy version for ${existing.code} in ${existing.policyYear}`,
+          );
         }
       }
 
-      const updateData: Parameters<typeof policyRepo.updatePolicy>[1] = {};
+      const updateData: Parameters<typeof policyRepo.updatePolicy>[1] = {
+        version: (existing.version ?? 1) + 1,
+      };
       if (input.name !== undefined) updateData.name = input.name;
       if (input.description !== undefined) updateData.description = input.description;
       if (input.policyGroupId !== undefined) updateData.policyGroupId = input.policyGroupId;
@@ -300,10 +425,8 @@ export function createLeavePolicyService(
       if (input.reservePendingBalance !== undefined) updateData.reservePendingBalance = input.reservePendingBalance;
       if (input.approvalPolicyKey !== undefined) updateData.approvalPolicyKey = input.approvalPolicyKey;
       if (input.active !== undefined) updateData.active = input.active;
-      if (input.effectiveFrom) updateData.effectiveFrom = new Date(`${input.effectiveFrom}T00:00:00Z`);
-      if (input.effectiveTo !== undefined) {
-        updateData.effectiveTo = input.effectiveTo ? new Date(`${input.effectiveTo}T00:00:00Z`) : null;
-      }
+      if (input.effectiveFrom) updateData.effectiveFrom = nextFrom;
+      if (input.effectiveTo !== undefined) updateData.effectiveTo = nextTo;
 
       return policyRepo.updatePolicy(id, updateData);
     },
@@ -360,9 +483,25 @@ export function createLeavePolicyService(
         }
       }
 
+      // Fetch balance adjustments for employee in this year and leaveCode
+      const adjustmentsList = await policyRepo.findAdjustments({
+        employeeId: employee.id,
+        policyYear: year,
+        leaveCode: policy.code,
+      });
+
+      // Check if an authoritative annual rollover carry-forward entry exists for this year
+      const rolloverCarryAdj = adjustmentsList.find(
+        (adj) =>
+          adj.adjustmentType === 'CARRY_FORWARD_CORRECTION' &&
+          (adj.rolloverFromYear !== null || adj.reason.startsWith('[ANNUAL_ROLLOVER_')),
+      );
+
       // Calculate carriedIn from previous years if carryForwardAllowed
       let carriedIn = 0;
-      if (policy.carryForwardAllowed && policy.annualEntitlement !== null) {
+      if (rolloverCarryAdj) {
+        carriedIn = rolloverCarryAdj.days;
+      } else if (policy.carryForwardAllowed && policy.annualEntitlement !== null) {
         const joiningYear = employee.joiningDate.getUTCFullYear();
         const maxCarry = policy.carryForwardLimit;
         for (let y = joiningYear; y < numYear; y++) {
@@ -377,15 +516,17 @@ export function createLeavePolicyService(
         }
       }
 
-      // Fetch balance adjustments for employee in this year and leaveCode
-      const adjustmentsList = await policyRepo.findAdjustments({
-        employeeId: employee.id,
-        policyYear: year,
-        leaveCode: policy.code,
-      });
-
       let adjustments = 0;
       for (const adj of adjustmentsList) {
+        const isRolloverEntry =
+          adj.rolloverFromYear !== null && adj.rolloverFromYear !== undefined
+            ? true
+            : adj.reason.startsWith('[ANNUAL_ROLLOVER_');
+        if (isRolloverEntry) {
+          // Rollover CARRY_FORWARD_CORRECTION is already accounted for in `carriedIn`;
+          // Rollover LAPSE is an audit record of the prior year's uncarried surplus.
+          continue;
+        }
         if (adj.adjustmentType === 'CREDIT' || adj.adjustmentType === 'OPENING_CORRECTION') {
           adjustments += adj.days;
         } else if (adj.adjustmentType === 'DEBIT' || adj.adjustmentType === 'LAPSE') {
@@ -464,11 +605,90 @@ export function createLeavePolicyService(
         policyId: policy?.id ?? null,
         leaveCode: input.leaveCode.toUpperCase(),
         policyYear: input.policyYear,
+        rolloverFromYear: null,
         adjustmentType: input.adjustmentType,
         days: input.days,
         reason: input.reason,
         actorUserId: access.userId,
       });
+    },
+
+    async executeRolloverLedger(
+      access: Access,
+      fromYear: number,
+      toYear: number,
+      entries: Array<{
+        employeeId: string;
+        leaveCode: string;
+        policyYear: string;
+        adjustmentType: 'CARRY_FORWARD_CORRECTION' | 'LAPSE';
+        days: number;
+        reason: string;
+      }>,
+    ) {
+      assertManage(access);
+      const lockKey = `${fromYear}_${toYear}`;
+      if (inFlightRollovers.has(lockKey)) {
+        throw new HttpError(
+          409,
+          'ROLLOVER_ALREADY_EXECUTED',
+          `Annual leave rollover from ${fromYear} to ${toYear} is already in progress or has been executed.`,
+        );
+      }
+      inFlightRollovers.add(lockKey);
+      try {
+        const rolloverTag = `[ANNUAL_ROLLOVER_${fromYear}_${toYear}]`;
+        const existingAdjustments = await policyRepo.findAdjustments({
+          policyYear: String(toYear),
+        });
+        const alreadyExecuted = existingAdjustments.some(
+          (adj) =>
+            adj.rolloverFromYear === fromYear || adj.reason.startsWith(rolloverTag),
+        );
+        if (alreadyExecuted) {
+          throw new HttpError(
+            409,
+            'ROLLOVER_ALREADY_EXECUTED',
+            `Annual leave rollover from ${fromYear} to ${toYear} has already been executed.`,
+          );
+        }
+
+        const prepared: Prisma.LeaveBalanceAdjustmentUncheckedCreateInput[] = [];
+        for (const item of entries) {
+          const employee = await resolveEmployee(item.employeeId);
+          const policy = await policyRepo.findPolicyByCodeAndContext(
+            item.leaveCode,
+            item.policyYear,
+            employee.designation.category,
+            employee.departmentId,
+            employee.policyGroupId,
+          );
+          prepared.push({
+            employeeId: employee.id,
+            leaveTypeId: policy?.leaveTypeId ?? null,
+            policyId: policy?.id ?? null,
+            leaveCode: item.leaveCode.toUpperCase(),
+            policyYear: item.policyYear,
+            rolloverFromYear: fromYear,
+            adjustmentType: item.adjustmentType,
+            days: item.days,
+            reason: item.reason,
+            actorUserId: access.userId,
+          });
+        }
+
+        if (policyRepo.executeRolloverAdjustments) {
+          return await policyRepo.executeRolloverAdjustments(fromYear, toYear, prepared);
+        }
+
+        const results: LeaveBalanceAdjustmentRecord[] = [];
+        for (const data of prepared) {
+          results.push(await policyRepo.createAdjustment(data));
+        }
+        return results;
+      } finally {
+        inFlightRollovers.delete(lockKey);
+      }
     },
 
     async listAdjustments(access: Access, query: QueryLeaveBalanceAdjustmentInput) {

@@ -423,7 +423,7 @@ export async function seedReferenceData(prisma: PrismaClient) {
       attendanceStatus: 'RESTRICTED_HOLIDAY',
       affectsTimetable: false,
       requiresAcademicCoverage: false,
-      requiresOperationalCoverage: true,
+      requiresOperationalCoverage: false,
       approvalPolicyKey: 'NON_TEACHING_STANDARD_LEAVE',
       approvalStatus: 'AWAITING_APPROVAL',
       active: true,
@@ -481,43 +481,51 @@ export async function seedReferenceData(prisma: PrismaClient) {
 
   for (const pol of defaultPolicies) {
     const leaveTypeId = createdLeaveTypes.get(pol.code);
-    await prisma.leavePolicy.upsert({
+    const existingPol = await prisma.leavePolicy.findFirst({
       where: {
-        code_policyYear_employeeCategory_departmentId_policyGroupId: {
-          code: pol.code,
-          policyYear: pol.policyYear,
-          employeeCategory: pol.employeeCategory,
-          departmentId: null as unknown as number,
-          policyGroupId: null as unknown as string,
-        },
-      },
-      update: {
-        name: pol.name,
-        description: pol.description,
-        annualEntitlement: pol.annualEntitlement,
-        carryForwardAllowed: pol.carryForwardAllowed,
-        carryForwardLimit: pol.carryForwardLimit,
-        lapseAtYearEnd: pol.lapseAtYearEnd,
-        halfDayAllowed: pol.halfDayAllowed,
-        minimumNoticeDays: pol.minimumNoticeDays,
-        maximumConsecutiveDays: pol.maximumConsecutiveDays,
-        attachmentRequired: pol.attachmentRequired,
-        attendanceStatus: pol.attendanceStatus,
-        affectsTimetable: pol.affectsTimetable,
-        requiresAcademicCoverage: pol.requiresAcademicCoverage,
-        requiresOperationalCoverage: pol.requiresOperationalCoverage,
-        approvalPolicyKey: pol.approvalPolicyKey,
-        approvalStatus: pol.approvalStatus,
-        active: pol.active,
-        leaveTypeId,
-      },
-      create: {
-        ...pol,
+        code: pol.code,
+        policyYear: pol.policyYear,
+        employeeCategory: pol.employeeCategory,
         departmentId: null,
         policyGroupId: null,
-        leaveTypeId,
+        version: 1,
       },
     });
+    if (existingPol) {
+      await prisma.leavePolicy.update({
+        where: { id: existingPol.id },
+        data: {
+          name: pol.name,
+          description: pol.description,
+          annualEntitlement: pol.annualEntitlement,
+          carryForwardAllowed: pol.carryForwardAllowed,
+          carryForwardLimit: pol.carryForwardLimit,
+          lapseAtYearEnd: pol.lapseAtYearEnd,
+          halfDayAllowed: pol.halfDayAllowed,
+          minimumNoticeDays: pol.minimumNoticeDays,
+          maximumConsecutiveDays: pol.maximumConsecutiveDays,
+          attachmentRequired: pol.attachmentRequired,
+          attendanceStatus: pol.attendanceStatus,
+          affectsTimetable: pol.affectsTimetable,
+          requiresAcademicCoverage: pol.requiresAcademicCoverage,
+          requiresOperationalCoverage: pol.requiresOperationalCoverage,
+          approvalPolicyKey: pol.approvalPolicyKey,
+          approvalStatus: pol.approvalStatus,
+          active: pol.active,
+          leaveTypeId,
+        },
+      });
+    } else {
+      await prisma.leavePolicy.create({
+        data: {
+          ...pol,
+          version: 1,
+          departmentId: null,
+          policyGroupId: null,
+          leaveTypeId,
+        },
+      });
+    }
   }
 
   // Default OOD / ODE mappings

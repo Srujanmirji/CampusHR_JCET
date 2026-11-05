@@ -115,8 +115,8 @@ function createMockLeaveRepo(): LeaveRepository {
     async findTypeConflict() {
       return null;
     },
-    async saveType(_before: any, data: any) {
-      return { id: 1, ...data } as any;
+    async saveType(_before: unknown, data: unknown) {
+      return { id: 1, ...(data as Record<string, unknown>) } as never;
     },
     async user() {
       return null;
@@ -139,13 +139,13 @@ function createMockLeaveRepo(): LeaveRepository {
       return [];
     },
     async find(id: string) {
-      return leaveRequests.find((r) => r.id === id) as any;
+      return (leaveRequests.find((r) => r.id === id) ?? null) as never;
     },
     async submit() {
-      return {} as any;
+      return {} as never;
     },
     async advance() {
-      return {} as any;
+      return {} as never;
     },
     async activeEmployees(deptId?: number) {
       if (deptId) return employees.filter((e) => e.departmentId === deptId);
@@ -194,7 +194,6 @@ test('previewRollover correctly calculates carry-forward, lapsed and next-year o
   const summary = await service.previewRollover(adminAccess, {
     year: 2026,
     targetYear: 2027,
-    encashSurplusEL: false,
   });
 
   assert.equal(summary.fromYear, 2026);
@@ -234,7 +233,6 @@ test('previewRollover restricts HOD scope to own department and forbids Faculty'
   // HOD scope is restricted to department 1 (CSE)
   const hodSummary = await service.previewRollover(hodAccess, {
     year: 2026,
-    encashSurplusEL: false,
   });
   assert.equal(hodSummary.totalEmployees, 1);
   assert.equal(hodSummary.records[0].department.code, 'CSE');
@@ -244,7 +242,6 @@ test('previewRollover restricts HOD scope to own department and forbids Faculty'
     () =>
       service.previewRollover(facultyAccess, {
         year: 2026,
-        encashSurplusEL: false,
       }),
     {
       message:
@@ -260,7 +257,6 @@ test('exportRolloverCsv outputs structured CSV format with valid headers', async
   const csv = await service.exportRolloverCsv(adminAccess, {
     year: 2026,
     targetYear: 2027,
-    encashSurplusEL: false,
   });
 
   assert.ok(
@@ -272,23 +268,22 @@ test('exportRolloverCsv outputs structured CSV format with valid headers', async
 });
 
 test('executeRollover rejects non-admin callers and triggers notifications for admins', async () => {
-  let capturedNotification: any = null;
+  let capturedNotification: { role: string; dept: unknown; data: { kind?: string } } | null = null;
   const mockNotifier = {
-    notifyRole: async (role: string, dept: any, data: any) => {
-      capturedNotification = { role, dept, data };
+    notifyRole: async (role: string, dept: unknown, data: unknown) => {
+      capturedNotification = { role, dept, data: data as { kind?: string } };
     },
     notifyEmployee: async () => {},
-  } as any;
+  };
 
   const repo = createMockLeaveRepo();
-  const service = createLeaveService(repo, mockNotifier);
+  const service = createLeaveService(repo, mockNotifier as never);
 
   await assert.rejects(
     () =>
       service.executeRollover(hodAccess, {
         fromYear: 2026,
         toYear: 2027,
-        encashSurplusEL: false,
       }),
     {
       message:
@@ -299,11 +294,11 @@ test('executeRollover rejects non-admin callers and triggers notifications for a
   const result = await service.executeRollover(adminAccess, {
     fromYear: 2026,
     toYear: 2027,
-    encashSurplusEL: false,
   });
 
   assert.equal(result.success, true);
-  assert.ok(capturedNotification);
-  assert.equal(capturedNotification.role, 'HOD');
-  assert.equal(capturedNotification.data.kind, 'leave.rollover.completed');
+  const notification = capturedNotification as { role: string; dept: unknown; data: { kind?: string } } | null;
+  assert.ok(notification);
+  assert.equal(notification.role, 'HOD');
+  assert.equal(notification.data.kind, 'leave.rollover.completed');
 });

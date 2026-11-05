@@ -44,7 +44,13 @@ export function MyLeave({
     queryFn: () => listRequests({ employeeId }),
     enabled: employeeId !== undefined,
   });
-  const activeTypes = (types.data ?? []).filter((type) => type.active);
+  const activeTypes = (types.data ?? []).filter((type) => {
+    if (!type.active) return false;
+    if (balances.data && balances.data.length > 0) {
+      return balances.data.some((b) => b.leaveType.code === type.code);
+    }
+    return true;
+  });
   const failed = [types, balances, requests].find((query) => query.isError);
 
   if (failed) {

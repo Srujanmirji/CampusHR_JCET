@@ -6,6 +6,9 @@ export const requestSelect = {
   id: true,
   employeeId: true,
   departmentId: true,
+  policyId: true,
+  policyVersion: true,
+  policySnapshot: true,
   startDate: true,
   endDate: true,
   halfDay: true,
@@ -14,10 +17,27 @@ export const requestSelect = {
   status: true,
   approverRoles: true,
   pendingRole: true,
+  dutyType: true,
+  organisation: true,
+  location: true,
+  referenceNumber: true,
+  attachmentName: true,
+  attachmentUrl: true,
+  restrictedHolidayId: true,
+  vacationPeriodId: true,
+  coverageRequired: true,
+  operationalCoverageRole: true,
+  operationalCoverageNote: true,
   createdAt: true,
   updatedAt: true,
   employee: {
-    select: { id: true, employeeCode: true, firstName: true, lastName: true },
+    select: {
+      id: true,
+      employeeCode: true,
+      firstName: true,
+      lastName: true,
+      designation: { select: { category: true } },
+    },
   },
   department: { select: { id: true, code: true, name: true } },
   leaveType: { select: { id: true, code: true, name: true } },
@@ -164,12 +184,12 @@ export function createLeaveRepository(prisma: PrismaClient) {
      */
     submit(
       data: Prisma.LeaveRequestUncheckedCreateInput,
-      check: (taken: TakenRecord[]) => void,
+      check: (taken: TakenRecord[]) => Promise<void> | void,
       audit: Audit,
     ) {
       return prisma.$transaction(
         async (tx) => {
-          check(
+          await check(
             await tx.leaveRequest.findMany({
               where: takenWhere(data.employeeId),
               select: takenSelect,
