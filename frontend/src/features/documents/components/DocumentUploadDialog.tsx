@@ -38,7 +38,7 @@ const SUGGESTED_TYPES: Record<DocumentCategoryKey, string[]> = {
     'JCET Appointment Letter',
     'Previous College Experience Letter',
     'Relieving Letter',
-    'Salary Slip / Bank Proof',
+    'Previous Service / Relieving Certificate',
   ],
   CERTIFICATION: [
     'Faculty Development Program (FDP) Certificate',
@@ -48,7 +48,7 @@ const SUGGESTED_TYPES: Record<DocumentCategoryKey, string[]> = {
   ],
   OTHER: [
     'Medical Fitness Certificate',
-    'Bank Passbook Copy',
+    'Identity / Address Proof Copy',
     'Other Institutional Document',
   ],
 };

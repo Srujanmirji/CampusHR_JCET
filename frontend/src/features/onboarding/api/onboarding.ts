@@ -15,7 +15,7 @@ export interface DocumentsChecklist {
   experienceCertificate: boolean;
   relievingOrder: boolean;
   aadhaarPan: boolean;
-  bankDetails: boolean;
+  addressProof: boolean;
 }
 
 export interface OnboardingCandidate {
@@ -43,12 +43,6 @@ export interface OnboardingCandidate {
   experienceYears: number;
   expectedJoiningDate: string;
   status: CandidateStatus;
-  payScale: string;
-  basicPay: number;
-  agp: number;
-  daPercent: number;
-  hraPercent: number;
-  grossSalary: number;
   probationMonths: number;
   noticePeriodMonths: number;
   documentsChecklist: DocumentsChecklist | null;
@@ -82,12 +76,6 @@ export interface AppointmentLetterData {
   designation: string;
   category: 'TEACHING' | 'NON_TEACHING';
   employmentType: string;
-  payScale: string;
-  basicPay: number;
-  agp: number;
-  daPercent: number;
-  hraPercent: number;
-  grossSalary: number;
   probationMonths: number;
   noticePeriodMonths: number;
   expectedJoiningDate: string;
@@ -151,11 +139,6 @@ export async function createCandidate(payload: {
   specialization?: string;
   experienceYears?: number;
   expectedJoiningDate: string;
-  payScale: string;
-  basicPay: number;
-  agp?: number;
-  daPercent?: number;
-  hraPercent?: number;
   probationMonths?: number;
   noticePeriodMonths?: number;
   notes?: string;
@@ -180,11 +163,6 @@ export async function updateCandidate(
     specialization?: string;
     experienceYears?: number;
     expectedJoiningDate?: string;
-    payScale?: string;
-    basicPay?: number;
-    agp?: number;
-    daPercent?: number;
-    hraPercent?: number;
     probationMonths?: number;
     noticePeriodMonths?: number;
     documentsChecklist?: Partial<DocumentsChecklist>;

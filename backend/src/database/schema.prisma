@@ -937,13 +937,6 @@ model OnboardingCandidate {
   expectedJoiningDate DateTime        @map("expected_joining_date") @db.Date
   status              CandidateStatus @default(OFFER_PENDING)
 
-  // Salary & compensation structure
-  payScale            String          @map("pay_scale")
-  basicPay            Float           @map("basic_pay")
-  agp                 Float           @default(0)
-  daPercent           Float           @default(50) @map("da_percent")
-  hraPercent          Float           @default(18) @map("hra_percent")
-  grossSalary         Float           @map("gross_salary")
   probationMonths     Int             @default(12) @map("probation_months")
   noticePeriodMonths  Int             @default(3) @map("notice_period_months")
 

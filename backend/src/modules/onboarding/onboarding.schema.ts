@@ -20,7 +20,7 @@ export const documentsChecklistSchema = z.object({
   experienceCertificate: z.boolean().default(false),
   relievingOrder: z.boolean().default(false),
   aadhaarPan: z.boolean().default(false),
-  bankDetails: z.boolean().default(false),
+  addressProof: z.boolean().default(false),
 });
 
 export type DocumentsChecklist = z.infer<typeof documentsChecklistSchema>;
@@ -37,11 +37,6 @@ export const createCandidateSchema = z.object({
   specialization: z.string().trim().optional(),
   experienceYears: z.number().int().min(0).default(0),
   expectedJoiningDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
-  payScale: z.string().trim().min(1, 'Pay scale is required'),
-  basicPay: z.number().positive('Basic pay must be positive'),
-  agp: z.number().min(0).default(0),
-  daPercent: z.number().min(0).default(50),
-  hraPercent: z.number().min(0).default(18),
   probationMonths: z.number().int().positive().default(12),
   noticePeriodMonths: z.number().int().positive().default(3),
   notes: z.string().optional(),
@@ -61,11 +56,6 @@ export const updateCandidateSchema = z.object({
   specialization: z.string().trim().optional(),
   experienceYears: z.number().int().min(0).optional(),
   expectedJoiningDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  payScale: z.string().trim().min(1).optional(),
-  basicPay: z.number().positive().optional(),
-  agp: z.number().min(0).optional(),
-  daPercent: z.number().min(0).optional(),
-  hraPercent: z.number().min(0).optional(),
   probationMonths: z.number().int().positive().optional(),
   noticePeriodMonths: z.number().int().positive().optional(),
   documentsChecklist: documentsChecklistSchema.partial().optional(),
