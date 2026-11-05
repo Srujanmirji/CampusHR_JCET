@@ -676,57 +676,133 @@ export function createLeaveService(
       const records: EmployeeRolloverRecord[] = [];
 
       for (const emp of employees) {
-        const empTaken = takenByEmp.get(emp.id) ?? [];
-        const firstYear = emp.joiningDate.getUTCFullYear();
+        let balances: EmployeeRolloverRecord['balances'];
 
-        const balances = types
-          .filter((t) => t.active)
-          .map((type) => {
-            const takenDays = daysByYear(empTaken, type.id);
-            const balFrom = yearBalance(type, takenDays, fromYear, firstYear);
-            const balTo = yearBalance(type, takenDays, toYear, firstYear);
+        if (policyService) {
+          const policiesFrom = await policyService.getApplicablePolicies(
+            access,
+            emp.id,
+            String(fromYear),
+          );
+          const policiesTo = await policyService.getApplicablePolicies(
+            access,
+            emp.id,
+            String(toYear),
+          );
 
-            let closingBalance: number | null = null;
-            let carriedForward = 0;
-            let lapsed = 0;
-            let encashed = 0;
-            let nextYearOpening: number | null = null;
+          balances = await Promise.all(
+            policiesFrom.map(async (polFrom) => {
+              const polTo = policiesTo.find((p) => p.code === polFrom.code);
+              const type = types.find((t) => t.code === polFrom.code);
 
-            if (type.yearlyQuota !== null && type.yearlyQuota !== undefined) {
-              closingBalance = Math.max(
-                0,
-                balFrom.entitled !== null ? balFrom.entitled - balFrom.used : 0,
-              );
-              carriedForward = balTo.carriedIn;
-              const surplus = Math.max(0, closingBalance - carriedForward);
+              let closingBalance: number | null = null;
+              let carriedForward = 0;
+              let lapsed = 0;
+              let encashed = 0;
+              let nextYearOpening: number | null = null;
 
-              if (encashSurplusEL && type.code === 'EL') {
-                encashed = surplus;
-                lapsed = 0;
-              } else {
-                encashed = 0;
-                lapsed = surplus;
+              if (polFrom.annualEntitlement !== null) {
+                const balFrom = await policyService.calculateEmployeeBalance(
+                  access,
+                  emp.id,
+                  polFrom.code,
+                  String(fromYear),
+                );
+
+                closingBalance = Math.max(
+                  0,
+                  balFrom.entitled !== null ? balFrom.entitled - balFrom.used : 0,
+                );
+
+                const carryForwardAllowed = polTo ? polTo.carryForwardAllowed : polFrom.carryForwardAllowed;
+                const carryForwardCap = (polTo ? polTo.carryForwardLimit : polFrom.carryForwardLimit) ?? 0;
+                carriedForward = carryForwardAllowed ? Math.min(carryForwardCap, closingBalance) : 0;
+                const surplus = Math.max(0, closingBalance - carriedForward);
+
+                if (encashSurplusEL && polFrom.code === 'EL') {
+                  encashed = surplus;
+                  lapsed = 0;
+                } else {
+                  encashed = 0;
+                  const lapseAtYearEnd = polTo ? polTo.lapseAtYearEnd : polFrom.lapseAtYearEnd;
+                  lapsed = (lapseAtYearEnd || carryForwardAllowed) ? surplus : 0;
+                }
+
+                const toEntitlement = polTo?.annualEntitlement ?? polFrom.annualEntitlement;
+                nextYearOpening = toEntitlement !== null ? toEntitlement + carriedForward : null;
               }
-              nextYearOpening = balTo.entitled;
-            }
 
-            totalDaysCarriedForward += carriedForward;
-            totalDaysLapsed += lapsed;
-            totalDaysEncashed += encashed;
+              totalDaysCarriedForward += carriedForward;
+              totalDaysLapsed += lapsed;
+              totalDaysEncashed += encashed;
 
-            return {
-              leaveTypeId: type.id,
-              leaveTypeCode: type.code,
-              leaveTypeName: type.name,
-              yearlyQuota: type.yearlyQuota,
-              carryForwardMax: type.carryForwardMax,
-              closingBalance,
-              carriedForward,
-              lapsed,
-              encashed,
-              nextYearOpening,
-            };
-          });
+              return {
+                leaveTypeId: type?.id ?? 0,
+                leaveTypeCode: polFrom.code,
+                leaveTypeName: polFrom.name,
+                yearlyQuota: polFrom.annualEntitlement,
+                carryForwardMax: polFrom.carryForwardLimit ?? 0,
+                closingBalance,
+                carriedForward,
+                lapsed,
+                encashed,
+                nextYearOpening,
+              };
+            }),
+          );
+        } else {
+          const empTaken = takenByEmp.get(emp.id) ?? [];
+          const firstYear = emp.joiningDate.getUTCFullYear();
+
+          balances = types
+            .filter((t) => t.active)
+            .map((type) => {
+              const takenDays = daysByYear(empTaken, type.id);
+              const balFrom = yearBalance(type, takenDays, fromYear, firstYear);
+              const balTo = yearBalance(type, takenDays, toYear, firstYear);
+
+              let closingBalance: number | null = null;
+              let carriedForward = 0;
+              let lapsed = 0;
+              let encashed = 0;
+              let nextYearOpening: number | null = null;
+
+              if (type.yearlyQuota !== null && type.yearlyQuota !== undefined) {
+                closingBalance = Math.max(
+                  0,
+                  balFrom.entitled !== null ? balFrom.entitled - balFrom.used : 0,
+                );
+                carriedForward = balTo.carriedIn;
+                const surplus = Math.max(0, closingBalance - carriedForward);
+
+                if (encashSurplusEL && type.code === 'EL') {
+                  encashed = surplus;
+                  lapsed = 0;
+                } else {
+                  encashed = 0;
+                  lapsed = surplus;
+                }
+                nextYearOpening = balTo.entitled;
+              }
+
+              totalDaysCarriedForward += carriedForward;
+              totalDaysLapsed += lapsed;
+              totalDaysEncashed += encashed;
+
+              return {
+                leaveTypeId: type.id,
+                leaveTypeCode: type.code,
+                leaveTypeName: type.name,
+                yearlyQuota: type.yearlyQuota,
+                carryForwardMax: type.carryForwardMax,
+                closingBalance,
+                carriedForward,
+                lapsed,
+                encashed,
+                nextYearOpening,
+              };
+            });
+        }
 
         const empCarried = balances.reduce(
           (sum, b) => sum + b.carriedForward,
@@ -789,12 +865,57 @@ export function createLeaveService(
         );
       }
 
+      if (policyService) {
+        const rolloverTag = `[ANNUAL_ROLLOVER_${input.fromYear}_${input.toYear}]`;
+        const existingAdjustments = await policyService.listAdjustments(access, {
+          policyYear: String(input.toYear),
+        });
+        const alreadyExecuted = existingAdjustments.some((adj) =>
+          adj.reason.startsWith(rolloverTag),
+        );
+        if (alreadyExecuted) {
+          throw new HttpError(
+            409,
+            'ROLLOVER_ALREADY_EXECUTED',
+            `Annual leave rollover from ${input.fromYear} to ${input.toYear} has already been executed.`,
+          );
+        }
+      }
+
       const summary = await this.previewRollover(access, {
         year: input.fromYear,
         targetYear: input.toYear,
         departmentId: input.departmentId,
         encashSurplusEL: input.encashSurplusEL,
       });
+
+      if (policyService) {
+        const rolloverTag = `[ANNUAL_ROLLOVER_${input.fromYear}_${input.toYear}]`;
+        for (const record of summary.records) {
+          for (const b of record.balances) {
+            if (b.carriedForward > 0) {
+              await policyService.createAdjustment(access, {
+                employeeId: record.employeeId,
+                leaveCode: b.leaveTypeCode,
+                policyYear: String(input.toYear),
+                adjustmentType: 'CARRY_FORWARD_CORRECTION',
+                days: b.carriedForward,
+                reason: `${rolloverTag} Carried forward ${b.carriedForward} days from ${input.fromYear}`,
+              });
+            }
+            if (b.lapsed > 0) {
+              await policyService.createAdjustment(access, {
+                employeeId: record.employeeId,
+                leaveCode: b.leaveTypeCode,
+                policyYear: String(input.toYear),
+                adjustmentType: 'LAPSE',
+                days: b.lapsed,
+                reason: `${rolloverTag} Lapsed ${b.lapsed} unused days from ${input.fromYear}`,
+              });
+            }
+          }
+        }
+      }
 
       if (notifier) {
         await notifier.notifyRole('HOD', null, {

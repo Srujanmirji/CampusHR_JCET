@@ -16,6 +16,9 @@ import {
 import type { LeaveRepository } from '../src/modules/leave/leave.repository.js';
 import type { Access } from '../src/modules/auth/auth.service.js';
 
+const FACULTY_GROUP_ID = randomUUID();
+const STAFF_GROUP_ID = randomUUID();
+
 function createMemoryPolicyRepository(): LeavePolicyRepository {
   const policies: LeavePolicyRecord[] = [];
   const adjustments: LeaveBalanceAdjustmentRecord[] = [];
@@ -40,10 +43,12 @@ function createMemoryPolicyRepository(): LeavePolicyRepository {
       email: 'aarav.patil@jcet.edu',
       departmentId: 1,
       employmentType: 'PERMANENT',
-      joiningDate: new Date('2024-01-01T00:00:00Z'),
+      joiningDate: new Date('2026-01-01T00:00:00Z'),
       status: 'ACTIVE',
       designation: { id: 1, name: 'Assistant Professor', category: 'TEACHING' },
       department: { id: 1, code: 'CSE', name: 'Computer Science & Engineering' },
+      policyGroupId: FACULTY_GROUP_ID,
+      policyGroup: { id: FACULTY_GROUP_ID, name: 'Teaching Faculty - Standard' },
     },
     {
       id: 'emp-non-teaching-1',
@@ -53,10 +58,12 @@ function createMemoryPolicyRepository(): LeavePolicyRepository {
       email: 'ramesh.k@jcet.edu',
       departmentId: 2,
       employmentType: 'PERMANENT',
-      joiningDate: new Date('2024-01-01T00:00:00Z'),
+      joiningDate: new Date('2026-01-01T00:00:00Z'),
       status: 'ACTIVE',
       designation: { id: 2, name: 'Office Superintendent', category: 'NON_TEACHING' },
       department: { id: 2, code: 'ADMIN', name: 'Administration' },
+      policyGroupId: STAFF_GROUP_ID,
+      policyGroup: { id: STAFF_GROUP_ID, name: 'Non-Teaching Staff - Operational & Support' },
     },
   ];
 
@@ -83,7 +90,18 @@ function createMemoryPolicyRepository(): LeavePolicyRepository {
       return policies.find((p) => p.id === id) ?? null;
     },
 
-    async findPolicyByCodeAndContext(code, policyYear, employeeCategory, departmentId) {
+    async findPolicyByCodeAndContext(code, policyYear, employeeCategory, departmentId, policyGroupId) {
+      if (policyGroupId) {
+        const grp = policies.find(
+          (p) =>
+            p.code === code &&
+            p.policyYear === policyYear &&
+            (p.employeeCategory === employeeCategory || p.appliesToAllCategories) &&
+            p.policyGroupId === policyGroupId &&
+            p.active,
+        );
+        if (grp) return grp;
+      }
       if (departmentId) {
         const dept = policies.find(
           (p) =>
@@ -106,6 +124,14 @@ function createMemoryPolicyRepository(): LeavePolicyRepository {
       return generic ?? null;
     },
 
+    async findPolicyGroups(category) {
+      const groups = [
+        { id: FACULTY_GROUP_ID, name: 'Teaching Faculty - Standard', description: null, employeeCategory: 'TEACHING' as const, active: true },
+        { id: STAFF_GROUP_ID, name: 'Non-Teaching Staff - Operational & Support', description: null, employeeCategory: 'NON_TEACHING' as const, active: true },
+      ];
+      return groups.filter((g) => !category || g.employeeCategory === category);
+    },
+
     async createPolicy(data: Prisma.LeavePolicyUncheckedCreateInput) {
       const record: LeavePolicyRecord = {
         id: randomUUID(),
@@ -117,11 +143,12 @@ function createMemoryPolicyRepository(): LeavePolicyRepository {
         appliesToAllCategories: data.appliesToAllCategories ?? false,
         employmentType: data.employmentType ?? null,
         departmentId: data.departmentId ?? null,
+        policyGroupId: data.policyGroupId ?? null,
         leaveTypeId: data.leaveTypeId ?? null,
         annualEntitlement: data.annualEntitlement ?? null,
         entitlementUnit: data.entitlementUnit ?? 'DAYS',
         carryForwardAllowed: data.carryForwardAllowed ?? false,
-        carryForwardLimit: data.carryForwardLimit ?? 0,
+        carryForwardLimit: data.carryForwardLimit ?? null,
         carryForwardExpiryMonths: data.carryForwardExpiryMonths ?? null,
         lapseAtYearEnd: data.lapseAtYearEnd ?? true,
         halfDayAllowed: data.halfDayAllowed ?? false,
@@ -137,6 +164,7 @@ function createMemoryPolicyRepository(): LeavePolicyRepository {
         requiresOperationalCoverage: data.requiresOperationalCoverage ?? false,
         reservePendingBalance: data.reservePendingBalance ?? true,
         approvalPolicyKey: data.approvalPolicyKey ?? 'STANDARD',
+        approvalStatus: (data.approvalStatus as string) ?? 'AWAITING_APPROVAL',
         calendarPolicyKey: data.calendarPolicyKey ?? 'INSTITUTION_CALENDAR',
         active: data.active ?? true,
         effectiveFrom: data.effectiveFrom as Date,
@@ -276,7 +304,23 @@ function createFakeLeaveRepository(): LeaveRepository {
     async saveType() { return dummyTypes[0]; },
     async submit() { return null; },
     async advance() { return null; },
-    async activeEmployees() { return []; },
+    async activeEmployees(departmentId?: number) {
+      const emps = [
+        {
+          id: 'emp-faculty-1',
+          employeeCode: 'JCET-CSE-001',
+          firstName: 'Aarav',
+          lastName: 'Patil',
+          email: 'aarav.patil@jcet.edu',
+          departmentId: 1,
+          employmentType: 'PERMANENT',
+          joiningDate: new Date('2026-01-01T00:00:00Z'),
+          status: 'ACTIVE',
+          department: { id: 1, code: 'CSE', name: 'Computer Science & Engineering' },
+        },
+      ];
+      return emps.filter((e) => !departmentId || e.departmentId === departmentId);
+    },
   };
   return repo as unknown as LeaveRepository;
 }
@@ -677,5 +721,252 @@ test('Carry Forward & Lapse: Confirms EL carries forward up to limit while CL la
   assert.equal(elPolicy.carryForwardAllowed, true);
   assert.equal(elPolicy.carryForwardLimit, 15);
   assert.equal(elPolicy.lapseAtYearEnd, false);
+});
+
+test('EmployeePolicyGroup: Policy group scoping overrides general category policy', async () => {
+  const policyRepo = createMemoryPolicyRepository();
+  const leaveRepo = createFakeLeaveRepository();
+  const service = createLeavePolicyService(policyRepo, leaveRepo);
+
+  // General Non-Teaching CL policy: 12 days
+  await service.createPolicy(hrAccess, {
+    code: 'CL',
+    name: 'Casual Leave (General Non-Teaching)',
+    policyYear: '2026',
+    employeeCategory: 'NON_TEACHING',
+    annualEntitlement: 12,
+    effectiveFrom: '2026-01-01',
+  });
+
+  // Group-specific Non-Teaching CL policy for STAFF_GROUP_ID: 15 days
+  await service.createPolicy(hrAccess, {
+    code: 'CL',
+    name: 'Casual Leave (Operational Staff Group)',
+    policyYear: '2026',
+    employeeCategory: 'NON_TEACHING',
+    policyGroupId: STAFF_GROUP_ID,
+    annualEntitlement: 15,
+    effectiveFrom: '2026-01-01',
+  });
+
+  // Resolve applicable policies for emp-non-teaching-1 (who belongs to STAFF_GROUP_ID)
+  const applicable = await service.getApplicablePolicies(hrAccess, 'emp-non-teaching-1', '2026');
+  const cl = applicable.find((p) => p.code === 'CL');
+  assert.ok(cl);
+  assert.equal(cl.name, 'Casual Leave (Operational Staff Group)');
+  assert.equal(cl.annualEntitlement, 15);
+  assert.equal(cl.policyGroupId, STAFF_GROUP_ID);
+});
+
+test('Policy Versioning & Historical Immutability: Changes in future/current policy do not rewrite past records', async () => {
+  const policyRepo = createMemoryPolicyRepository();
+  const leaveRepo = createFakeLeaveRepository();
+  const service = createLeavePolicyService(policyRepo, leaveRepo);
+
+  // 1. Create 2026 policy: CL = 12 days
+  const pol2026 = await service.createPolicy(hrAccess, {
+    code: 'CL',
+    name: 'Casual Leave 2026',
+    policyYear: '2026',
+    employeeCategory: 'TEACHING',
+    leaveTypeId: 1,
+    annualEntitlement: 12,
+    effectiveFrom: '2026-01-01',
+  });
+
+  // 2. Submit application linked to pol2026
+  const requestRecord = {
+    id: 'req-hist-001',
+    employeeId: 'emp-faculty-1',
+    leaveTypeId: 1,
+    policyId: pol2026.id,
+    leaveCode: 'CL',
+    days: 3,
+    status: 'APPROVED',
+    startDate: new Date('2026-02-01T00:00:00Z'),
+    endDate: new Date('2026-02-03T00:00:00Z'),
+  };
+  (leaveRepo as unknown as { taken: () => Promise<typeof requestRecord[]> }).taken = async () => [requestRecord];
+
+  // 3. Balance in 2026 reflects: Entitled 12, Used 3, Remaining 9
+  const bal2026 = await service.calculateEmployeeBalance(hrAccess, 'emp-faculty-1', 'CL', '2026');
+  assert.equal(bal2026.entitled, 12);
+  assert.equal(bal2026.used, 3);
+  assert.equal(bal2026.remaining, 9);
+  assert.equal(bal2026.policyId, pol2026.id);
+
+  // 4. Create 2027 policy with different entitlement: CL = 14 days
+  const pol2027 = await service.createPolicy(hrAccess, {
+    code: 'CL',
+    name: 'Casual Leave 2027',
+    policyYear: '2027',
+    employeeCategory: 'TEACHING',
+    leaveTypeId: 1,
+    annualEntitlement: 14,
+    effectiveFrom: '2027-01-01',
+  });
+
+  // 5. Update 2026 policy name or rules
+  await service.updatePolicy(hrAccess, pol2026.id, {
+    name: 'Casual Leave 2026 (Revised Description)',
+  });
+
+  // 6. Verify 2026 historical record still points to pol2026 and historical calculation is intact
+  assert.equal(requestRecord.policyId, pol2026.id);
+  const bal2026After = await service.calculateEmployeeBalance(hrAccess, 'emp-faculty-1', 'CL', '2026');
+  assert.equal(bal2026After.entitled, 12);
+  assert.equal(bal2026After.used, 3);
+  assert.equal(bal2026After.remaining, 9);
+
+  // 7. Verify 2027 is distinct
+  const bal2027 = await service.calculateEmployeeBalance(hrAccess, 'emp-faculty-1', 'CL', '2027');
+  assert.equal(bal2027.entitled, 14);
+  assert.equal(bal2027.used, 0);
+  assert.equal(bal2027.policyId, pol2027.id);
+});
+
+test('Annual Rollover Integration: Consumes policy rules, writes balance adjustments, and prevents duplicate execution', async () => {
+  const policyRepo = createMemoryPolicyRepository();
+  const leaveRepo = createFakeLeaveRepository();
+  const policyService = createLeavePolicyService(policyRepo, leaveRepo);
+
+  // Create 2026 and 2027 policies with configurable carry-forward cap (e.g. 8 days, not hardcoded 15)
+  await policyService.createPolicy(hrAccess, {
+    code: 'EL',
+    name: 'Earned Leave 2026',
+    policyYear: '2026',
+    employeeCategory: 'TEACHING',
+    leaveTypeId: 2,
+    annualEntitlement: 10,
+    carryForwardAllowed: true,
+    carryForwardLimit: 8, // Configured cap is 8 days
+    lapseAtYearEnd: false,
+    effectiveFrom: '2026-01-01',
+  });
+
+  await policyService.createPolicy(hrAccess, {
+    code: 'EL',
+    name: 'Earned Leave 2027',
+    policyYear: '2027',
+    employeeCategory: 'TEACHING',
+    leaveTypeId: 2,
+    annualEntitlement: 10,
+    carryForwardAllowed: true,
+    carryForwardLimit: 8,
+    lapseAtYearEnd: false,
+    effectiveFrom: '2027-01-01',
+  });
+
+  // Leave service with policyService
+  const { createLeaveService } = await import('../src/modules/leave/leave.service.js');
+  const leaveService = createLeaveService(
+    leaveRepo,
+    undefined,
+    undefined,
+    policyService,
+  );
+
+  // Employee used 0 days in 2026 out of 10.
+  // With carryForwardLimit = 8, preview should carry forward 8 days and lapse 2 days!
+  const preview = await leaveService.previewRollover(hrAccess, {
+    year: 2026,
+    targetYear: 2027,
+    encashSurplusEL: false,
+  });
+
+  const facultyRecord = preview.records.find((r) => r.employeeId === 'emp-faculty-1');
+  assert.ok(facultyRecord);
+  const elBal = facultyRecord.balances.find((b) => b.leaveTypeCode === 'EL');
+  assert.ok(elBal);
+  assert.equal(elBal.carriedForward, 8); // Respects configured 8d cap, NOT hardcoded 15!
+  assert.equal(elBal.lapsed, 2);
+
+  // Execute rollover
+  const result = await leaveService.executeRollover(hrAccess, {
+    fromYear: 2026,
+    toYear: 2027,
+    encashSurplusEL: false,
+  });
+  assert.equal(result.success, true);
+
+  // Verify traceable balance adjustments were written to the ledger
+  const adjustments = await policyService.listAdjustments(hrAccess, {
+    policyYear: '2027',
+  });
+  const cfAdj = adjustments.find(
+    (a) => a.employeeId === 'emp-faculty-1' && a.adjustmentType === 'CARRY_FORWARD_CORRECTION',
+  );
+  assert.ok(cfAdj);
+  assert.equal(cfAdj.days, 8);
+  assert.ok(cfAdj.reason.includes('[ANNUAL_ROLLOVER_2026_2027]'));
+  assert.equal(cfAdj.actorUserId, hrAccess.userId);
+
+  // Verify idempotency: executing rollover a second time fails with 409 conflict
+  await assert.rejects(
+    leaveService.executeRollover(hrAccess, {
+      fromYear: 2026,
+      toYear: 2027,
+      encashSurplusEL: false,
+    }),
+    (err: unknown) => (err as { status?: number }).status === 409,
+  );
+});
+
+test('Balance Ledger: Pending cancellation and rejection releases reserved days without double deduction', async () => {
+  const policyRepo = createMemoryPolicyRepository();
+  const leaveRepo = createFakeLeaveRepository();
+  const policyService = createLeavePolicyService(policyRepo, leaveRepo);
+
+  await policyService.createPolicy(hrAccess, {
+    code: 'CL',
+    name: 'Casual Leave',
+    policyYear: '2026',
+    employeeCategory: 'TEACHING',
+    leaveTypeId: 1,
+    annualEntitlement: 12,
+    reservePendingBalance: true,
+    effectiveFrom: '2026-01-01',
+  });
+
+  // 1. Initial balance: 12 remaining
+  let bal = await policyService.calculateEmployeeBalance(hrAccess, 'emp-faculty-1', 'CL', '2026');
+  assert.equal(bal.remaining, 12);
+
+  // 2. Add PENDING request of 2 days
+  const pendingReq = {
+    id: 'req-pending-1',
+    employeeId: 'emp-faculty-1',
+    leaveTypeId: 1,
+    startDate: new Date('2026-03-01T00:00:00Z'),
+    endDate: new Date('2026-03-02T00:00:00Z'),
+    days: 2,
+    status: 'PENDING',
+  };
+  (leaveRepo as unknown as { taken: () => Promise<typeof pendingReq[]> }).taken = async () => [pendingReq];
+
+  bal = await policyService.calculateEmployeeBalance(hrAccess, 'emp-faculty-1', 'CL', '2026');
+  assert.equal(bal.pending, 2);
+  assert.equal(bal.remaining, 10); // 12 - 2 = 10
+
+  // 3. Reject or Cancel the request -> status changed to REJECTED
+  pendingReq.status = 'REJECTED';
+  bal = await policyService.calculateEmployeeBalance(hrAccess, 'emp-faculty-1', 'CL', '2026');
+  assert.equal(bal.pending, 0);
+  assert.equal(bal.used, 0);
+  assert.equal(bal.remaining, 12); // Released completely back to 12
+
+  // 4. Manual adjustments: require HR/Admin permissions and valid reason
+  await policyService.createAdjustment(hrAccess, {
+    employeeId: 'emp-faculty-1',
+    leaveCode: 'CL',
+    policyYear: '2026',
+    adjustmentType: 'CREDIT',
+    days: 3,
+    reason: 'Compensatory leave credit for weekend institutional event duty',
+  });
+
+  bal = await policyService.calculateEmployeeBalance(hrAccess, 'emp-faculty-1', 'CL', '2026');
+  assert.equal(bal.adjustments, 3);
+  assert.equal(bal.remaining, 15); // 12 + 3 = 15
 });
 

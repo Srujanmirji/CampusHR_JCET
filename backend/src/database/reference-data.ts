@@ -142,17 +142,60 @@ export async function seedReferenceData(prisma: PrismaClient) {
   }
 
   // Baseline Leave Policies for 2026 (both Teaching and Non-Teaching)
+  const facultyGroup = await prisma.employeePolicyGroup.upsert({
+    where: { name: 'Teaching Faculty - Standard' },
+    update: {
+      description: 'Standard academic workforce policy group for Teaching Faculty at JCET.',
+      employeeCategory: 'TEACHING',
+      active: true,
+    },
+    create: {
+      name: 'Teaching Faculty - Standard',
+      description: 'Standard academic workforce policy group for Teaching Faculty at JCET.',
+      employeeCategory: 'TEACHING',
+      active: true,
+    },
+  });
+
+  const staffGroup = await prisma.employeePolicyGroup.upsert({
+    where: { name: 'Non-Teaching Staff - Operational & Support' },
+    update: {
+      description: 'Standard operational workforce policy group for Non-Teaching Staff at JCET.',
+      employeeCategory: 'NON_TEACHING',
+      active: true,
+    },
+    create: {
+      name: 'Non-Teaching Staff - Operational & Support',
+      description: 'Standard operational workforce policy group for Non-Teaching Staff at JCET.',
+      employeeCategory: 'NON_TEACHING',
+      active: true,
+    },
+  });
+
+  // Assign existing employees without policyGroupId to their respective default group
+  const allEmps = await prisma.employee.findMany({
+    where: { policyGroupId: null },
+    include: { designation: { select: { category: true } } },
+  });
+  for (const emp of allEmps) {
+    const groupId = emp.designation.category === 'TEACHING' ? facultyGroup.id : staffGroup.id;
+    await prisma.employee.update({
+      where: { id: emp.id },
+      data: { policyGroupId: groupId },
+    });
+  }
+
   const defaultPolicies = [
-    // Casual Leave (CL) - 12 days confirmed
+    // Casual Leave (CL) - 12 days initial supplied
     {
       code: 'CL',
       name: 'Casual Leave (Teaching Faculty)',
-      description: 'Casual Leave for teaching faculty: 12 days per calendar year. Half-day allowed. Requires academic coverage.',
+      description: 'Casual Leave for teaching faculty: 12 days baseline. Half-day and break rules subject to institutional confirmation.',
       policyYear: '2026',
       employeeCategory: 'TEACHING' as const,
       annualEntitlement: 12,
       carryForwardAllowed: false,
-      carryForwardLimit: 0,
+      carryForwardLimit: null,
       lapseAtYearEnd: true,
       halfDayAllowed: true,
       minimumNoticeDays: 1,
@@ -163,18 +206,19 @@ export async function seedReferenceData(prisma: PrismaClient) {
       requiresAcademicCoverage: true,
       requiresOperationalCoverage: false,
       approvalPolicyKey: 'FACULTY_STANDARD_LEAVE',
+      approvalStatus: 'AWAITING_APPROVAL',
       active: true,
       effectiveFrom: new Date('2026-01-01T00:00:00Z'),
     },
     {
       code: 'CL',
       name: 'Casual Leave (Non-Teaching Staff)',
-      description: 'Casual Leave for non-teaching staff: 12 days per calendar year. Half-day allowed. Requires operational coverage.',
+      description: 'Casual Leave for non-teaching staff: 12 days baseline. Half-day rules subject to institutional confirmation.',
       policyYear: '2026',
       employeeCategory: 'NON_TEACHING' as const,
       annualEntitlement: 12,
       carryForwardAllowed: false,
-      carryForwardLimit: 0,
+      carryForwardLimit: null,
       lapseAtYearEnd: true,
       halfDayAllowed: true,
       minimumNoticeDays: 1,
@@ -185,20 +229,21 @@ export async function seedReferenceData(prisma: PrismaClient) {
       requiresAcademicCoverage: false,
       requiresOperationalCoverage: true,
       approvalPolicyKey: 'NON_TEACHING_STANDARD_LEAVE',
+      approvalStatus: 'AWAITING_APPROVAL',
       active: true,
       effectiveFrom: new Date('2026-01-01T00:00:00Z'),
     },
 
-    // Earned Leave (EL) - 10 days confirmed
+    // Earned Leave (EL) - 10 days initial supplied (carry-forward cap unconfirmed)
     {
       code: 'EL',
       name: 'Earned Leave (Teaching Faculty)',
-      description: 'Earned Leave for teaching faculty: 10 days per year, carry forward up to 15 days.',
+      description: 'Earned Leave for teaching faculty: 10 days baseline. Carry forward cap awaiting institutional approval.',
       policyYear: '2026',
       employeeCategory: 'TEACHING' as const,
       annualEntitlement: 10,
       carryForwardAllowed: true,
-      carryForwardLimit: 15,
+      carryForwardLimit: null,
       lapseAtYearEnd: false,
       halfDayAllowed: false,
       minimumNoticeDays: 7,
@@ -209,18 +254,19 @@ export async function seedReferenceData(prisma: PrismaClient) {
       requiresAcademicCoverage: true,
       requiresOperationalCoverage: false,
       approvalPolicyKey: 'FACULTY_STANDARD_LEAVE',
+      approvalStatus: 'AWAITING_APPROVAL',
       active: true,
       effectiveFrom: new Date('2026-01-01T00:00:00Z'),
     },
     {
       code: 'EL',
       name: 'Earned Leave (Non-Teaching Staff)',
-      description: 'Earned Leave for non-teaching staff: 10 days per year, carry forward up to 15 days.',
+      description: 'Earned Leave for non-teaching staff: 10 days baseline. Carry forward cap awaiting institutional approval.',
       policyYear: '2026',
       employeeCategory: 'NON_TEACHING' as const,
       annualEntitlement: 10,
       carryForwardAllowed: true,
-      carryForwardLimit: 15,
+      carryForwardLimit: null,
       lapseAtYearEnd: false,
       halfDayAllowed: false,
       minimumNoticeDays: 7,
@@ -231,6 +277,7 @@ export async function seedReferenceData(prisma: PrismaClient) {
       requiresAcademicCoverage: false,
       requiresOperationalCoverage: true,
       approvalPolicyKey: 'NON_TEACHING_STANDARD_LEAVE',
+      approvalStatus: 'AWAITING_APPROVAL',
       active: true,
       effectiveFrom: new Date('2026-01-01T00:00:00Z'),
     },
@@ -239,49 +286,53 @@ export async function seedReferenceData(prisma: PrismaClient) {
     {
       code: 'SPL_ML',
       name: 'Special / Medical Leave (Teaching Faculty)',
-      description: 'Special Leave / Medical Leave for faculty. Medical certificate required for medical exigencies.',
+      description: 'Special Leave / Medical Leave for faculty. Medical certificate requirement subject to institutional confirmation.',
       policyYear: '2026',
       employeeCategory: 'TEACHING' as const,
       annualEntitlement: null,
       carryForwardAllowed: false,
-      carryForwardLimit: 0,
+      carryForwardLimit: null,
       lapseAtYearEnd: true,
       halfDayAllowed: false,
       minimumNoticeDays: 0,
       maximumConsecutiveDays: 30,
       attachmentRequired: true,
+      attachmentRequiredAfterDays: null,
       attendanceStatus: 'ON_LEAVE',
       affectsTimetable: true,
       requiresAcademicCoverage: true,
       requiresOperationalCoverage: false,
       approvalPolicyKey: 'MEDICAL_LEAVE',
+      approvalStatus: 'AWAITING_APPROVAL',
       active: true,
       effectiveFrom: new Date('2026-01-01T00:00:00Z'),
     },
     {
       code: 'SPL_ML',
       name: 'Special / Medical Leave (Non-Teaching Staff)',
-      description: 'Special Leave / Medical Leave for non-teaching staff. Medical certificate required.',
+      description: 'Special Leave / Medical Leave for non-teaching staff. Medical certificate requirement subject to institutional confirmation.',
       policyYear: '2026',
       employeeCategory: 'NON_TEACHING' as const,
       annualEntitlement: null,
       carryForwardAllowed: false,
-      carryForwardLimit: 0,
+      carryForwardLimit: null,
       lapseAtYearEnd: true,
       halfDayAllowed: false,
       minimumNoticeDays: 0,
       maximumConsecutiveDays: 30,
       attachmentRequired: true,
+      attachmentRequiredAfterDays: null,
       attendanceStatus: 'ON_LEAVE',
       affectsTimetable: false,
       requiresAcademicCoverage: false,
       requiresOperationalCoverage: true,
       approvalPolicyKey: 'MEDICAL_LEAVE',
+      approvalStatus: 'AWAITING_APPROVAL',
       active: true,
       effectiveFrom: new Date('2026-01-01T00:00:00Z'),
     },
 
-    // On Official Duty (OOD) - 12 days confirmed
+    // On Official Duty (OOD) - 12 days initial supplied
     {
       code: 'OOD',
       name: 'On Official Duty',
@@ -290,7 +341,7 @@ export async function seedReferenceData(prisma: PrismaClient) {
       employeeCategory: 'TEACHING' as const,
       annualEntitlement: 12,
       carryForwardAllowed: false,
-      carryForwardLimit: 0,
+      carryForwardLimit: null,
       lapseAtYearEnd: true,
       halfDayAllowed: true,
       minimumNoticeDays: 2,
@@ -301,11 +352,12 @@ export async function seedReferenceData(prisma: PrismaClient) {
       requiresAcademicCoverage: true,
       requiresOperationalCoverage: false,
       approvalPolicyKey: 'OFFICIAL_DUTY',
+      approvalStatus: 'AWAITING_APPROVAL',
       active: true,
       effectiveFrom: new Date('2026-01-01T00:00:00Z'),
     },
 
-    // Official / Examination Duty (ODE) - 12 days confirmed
+    // Official / Examination Duty (ODE) - 12 days initial supplied
     {
       code: 'ODE',
       name: 'Official / Examination Duty',
@@ -314,7 +366,7 @@ export async function seedReferenceData(prisma: PrismaClient) {
       employeeCategory: 'TEACHING' as const,
       annualEntitlement: 12,
       carryForwardAllowed: false,
-      carryForwardLimit: 0,
+      carryForwardLimit: null,
       lapseAtYearEnd: true,
       halfDayAllowed: true,
       minimumNoticeDays: 2,
@@ -325,6 +377,7 @@ export async function seedReferenceData(prisma: PrismaClient) {
       requiresAcademicCoverage: true,
       requiresOperationalCoverage: false,
       approvalPolicyKey: 'OFFICIAL_DUTY',
+      approvalStatus: 'AWAITING_APPROVAL',
       active: true,
       effectiveFrom: new Date('2026-01-01T00:00:00Z'),
     },
@@ -338,7 +391,7 @@ export async function seedReferenceData(prisma: PrismaClient) {
       employeeCategory: 'TEACHING' as const,
       annualEntitlement: null,
       carryForwardAllowed: false,
-      carryForwardLimit: 0,
+      carryForwardLimit: null,
       lapseAtYearEnd: true,
       halfDayAllowed: false,
       minimumNoticeDays: 3,
@@ -349,6 +402,7 @@ export async function seedReferenceData(prisma: PrismaClient) {
       requiresAcademicCoverage: true,
       requiresOperationalCoverage: false,
       approvalPolicyKey: 'FACULTY_STANDARD_LEAVE',
+      approvalStatus: 'AWAITING_APPROVAL',
       active: true,
       effectiveFrom: new Date('2026-01-01T00:00:00Z'),
     },
@@ -360,7 +414,7 @@ export async function seedReferenceData(prisma: PrismaClient) {
       employeeCategory: 'NON_TEACHING' as const,
       annualEntitlement: null,
       carryForwardAllowed: false,
-      carryForwardLimit: 0,
+      carryForwardLimit: null,
       lapseAtYearEnd: true,
       halfDayAllowed: false,
       minimumNoticeDays: 3,
@@ -371,6 +425,7 @@ export async function seedReferenceData(prisma: PrismaClient) {
       requiresAcademicCoverage: false,
       requiresOperationalCoverage: true,
       approvalPolicyKey: 'NON_TEACHING_STANDARD_LEAVE',
+      approvalStatus: 'AWAITING_APPROVAL',
       active: true,
       effectiveFrom: new Date('2026-01-01T00:00:00Z'),
     },
@@ -384,7 +439,7 @@ export async function seedReferenceData(prisma: PrismaClient) {
       employeeCategory: 'TEACHING' as const,
       annualEntitlement: null,
       carryForwardAllowed: false,
-      carryForwardLimit: 0,
+      carryForwardLimit: null,
       lapseAtYearEnd: true,
       halfDayAllowed: false,
       minimumNoticeDays: 7,
@@ -395,6 +450,7 @@ export async function seedReferenceData(prisma: PrismaClient) {
       requiresAcademicCoverage: true,
       requiresOperationalCoverage: false,
       approvalPolicyKey: 'VACATION_LEAVE',
+      approvalStatus: 'AWAITING_APPROVAL',
       active: true,
       effectiveFrom: new Date('2026-01-01T00:00:00Z'),
     },
@@ -406,7 +462,7 @@ export async function seedReferenceData(prisma: PrismaClient) {
       employeeCategory: 'NON_TEACHING' as const,
       annualEntitlement: null,
       carryForwardAllowed: false,
-      carryForwardLimit: 0,
+      carryForwardLimit: null,
       lapseAtYearEnd: true,
       halfDayAllowed: false,
       minimumNoticeDays: 7,
@@ -417,6 +473,7 @@ export async function seedReferenceData(prisma: PrismaClient) {
       requiresAcademicCoverage: false,
       requiresOperationalCoverage: false,
       approvalPolicyKey: 'NON_TEACHING_STANDARD_LEAVE',
+      approvalStatus: 'AWAITING_APPROVAL',
       active: false,
       effectiveFrom: new Date('2026-01-01T00:00:00Z'),
     },
@@ -426,11 +483,12 @@ export async function seedReferenceData(prisma: PrismaClient) {
     const leaveTypeId = createdLeaveTypes.get(pol.code);
     await prisma.leavePolicy.upsert({
       where: {
-        code_policyYear_employeeCategory_departmentId: {
+        code_policyYear_employeeCategory_departmentId_policyGroupId: {
           code: pol.code,
           policyYear: pol.policyYear,
           employeeCategory: pol.employeeCategory,
           departmentId: null as unknown as number,
+          policyGroupId: null as unknown as string,
         },
       },
       update: {
@@ -449,12 +507,14 @@ export async function seedReferenceData(prisma: PrismaClient) {
         requiresAcademicCoverage: pol.requiresAcademicCoverage,
         requiresOperationalCoverage: pol.requiresOperationalCoverage,
         approvalPolicyKey: pol.approvalPolicyKey,
+        approvalStatus: pol.approvalStatus,
         active: pol.active,
         leaveTypeId,
       },
       create: {
         ...pol,
         departmentId: null,
+        policyGroupId: null,
         leaveTypeId,
       },
     });

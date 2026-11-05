@@ -8,6 +8,10 @@ CREATE TYPE "leave_adjustment_type" AS ENUM (
 );
 
 -- AlterTable
+ALTER TABLE "employees"
+ADD COLUMN "policy_group_id" UUID;
+
+-- AlterTable
 ALTER TABLE "leave_requests"
 ADD COLUMN "policy_id" UUID,
 ADD COLUMN "duty_type" TEXT,
@@ -33,11 +37,12 @@ CREATE TABLE "leave_policies" (
     "applies_to_all_categories" BOOLEAN NOT NULL DEFAULT false,
     "employment_type" "employment_type",
     "department_id" INTEGER,
+    "policy_group_id" UUID,
     "leave_type_id" INTEGER,
     "annual_entitlement" DOUBLE PRECISION,
     "entitlement_unit" TEXT NOT NULL DEFAULT 'DAYS',
     "carry_forward_allowed" BOOLEAN NOT NULL DEFAULT false,
-    "carry_forward_limit" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "carry_forward_limit" DOUBLE PRECISION,
     "carry_forward_expiry_months" INTEGER,
     "lapse_at_year_end" BOOLEAN NOT NULL DEFAULT true,
     "half_day_allowed" BOOLEAN NOT NULL DEFAULT false,
@@ -53,6 +58,7 @@ CREATE TABLE "leave_policies" (
     "requires_operational_coverage" BOOLEAN NOT NULL DEFAULT false,
     "reserve_pending_balance" BOOLEAN NOT NULL DEFAULT true,
     "approval_policy_key" TEXT DEFAULT 'STANDARD',
+    "approval_status" TEXT NOT NULL DEFAULT 'AWAITING_APPROVAL',
     "calendar_policy_key" TEXT DEFAULT 'INSTITUTION_CALENDAR',
     "active" BOOLEAN NOT NULL DEFAULT true,
     "effective_from" DATE NOT NULL,
@@ -124,13 +130,19 @@ CREATE INDEX "leave_policies_employee_category_idx" ON "leave_policies"("employe
 CREATE INDEX "leave_policies_active_idx" ON "leave_policies"("active");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "leave_policies_code_policy_year_employee_category_department__key" ON "leave_policies"("code", "policy_year", "employee_category", "department_id");
+CREATE UNIQUE INDEX "leave_policies_code_policy_year_employee_category_department__key" ON "leave_policies"("code", "policy_year", "employee_category", "department_id", "policy_group_id");
 
 -- CreateIndex
 CREATE INDEX "leave_balance_adjustments_employee_id_policy_year_idx" ON "leave_balance_adjustments"("employee_id", "policy_year");
 
 -- CreateIndex
 CREATE INDEX "leave_balance_adjustments_leave_code_idx" ON "leave_balance_adjustments"("leave_code");
+
+-- AddForeignKey
+ALTER TABLE "employees" ADD CONSTRAINT "employees_policy_group_id_fkey" FOREIGN KEY ("policy_group_id") REFERENCES "employee_policy_groups"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "leave_policies" ADD CONSTRAINT "leave_policies_policy_group_id_fkey" FOREIGN KEY ("policy_group_id") REFERENCES "employee_policy_groups"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "leave_requests" ADD CONSTRAINT "leave_requests_policy_id_fkey" FOREIGN KEY ("policy_id") REFERENCES "leave_policies"("id") ON DELETE SET NULL ON UPDATE CASCADE;

@@ -273,7 +273,18 @@ function LeaveRecords({
     }
   }
 
-  const activeTypes = (types.data ?? []).filter((type) => type.active);
+  const applicableCodes =
+    balances.data && balances.data.length > 0
+      ? new Set(balances.data.map((b) => b.leaveType.code))
+      : null;
+
+  const activeTypes = (types.data ?? []).filter((type) => {
+    if (!type.active) return false;
+    if (applicableCodes) {
+      return applicableCodes.has(type.code);
+    }
+    return true;
+  });
   const records = tab === 'approvals' && approvals ? queue : mine;
   const personal = tab !== 'approvals' || !approvals;
   const visibleRecords = (records.data ?? []).filter((request) => {

@@ -1,7 +1,7 @@
 import { passwordIsValid, passwordProblem } from '@campushr/password-policy';
 import { PasswordRequirements } from './PasswordRequirements';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, StyleSheet, Switch, Text, View } from 'react-native';
+import { AppState, Switch, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { ApiError, changeOwnPassword } from '../../lib/session';
 import { theme } from '../../lib/theme';

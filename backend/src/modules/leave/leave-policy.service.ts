@@ -1,4 +1,5 @@
 import { HttpError } from '../../common/http-error.js';
+import type { Prisma } from '../../generated/prisma/client.js';
 import type { Access } from '../auth/auth.service.js';
 import type { AcademicCalendarService } from '../academic-calendar/academic-calendar.service.js';
 import {
@@ -65,6 +66,13 @@ export interface LeavePolicyService {
   ): Promise<ComputedLeaveBalance[]>;
   createAdjustment(access: Access, input: CreateLeaveBalanceAdjustmentInput): Promise<LeaveBalanceAdjustmentRecord>;
   listAdjustments(access: Access, query: QueryLeaveBalanceAdjustmentInput): Promise<LeaveBalanceAdjustmentRecord[]>;
+  getPolicyGroups(access: Access, category?: StaffCategoryType): Promise<Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    employeeCategory: StaffCategoryType;
+    active: boolean;
+  }>>;
   getDutyMappings(access: Access): Promise<OnDutyDutyMappingRecord[]>;
   updateDutyMapping(access: Access, input: UpdateOnDutyDutyMappingInput): Promise<OnDutyDutyMappingRecord>;
   resolveDutyLeaveCode(dutyCategory: string): Promise<'ODE' | 'OOD'>;
@@ -155,18 +163,27 @@ export function createLeavePolicyService(
           },
           {
             OR: [
-              { employmentType: employee.employmentType as string | null },
+              { employmentType: employee.employmentType as unknown as Prisma.LeavePolicyWhereInput['employmentType'] },
               { employmentType: null },
+            ],
+          },
+          {
+            OR: [
+              { policyGroupId: employee.policyGroupId },
+              { policyGroupId: null },
             ],
           },
         ],
       });
 
-      // Filter and pick department-specific if both exist for same code
+      // Filter and pick group-specific or department-specific if both exist for same code
       const uniqueByCode = new Map<string, LeavePolicyRecord>();
       for (const pol of policies) {
         const existing = uniqueByCode.get(pol.code);
         if (!existing) {
+          uniqueByCode.set(pol.code, pol);
+        } else if (pol.policyGroupId && !existing.policyGroupId) {
+          // Group-specific overrides general policy
           uniqueByCode.set(pol.code, pol);
         } else if (pol.departmentId && !existing.departmentId) {
           // Department specific overrides generic
@@ -192,17 +209,21 @@ export function createLeavePolicyService(
       }
 
       // Check duplicate
-      const existing = await policyRepo.findPolicyByCodeAndContext(
-        input.code,
-        input.policyYear,
-        input.employeeCategory,
-        input.departmentId,
+      const policies = await policyRepo.findPolicies({
+        code: input.code,
+        policyYear: input.policyYear,
+        employeeCategory: input.employeeCategory,
+      });
+      const duplicate = policies.find(
+        (p) =>
+          (p.departmentId ?? null) === (input.departmentId ?? null) &&
+          (p.policyGroupId ?? null) === (input.policyGroupId ?? null),
       );
-      if (existing && existing.departmentId === (input.departmentId ?? null)) {
+      if (duplicate) {
         throw new HttpError(
           409,
           'DUPLICATE_POLICY',
-          `Policy for code ${input.code} already exists for year ${input.policyYear} and category ${input.employeeCategory}`,
+          `Policy for code ${input.code} already exists for year ${input.policyYear}, category ${input.employeeCategory}${input.policyGroupId ? ` and group ${input.policyGroupId}` : ''}`,
         );
       }
 
@@ -215,11 +236,13 @@ export function createLeavePolicyService(
         appliesToAllCategories: input.appliesToAllCategories ?? false,
         employmentType: input.employmentType ?? null,
         departmentId: input.departmentId ?? null,
+        policyGroupId: input.policyGroupId ?? null,
+        approvalStatus: input.approvalStatus ?? 'AWAITING_APPROVAL',
         leaveTypeId: input.leaveTypeId ?? null,
         annualEntitlement: input.annualEntitlement ?? null,
         entitlementUnit: input.entitlementUnit ?? 'DAYS',
         carryForwardAllowed: input.carryForwardAllowed ?? false,
-        carryForwardLimit: input.carryForwardLimit ?? 0,
+        carryForwardLimit: input.carryForwardLimit ?? null,
         carryForwardExpiryMonths: input.carryForwardExpiryMonths ?? null,
         lapseAtYearEnd: input.lapseAtYearEnd ?? true,
         halfDayAllowed: input.halfDayAllowed ?? false,
@@ -256,6 +279,8 @@ export function createLeavePolicyService(
       const updateData: Parameters<typeof policyRepo.updatePolicy>[1] = {};
       if (input.name !== undefined) updateData.name = input.name;
       if (input.description !== undefined) updateData.description = input.description;
+      if (input.policyGroupId !== undefined) updateData.policyGroupId = input.policyGroupId;
+      if (input.approvalStatus !== undefined) updateData.approvalStatus = input.approvalStatus;
       if (input.annualEntitlement !== undefined) updateData.annualEntitlement = input.annualEntitlement;
       if (input.carryForwardAllowed !== undefined) updateData.carryForwardAllowed = input.carryForwardAllowed;
       if (input.carryForwardLimit !== undefined) updateData.carryForwardLimit = input.carryForwardLimit;
@@ -310,6 +335,7 @@ export function createLeavePolicyService(
         year,
         employee.designation.category,
         employee.departmentId,
+        employee.policyGroupId,
       );
 
       if (!policy) {
@@ -347,7 +373,7 @@ export function createLeavePolicyService(
             }
           }
           const left = policy.annualEntitlement + carriedIn - prevUsed;
-          carriedIn = Math.min(maxCarry, Math.max(0, left));
+          carriedIn = maxCarry !== null ? Math.min(maxCarry, Math.max(0, left)) : Math.max(0, left);
         }
       }
 
@@ -429,6 +455,7 @@ export function createLeavePolicyService(
         input.policyYear,
         employee.designation.category,
         employee.departmentId,
+        employee.policyGroupId,
       );
 
       return policyRepo.createAdjustment({
@@ -455,6 +482,11 @@ export function createLeavePolicyService(
       }
 
       return policyRepo.findAdjustments(where);
+    },
+
+    async getPolicyGroups(_access: Access, category?: StaffCategoryType) {
+      void _access;
+      return policyRepo.findPolicyGroups(category);
     },
 
     async getDutyMappings(_access: Access) {

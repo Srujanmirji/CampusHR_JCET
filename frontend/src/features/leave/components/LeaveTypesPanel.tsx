@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertCircle,
   BookOpen,
   Briefcase,
   Edit2,
@@ -50,6 +51,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ApiError } from '@/services/api';
 import {
   createLeaveAdjustment,
+  fetchPolicyGroups,
   getDutyMappings,
   listLeaveAdjustments,
   listLeavePolicies,
@@ -155,6 +157,16 @@ export function LeaveTypesPanel() {
       <CardContent className="px-0">
         {subView === 'policies' && (
           <div>
+            <div className="mx-6 my-2 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300 flex items-start gap-2.5">
+              <AlertCircle className="size-4 shrink-0 text-amber-700 dark:text-amber-400 mt-0.5" />
+              <div>
+                <span className="font-semibold block text-amber-950 dark:text-amber-200">
+                  Institutional Policy Baseline (JCET Hubballi)
+                </span>
+                The entitlements and settings below reflect initial operational baselines. Unconfirmed rules (including carry-forward caps, medical certificate thresholds, break combinations, and staff vacation eligibility) remain labeled as <strong>Awaiting Approval</strong> or <strong>Not Configured</strong> until formally approved by JCET administration.
+              </div>
+            </div>
+
             {policiesQuery.isPending ? (
               <div className="flex flex-col gap-2 px-6 py-4">
                 <Skeleton className="h-12 w-full" />
@@ -245,9 +257,15 @@ export function LeaveTypesPanel() {
 
                           <TableCell className="text-xs">
                             {pol.carryForwardAllowed ? (
-                              <span className="text-emerald-700 dark:text-emerald-400 font-medium">
-                                Capped at {pol.carryForwardLimit}d
-                              </span>
+                              pol.carryForwardLimit !== null && pol.carryForwardLimit !== undefined ? (
+                                <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                                  Capped at {pol.carryForwardLimit}d
+                                </span>
+                              ) : (
+                                <span className="text-amber-700 dark:text-amber-400 font-medium">
+                                  Not Configured
+                                </span>
+                              )
                             ) : (
                               <span className="text-muted-foreground">Lapses at year-end</span>
                             )}
@@ -290,10 +308,17 @@ export function LeaveTypesPanel() {
                           </TableCell>
 
                           <TableCell>
-                            <StatusBadge
-                              status={pol.active ? 'Active' : 'Inactive'}
-                              label={pol.active ? 'Active' : 'Inactive'}
-                            />
+                            <div className="flex flex-col gap-1">
+                              <StatusBadge
+                                status={pol.active ? 'Active' : 'Inactive'}
+                                label={pol.active ? 'Active' : 'Inactive'}
+                              />
+                              {pol.approvalStatus === 'AWAITING_APPROVAL' && (
+                                <span className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300 w-fit">
+                                  Awaiting Approval
+                                </span>
+                              )}
+                            </div>
                           </TableCell>
 
                           <TableCell className="pr-6 text-right">
@@ -475,6 +500,10 @@ function EditPolicyDialog({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const policyGroupsQuery = useQuery({
+    queryKey: ['policy-groups'],
+    queryFn: () => fetchPolicyGroups(),
+  });
   const [code, setCode] = useState(policy?.code ?? 'CL');
   const [name, setName] = useState(policy?.name ?? '');
   const [description, setDescription] = useState(policy?.description ?? '');
@@ -482,16 +511,29 @@ function EditPolicyDialog({
   const [category, setCategory] = useState<'TEACHING' | 'NON_TEACHING'>(
     policy?.employeeCategory ?? 'TEACHING',
   );
+  const [policyGroupId, setPolicyGroupId] = useState(policy?.policyGroupId ?? 'ALL');
+  const [approvalStatus, setApprovalStatus] = useState<'DRAFT' | 'AWAITING_APPROVAL' | 'APPROVED'>(
+    policy?.approvalStatus ?? 'AWAITING_APPROVAL',
+  );
   const [asPerPolicy, setAsPerPolicy] = useState(
     policy ? policy.annualEntitlement === null : false,
   );
   const [entitlement, setEntitlement] = useState(policy?.annualEntitlement?.toString() ?? '12');
   const [carryForwardAllowed, setCarryForwardAllowed] = useState(policy?.carryForwardAllowed ?? false);
-  const [carryForwardLimit, setCarryForwardLimit] = useState(policy?.carryForwardLimit?.toString() ?? '15');
+  const [carryForwardLimit, setCarryForwardLimit] = useState(
+    policy?.carryForwardLimit !== null && policy?.carryForwardLimit !== undefined
+      ? policy.carryForwardLimit.toString()
+      : '',
+  );
   const [halfDayAllowed, setHalfDayAllowed] = useState(policy?.halfDayAllowed ?? false);
   const [minimumNoticeDays, setMinimumNoticeDays] = useState(policy?.minimumNoticeDays?.toString() ?? '1');
   const [maximumConsecutiveDays, setMaximumConsecutiveDays] = useState(policy?.maximumConsecutiveDays?.toString() ?? '15');
   const [attachmentRequired, setAttachmentRequired] = useState(policy?.attachmentRequired ?? false);
+  const [attachmentRequiredAfterDays, setAttachmentRequiredAfterDays] = useState(
+    policy?.attachmentRequiredAfterDays !== null && policy?.attachmentRequiredAfterDays !== undefined
+      ? policy.attachmentRequiredAfterDays.toString()
+      : '',
+  );
   const [attendanceStatus, setAttendanceStatus] = useState(policy?.attendanceStatus ?? 'ON_LEAVE');
   const [affectsTimetable, setAffectsTimetable] = useState(policy?.affectsTimetable ?? (category === 'TEACHING'));
   const [active, setActive] = useState(policy?.active ?? true);
@@ -505,14 +547,17 @@ function EditPolicyDialog({
         description: description.trim() || null,
         policyYear,
         employeeCategory: category,
+        policyGroupId: policyGroupId && policyGroupId !== 'ALL' ? policyGroupId : null,
+        approvalStatus,
         annualEntitlement: asPerPolicy ? null : Number(entitlement),
         carryForwardAllowed,
-        carryForwardLimit: carryForwardAllowed ? Number(carryForwardLimit) : 0,
+        carryForwardLimit: carryForwardAllowed && carryForwardLimit.trim() ? Number(carryForwardLimit) : null,
         lapseAtYearEnd: !carryForwardAllowed,
         halfDayAllowed,
         minimumNoticeDays: Number(minimumNoticeDays),
         maximumConsecutiveDays: maximumConsecutiveDays ? Number(maximumConsecutiveDays) : null,
         attachmentRequired,
+        attachmentRequiredAfterDays: attachmentRequired && attachmentRequiredAfterDays.trim() ? Number(attachmentRequiredAfterDays) : null,
         attendanceStatus,
         affectsTimetable: category === 'TEACHING' ? affectsTimetable : false,
         requiresAcademicCoverage: category === 'TEACHING',
@@ -612,6 +657,42 @@ function EditPolicyDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <Field>
+              <FieldLabel htmlFor="pol-group">Policy Group</FieldLabel>
+              <Select value={policyGroupId} onValueChange={setPolicyGroupId}>
+                <SelectTrigger id="pol-group">
+                  <SelectValue placeholder="All Groups" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Groups ({category === 'TEACHING' ? 'Faculty' : 'Staff'})</SelectItem>
+                  {(policyGroupsQuery.data ?? [])
+                    .filter((g) => g.employeeCategory === category)
+                    .map((g) => (
+                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="pol-approval-status">Institutional Approval</FieldLabel>
+              <Select
+                value={approvalStatus}
+                onValueChange={(val) => setApprovalStatus(val as 'DRAFT' | 'AWAITING_APPROVAL' | 'APPROVED')}
+              >
+                <SelectTrigger id="pol-approval-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AWAITING_APPROVAL">Awaiting Approval</SelectItem>
+                  <SelectItem value="APPROVED">Approved by JCET</SelectItem>
+                  <SelectItem value="DRAFT">Draft Policy</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field>
               <FieldLabel htmlFor="pol-attendance">Attendance Status Treatment</FieldLabel>
               <Select value={attendanceStatus} onValueChange={setAttendanceStatus}>
                 <SelectTrigger id="pol-attendance">
@@ -684,11 +765,14 @@ function EditPolicyDialog({
             </label>
             {carryForwardAllowed && (
               <Field>
-                <FieldLabel htmlFor="pol-carry">Maximum Days to Carry Forward</FieldLabel>
+                <FieldLabel htmlFor="pol-carry">
+                  Maximum Carry Forward Days (Leave blank if Not Configured)
+                </FieldLabel>
                 <Input
                   id="pol-carry"
                   inputMode="numeric"
                   value={carryForwardLimit}
+                  placeholder="Not Configured (Awaiting Approval)"
                   onChange={(e) => setCarryForwardLimit(e.target.value)}
                 />
               </Field>
@@ -721,6 +805,21 @@ function EditPolicyDialog({
               />
               Mandatory Supporting Document / Medical Certificate
             </label>
+
+            {attachmentRequired && (
+              <Field className="pl-6">
+                <FieldLabel htmlFor="pol-att-days">
+                  Require document after consecutive days (leave blank if required from Day 1)
+                </FieldLabel>
+                <Input
+                  id="pol-att-days"
+                  inputMode="numeric"
+                  value={attachmentRequiredAfterDays}
+                  placeholder="e.g. 2 (Leave blank if from Day 1)"
+                  onChange={(e) => setAttachmentRequiredAfterDays(e.target.value)}
+                />
+              </Field>
+            )}
 
             {category === 'TEACHING' && (
               <label className="flex items-center gap-2 cursor-pointer font-medium">

@@ -306,7 +306,7 @@ export interface LeavePolicyDto {
   annualEntitlement: number | null;
   entitlementUnit: string;
   carryForwardAllowed: boolean;
-  carryForwardLimit: number;
+  carryForwardLimit: number | null;
   carryForwardExpiryMonths: number | null;
   lapseAtYearEnd: boolean;
   halfDayAllowed: boolean;
@@ -322,6 +322,9 @@ export interface LeavePolicyDto {
   requiresOperationalCoverage: boolean;
   reservePendingBalance: boolean;
   approvalPolicyKey: string | null;
+  approvalStatus: 'DRAFT' | 'AWAITING_APPROVAL' | 'APPROVED';
+  policyGroupId: string | null;
+  policyGroup?: { id: string; name: string } | null;
   calendarPolicyKey: string | null;
   active: boolean;
   effectiveFrom: string;
@@ -429,6 +432,18 @@ export async function createLeaveAdjustment(input: {
 export async function getDutyMappings(): Promise<OnDutyDutyMappingDto[]> {
   const res = await apiRequest('/leave-policies/duty-mappings');
   return (res as { data: OnDutyDutyMappingDto[] }).data;
+}
+
+export async function fetchPolicyGroups(category?: string): Promise<Array<{
+  id: string;
+  name: string;
+  description: string | null;
+  employeeCategory: 'TEACHING' | 'NON_TEACHING';
+  active: boolean;
+}>> {
+  const search = category ? `?category=${category}` : '';
+  const res = await apiRequest(`/leave-policies/groups${search}`);
+  return (res as { data: Array<{ id: string; name: string; description: string | null; employeeCategory: 'TEACHING' | 'NON_TEACHING'; active: boolean }> }).data;
 }
 
 export async function updateDutyMapping(input: {

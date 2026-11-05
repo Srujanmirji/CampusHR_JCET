@@ -17,7 +17,7 @@ export interface LeavePolicyRecord {
   annualEntitlement: number | null;
   entitlementUnit: string;
   carryForwardAllowed: boolean;
-  carryForwardLimit: number;
+  carryForwardLimit: number | null;
   carryForwardExpiryMonths: number | null;
   lapseAtYearEnd: boolean;
   halfDayAllowed: boolean;
@@ -33,6 +33,9 @@ export interface LeavePolicyRecord {
   requiresOperationalCoverage: boolean;
   reservePendingBalance: boolean;
   approvalPolicyKey: string | null;
+  approvalStatus: string;
+  policyGroupId: string | null;
+  policyGroup?: { id: string; name: string } | null;
   calendarPolicyKey: string | null;
   active: boolean;
   effectiveFrom: Date;
@@ -87,6 +90,11 @@ export interface EmployeeWithCategoryRecord {
     code: string;
     name: string;
   };
+  policyGroupId: string | null;
+  policyGroup?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 export interface LeavePolicyRepository {
@@ -97,7 +105,15 @@ export interface LeavePolicyRepository {
     policyYear: string,
     employeeCategory: StaffCategoryType,
     departmentId?: number | null,
+    policyGroupId?: string | null,
   ): Promise<LeavePolicyRecord | null>;
+  findPolicyGroups(category?: StaffCategoryType): Promise<Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    employeeCategory: StaffCategoryType;
+    active: boolean;
+  }>>;
   createPolicy(data: Prisma.LeavePolicyUncheckedCreateInput): Promise<LeavePolicyRecord>;
   updatePolicy(id: string, data: Prisma.LeavePolicyUncheckedUpdateInput): Promise<LeavePolicyRecord>;
   deletePolicy(id: string): Promise<LeavePolicyRecord>;
@@ -119,6 +135,7 @@ export interface LeavePolicyRepository {
 const policyInclude = {
   department: { select: { id: true, code: true, name: true } },
   leaveType: { select: { id: true, code: true, name: true } },
+  policyGroup: { select: { id: true, name: true } },
 } as const;
 
 export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRepository {
@@ -143,8 +160,40 @@ export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRe
       policyYear: string,
       employeeCategory: StaffCategoryType,
       departmentId?: number | null,
+      policyGroupId?: string | null,
     ) {
-      // First check department-specific policy, fall back to institution-wide (departmentId = null)
+      // 1. Check group-specific policy first (with department if available)
+      if (policyGroupId) {
+        if (departmentId) {
+          const groupDeptPolicy = await prisma.leavePolicy.findFirst({
+            where: {
+              code,
+              policyYear,
+              employeeCategory,
+              policyGroupId,
+              departmentId,
+              active: true,
+            },
+            include: policyInclude,
+          });
+          if (groupDeptPolicy) return groupDeptPolicy as unknown as LeavePolicyRecord;
+        }
+
+        const groupPolicy = await prisma.leavePolicy.findFirst({
+          where: {
+            code,
+            policyYear,
+            employeeCategory,
+            policyGroupId,
+            departmentId: null,
+            active: true,
+          },
+          include: policyInclude,
+        });
+        if (groupPolicy) return groupPolicy as unknown as LeavePolicyRecord;
+      }
+
+      // 2. Check department-specific policy (without specific group)
       if (departmentId) {
         const deptPolicy = await prisma.leavePolicy.findFirst({
           where: {
@@ -152,6 +201,7 @@ export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRe
             policyYear,
             employeeCategory,
             departmentId,
+            policyGroupId: null,
             active: true,
           },
           include: policyInclude,
@@ -159,12 +209,14 @@ export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRe
         if (deptPolicy) return deptPolicy as unknown as LeavePolicyRecord;
       }
 
+      // 3. Fall back to institution-wide category policy
       const instPolicy = await prisma.leavePolicy.findFirst({
         where: {
           code,
           policyYear,
           employeeCategory,
           departmentId: null,
+          policyGroupId: null,
           active: true,
         },
         include: policyInclude,
@@ -172,7 +224,7 @@ export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRe
 
       if (instPolicy) return instPolicy as unknown as LeavePolicyRecord;
 
-      // Also check if there is an appliesToAllCategories policy
+      // 4. Also check if there is an appliesToAllCategories policy
       const genericPolicy = await prisma.leavePolicy.findFirst({
         where: {
           code,
@@ -214,6 +266,7 @@ export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRe
         include: {
           designation: { select: { id: true, name: true, category: true } },
           department: { select: { id: true, code: true, name: true } },
+          policyGroup: { select: { id: true, name: true } },
         },
       })) as unknown as EmployeeWithCategoryRecord | null;
     },
@@ -227,9 +280,20 @@ export function createLeavePolicyRepository(prisma: PrismaClient): LeavePolicyRe
         include: {
           designation: { select: { id: true, name: true, category: true } },
           department: { select: { id: true, code: true, name: true } },
+          policyGroup: { select: { id: true, name: true } },
         },
         orderBy: [{ departmentId: 'asc' }, { employeeCode: 'asc' }],
       })) as unknown as EmployeeWithCategoryRecord[];
+    },
+
+    async findPolicyGroups(category?: StaffCategoryType) {
+      return prisma.employeePolicyGroup.findMany({
+        where: {
+          active: true,
+          ...(category ? { employeeCategory: category } : {}),
+        },
+        orderBy: { name: 'asc' },
+      });
     },
 
     async createAdjustment(data: Prisma.LeaveBalanceAdjustmentUncheckedCreateInput) {

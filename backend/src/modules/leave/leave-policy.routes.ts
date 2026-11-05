@@ -32,6 +32,14 @@ export function createLeavePolicyRouter(
       res.json({ data: await service.updateDutyMapping(access(res), input) });
     })
 
+    // Employee Policy Groups
+    .get('/groups', ...canRead, async (req, res) => {
+      const category = typeof req.query.category === 'string' && (req.query.category === 'TEACHING' || req.query.category === 'NON_TEACHING')
+        ? req.query.category
+        : undefined;
+      res.json({ data: await service.getPolicyGroups(access(res), category) });
+    })
+
     // Applicable policies for an employee / current user
     .get('/applicable', ...canRead, async (req, res) => {
       const employeeId = typeof req.query.employeeId === 'string' ? req.query.employeeId : undefined;

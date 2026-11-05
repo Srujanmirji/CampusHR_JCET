@@ -195,6 +195,8 @@ model Employee {
   onboardingRecord      OnboardingCandidate?   @relation("OnboardedCandidate")
   onDutyRequests        OnDutyRequest[]
   balanceAdjustments    LeaveBalanceAdjustment[] @relation("EmployeeBalanceAdjustments")
+  policyGroupId         String?                @map("policy_group_id") @db.Uuid
+  policyGroup           EmployeePolicyGroup?   @relation("EmployeeToPolicyGroup", fields: [policyGroupId], references: [id], onDelete: SetNull)
 
   @@index([departmentId])
   @@index([status])
@@ -1180,7 +1182,7 @@ model LeavePolicy {
   annualEntitlement           Float?                  @map("annual_entitlement") // null = "As per policy" / unfixed
   entitlementUnit             String                  @default("DAYS") @map("entitlement_unit")
   carryForwardAllowed         Boolean                 @default(false) @map("carry_forward_allowed")
-  carryForwardLimit           Float                   @default(0) @map("carry_forward_limit")
+  carryForwardLimit           Float?                  @map("carry_forward_limit")
   carryForwardExpiryMonths    Int?                    @map("carry_forward_expiry_months")
   lapseAtYearEnd              Boolean                 @default(true) @map("lapse_at_year_end")
   halfDayAllowed              Boolean                 @default(false) @map("half_day_allowed")
@@ -1196,6 +1198,9 @@ model LeavePolicy {
   requiresOperationalCoverage Boolean                 @default(false) @map("requires_operational_coverage")
   reservePendingBalance       Boolean                 @default(true) @map("reserve_pending_balance")
   approvalPolicyKey           String?                 @default("STANDARD") @map("approval_policy_key")
+  approvalStatus              String                  @default("AWAITING_APPROVAL") @map("approval_status") // DRAFT, AWAITING_APPROVAL, APPROVED
+  policyGroupId               String?                 @map("policy_group_id") @db.Uuid
+  policyGroup                 EmployeePolicyGroup?    @relation("PolicyGroupLeavePolicies", fields: [policyGroupId], references: [id], onDelete: SetNull)
   calendarPolicyKey           String?                 @default("INSTITUTION_CALENDAR") @map("calendar_policy_key")
   active                      Boolean                 @default(true)
   effectiveFrom               DateTime                @map("effective_from") @db.Date
@@ -1205,7 +1210,7 @@ model LeavePolicy {
   createdAt                   DateTime                @default(now()) @map("created_at")
   updatedAt                   DateTime                @updatedAt @map("updated_at")
 
-  @@unique([code, policyYear, employeeCategory, departmentId])
+  @@unique([code, policyYear, employeeCategory, departmentId, policyGroupId])
   @@index([policyYear])
   @@index([employeeCategory])
   @@index([active])
@@ -1244,6 +1249,9 @@ model EmployeePolicyGroup {
   active           Boolean       @default(true)
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  employees        Employee[]    @relation("EmployeeToPolicyGroup")
+  leavePolicies    LeavePolicy[] @relation("PolicyGroupLeavePolicies")
 
   @@map("employee_policy_groups")
 }
