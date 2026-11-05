@@ -31,7 +31,7 @@ export interface MobileRestrictedHoliday {
 
 export async function fetchMobileCalendarOverview(): Promise<MobileCalendarOverview | null> {
   try {
-    const res = await apiFetch('/api/v1/academic-calendar/overview');
+    const res = await apiFetch('/academic-calendar/overview');
     if (!res.ok) return null;
     return (await res.json()) as MobileCalendarOverview;
   } catch {
@@ -42,7 +42,7 @@ export async function fetchMobileCalendarOverview(): Promise<MobileCalendarOverv
 export async function fetchMobileCalendarDays(monthStr?: string): Promise<MobileCalendarDay[]> {
   try {
     const query = monthStr ? `?month=${monthStr}&pageSize=100` : '?pageSize=100';
-    const res = await apiFetch(`/api/v1/academic-calendar${query}`);
+    const res = await apiFetch(`/academic-calendar${query}`);
     if (!res.ok) return [];
     const json = await res.json();
     return json.data || [];
@@ -53,7 +53,7 @@ export async function fetchMobileCalendarDays(monthStr?: string): Promise<Mobile
 
 export async function fetchMobileRestrictedHolidays(): Promise<MobileRestrictedHoliday[]> {
   try {
-    const res = await apiFetch('/api/v1/restricted-holidays');
+    const res = await apiFetch('/restricted-holidays');
     if (!res.ok) return [];
     return (await res.json()) as MobileRestrictedHoliday[];
   } catch {

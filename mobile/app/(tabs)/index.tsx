@@ -518,6 +518,27 @@ function FacultyHome() {
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          onPress={() => router.push('/on-duty' as any)}
+          style={styles.updateRow}
+        >
+          <View
+            style={[
+              styles.updateIcon,
+              { backgroundColor: theme.colors.violetContainer },
+            ]}
+          >
+            <Icon name="workload" color={theme.colors.violet} size={20} />
+          </View>
+          <View style={styles.grow}>
+            <Text style={styles.label}>Official On-Duty & Valuation</Text>
+            <Text style={styles.detail}>
+              Apply for VTU valuation, external duties & track approvals
+            </Text>
+          </View>
+          <Icon name="next" color={theme.colors.mutedForeground} size={18} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
           onPress={() => router.push('/documents')}
           style={styles.updateRow}
         >

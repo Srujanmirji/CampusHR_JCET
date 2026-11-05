@@ -176,6 +176,12 @@ export default function ProfileTab() {
             onPress={() => router.push('/calendar' as any)}
           />
           <ProfileListRow
+            label="Official On-Duty & Valuation"
+            detail="OD applications, VTU duties & attendance certificates"
+            icon="workload"
+            onPress={() => router.push('/on-duty' as any)}
+          />
+          <ProfileListRow
             label="Documents"
             detail="Verified, pending & expiring records"
             icon="document"
