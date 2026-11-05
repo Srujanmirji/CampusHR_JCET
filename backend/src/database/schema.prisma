@@ -1206,7 +1206,9 @@ model LeavePolicy {
   createdAt                   DateTime                @default(now()) @map("created_at")
   updatedAt                   DateTime                @updatedAt @map("updated_at")
 
-  @@unique([code, policyYear, employeeCategory, departmentId, policyGroupId, version])
+  // Name pinned to the index created by migration 20261105113000 (PostgreSQL
+  // truncates identifiers to 63 bytes), so the schema and database do not drift.
+  @@unique([code, policyYear, employeeCategory, departmentId, policyGroupId, version], map: "leave_policies_code_policy_year_employee_category_department__k")
   @@index([policyYear])
   @@index([employeeCategory])
   @@index([active])
