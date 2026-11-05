@@ -368,7 +368,7 @@ export function createAcademicCalendarRepository(prisma: PrismaClient): Academic
       date: Date,
       options?: { departmentId?: number | null; appliesToEmployeeType?: string | null },
     ) {
-      // Find most specific match first (department match, then institutional)
+      // Find candidate matches for that date
       const days = await prisma.calendarDay.findMany({
         where: {
           date,
@@ -385,18 +385,30 @@ export function createAcademicCalendarRepository(prisma: PrismaClient): Academic
 
       if (days.length === 0) return null;
 
+      // Filter by employeeType if specified
+      const applicableDays = options?.appliesToEmployeeType
+        ? days.filter(
+            (d) =>
+              !d.appliesToEmployeeType ||
+              d.appliesToEmployeeType === 'ALL' ||
+              d.appliesToEmployeeType.toUpperCase() === options.appliesToEmployeeType!.toUpperCase(),
+          )
+        : days;
+
+      if (applicableDays.length === 0) return null;
+
       if (options?.departmentId) {
-        const deptSpecific = days.find((d) => d.departmentId === options.departmentId);
+        const deptSpecific = applicableDays.find((d) => d.departmentId === options.departmentId);
         if (deptSpecific) return deptSpecific;
       }
 
-      return days.find((d) => d.departmentId === null) ?? days[0]!;
+      return applicableDays.find((d) => d.departmentId === null) ?? applicableDays[0]!;
     },
 
     async findCalendarDaysByDateRange(
       startDate: Date,
       endDate: Date,
-      options?: { departmentId?: number | null; appliesToEmployeeType?: string | null },
+      _options?: { departmentId?: number | null; appliesToEmployeeType?: string | null },
     ) {
       return prisma.calendarDay.findMany({
         where: {

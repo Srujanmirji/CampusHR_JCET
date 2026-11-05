@@ -11,13 +11,14 @@ import type {
 } from '../src/modules/academic-calendar/academic-calendar.repository.js';
 import { createAcademicCalendarService } from '../src/modules/academic-calendar/academic-calendar.service.js';
 import type { Access } from '../src/modules/auth/auth.service.js';
+import { defaultGrants } from '../src/modules/auth/permissions.js';
 
 function createMemoryCalendarRepository(): AcademicCalendarRepository {
-  let academicYears: AcademicYearRecord[] = [];
-  let semesters: SemesterRecord[] = [];
-  let calendarDays: CalendarDayRecord[] = [];
-  let restrictedHolidays: RestrictedHolidayRecord[] = [];
-  let weeklyPatterns: WeeklyWorkingPatternRecord[] = [
+  const academicYears: AcademicYearRecord[] = [];
+  const semesters: SemesterRecord[] = [];
+  const calendarDays: CalendarDayRecord[] = [];
+  const restrictedHolidays: RestrictedHolidayRecord[] = [];
+  const weeklyPatterns: WeeklyWorkingPatternRecord[] = [
     { id: randomUUID(), dayOfWeek: 0, dayName: 'Sunday', isWorkingDay: false, description: 'Weekly Off', updatedAt: new Date() },
     { id: randomUUID(), dayOfWeek: 1, dayName: 'Monday', isWorkingDay: true, description: 'Working Day', updatedAt: new Date() },
     { id: randomUUID(), dayOfWeek: 2, dayName: 'Tuesday', isWorkingDay: true, description: 'Working Day', updatedAt: new Date() },
@@ -150,11 +151,23 @@ function createMemoryCalendarRepository(): AcademicCalendarRepository {
         (d) => d.date.toISOString().split('T')[0] === dateStr,
       );
       if (matches.length === 0) return null;
+
+      const applicableMatches = options?.appliesToEmployeeType
+        ? matches.filter(
+            (d) =>
+              !d.appliesToEmployeeType ||
+              d.appliesToEmployeeType === 'ALL' ||
+              d.appliesToEmployeeType.toUpperCase() === options.appliesToEmployeeType!.toUpperCase(),
+          )
+        : matches;
+
+      if (applicableMatches.length === 0) return null;
+
       if (options?.departmentId) {
-        const deptMatch = matches.find((d) => d.departmentId === options.departmentId);
+        const deptMatch = applicableMatches.find((d) => d.departmentId === options.departmentId);
         if (deptMatch) return deptMatch;
       }
-      return matches.find((d) => d.departmentId === null) ?? matches[0]!;
+      return applicableMatches.find((d) => d.departmentId === null) ?? applicableMatches[0]!;
     },
     async findCalendarDaysByDateRange(startDate, endDate) {
       return calendarDays.filter((d) => d.date >= startDate && d.date <= endDate);
@@ -593,4 +606,244 @@ test('Date-Range Entry: Vacation creates days across date range', async () => {
     assert.equal(day.dayType, 'VACATION');
     assert.equal(day.isWorkingDay, false);
   }
+});
+
+test('Academic Year: prevent overlapping date ranges across academic years', async () => {
+  const repo = createMemoryCalendarRepository();
+  const service = createAcademicCalendarService(repo);
+
+  // 1. Create first academic year: 2026-08-01 to 2027-07-31
+  await service.createAcademicYear(adminAccess, {
+    name: '2026–27',
+    startDate: '2026-08-01',
+    endDate: '2027-07-31',
+    isCurrent: true,
+  });
+
+  // 2. Attempt to create overlapping academic year: 2027-01-01 to 2027-12-31
+  await assert.rejects(
+    () =>
+      service.createAcademicYear(adminAccess, {
+        name: '2027 Overlap',
+        startDate: '2027-01-01',
+        endDate: '2027-12-31',
+      }),
+    /overlaps with existing academic year/,
+  );
+
+  // 3. Non-overlapping next year succeeds: 2027-08-01 to 2028-07-31
+  const year2 = await service.createAcademicYear(adminAccess, {
+    name: '2027–28',
+    startDate: '2027-08-01',
+    endDate: '2028-07-31',
+  });
+  assert.equal(year2.name, '2027–28');
+
+  // 4. Updating year2 with a date overlapping year1 is rejected
+  await assert.rejects(
+    () =>
+      service.updateAcademicYear(adminAccess, year2.id, {
+        startDate: '2027-06-01',
+      }),
+    /overlaps with existing academic year/,
+  );
+});
+
+test('Semester: validate teaching and exam date boundaries and prevent overlapping semesters in same year', async () => {
+  const repo = createMemoryCalendarRepository();
+  const service = createAcademicCalendarService(repo);
+
+  const year = await service.createAcademicYear(adminAccess, {
+    name: '2026–27',
+    startDate: '2026-08-01',
+    endDate: '2027-07-31',
+  });
+
+  // 1. Teaching start date after teaching end date -> rejected
+  await assert.rejects(
+    () =>
+      service.createSemester(adminAccess, {
+        academicYearId: year.id,
+        name: 'Invalid Teaching Dates',
+        type: 'ODD',
+        startDate: '2026-08-16',
+        endDate: '2026-12-31',
+        teachingStartDate: '2026-12-15',
+        teachingEndDate: '2026-09-01',
+      }),
+    /Teaching start date cannot be after teaching end date/,
+  );
+
+  // 2. Teaching dates outside semester dates -> rejected
+  await assert.rejects(
+    () =>
+      service.createSemester(adminAccess, {
+        academicYearId: year.id,
+        name: 'Teaching Outside Bounds',
+        type: 'ODD',
+        startDate: '2026-08-16',
+        endDate: '2026-12-31',
+        teachingStartDate: '2026-08-01', // Before semester start
+        teachingEndDate: '2026-12-10',
+      }),
+    /Teaching start date must fall within semester dates/,
+  );
+
+  // 3. Exam start date after exam end date -> rejected
+  await assert.rejects(
+    () =>
+      service.createSemester(adminAccess, {
+        academicYearId: year.id,
+        name: 'Invalid Exam Dates',
+        type: 'ODD',
+        startDate: '2026-08-16',
+        endDate: '2026-12-31',
+        examStartDate: '2026-12-30',
+        examEndDate: '2026-12-10',
+      }),
+    /Exam start date cannot be after exam end date/,
+  );
+
+  // 4. Valid Odd Semester created: 2026-08-16 to 2026-12-31
+  const oddSem = await service.createSemester(adminAccess, {
+    academicYearId: year.id,
+    name: 'Odd Semester 2026–27',
+    type: 'ODD',
+    startDate: '2026-08-16',
+    endDate: '2026-12-31',
+    teachingStartDate: '2026-08-20',
+    teachingEndDate: '2026-12-10',
+    examStartDate: '2026-12-12',
+    examEndDate: '2026-12-30',
+  });
+  assert.equal(oddSem.type, 'ODD');
+
+  // 5. Overlapping semester in same academic year is rejected (e.g. 2026-12-01 to 2027-04-30)
+  await assert.rejects(
+    () =>
+      service.createSemester(adminAccess, {
+        academicYearId: year.id,
+        name: 'Overlapping Even Semester',
+        type: 'EVEN',
+        startDate: '2026-12-01',
+        endDate: '2027-04-30',
+      }),
+    /overlaps with existing semester/,
+  );
+
+  // 6. Non-overlapping Even Semester succeeds: 2027-01-15 to 2027-05-31
+  const evenSem = await service.createSemester(adminAccess, {
+    academicYearId: year.id,
+    name: 'Even Semester 2026–27',
+    type: 'EVEN',
+    startDate: '2027-01-15',
+    endDate: '2027-05-31',
+  });
+  assert.equal(evenSem.type, 'EVEN');
+});
+
+test('Working Pattern: weekly pattern is fully configurable and affects working day calculation', async () => {
+  const repo = createMemoryCalendarRepository();
+  const service = createAcademicCalendarService(repo);
+
+  // Default: Monday (1) to Saturday (6) is working, Sunday (0) is weekly off
+  const defaultMonday = await service.getDayClassification('2026-11-09');
+  assert.equal(defaultMonday.isWorkingDay, true);
+  const defaultSunday = await service.getDayClassification('2026-11-08');
+  assert.equal(defaultSunday.isWorkingDay, false);
+
+  // Administrator updates working pattern: make Saturday (6) non-working and Sunday (0) working
+  await service.updateWeeklyWorkingPatterns(adminAccess, {
+    patterns: [
+      { dayOfWeek: 0, dayName: 'Sunday', isWorkingDay: true, description: 'Shifted Working Day' },
+      { dayOfWeek: 1, dayName: 'Monday', isWorkingDay: true, description: 'Working Day' },
+      { dayOfWeek: 2, dayName: 'Tuesday', isWorkingDay: true, description: 'Working Day' },
+      { dayOfWeek: 3, dayName: 'Wednesday', isWorkingDay: true, description: 'Working Day' },
+      { dayOfWeek: 4, dayName: 'Thursday', isWorkingDay: true, description: 'Working Day' },
+      { dayOfWeek: 5, dayName: 'Friday', isWorkingDay: true, description: 'Working Day' },
+      { dayOfWeek: 6, dayName: 'Saturday', isWorkingDay: false, description: 'New Weekly Off' },
+    ],
+  });
+
+  // Verify updated working pattern took effect
+  const updatedSunday = await service.getDayClassification('2026-11-08');
+  assert.equal(updatedSunday.isWorkingDay, true);
+
+  const updatedSaturday = await service.getDayClassification('2026-11-07');
+  assert.equal(updatedSaturday.isWorkingDay, false);
+});
+
+test('Vacation & Scope: Vacation scoped to TEACHING does not make date non-working for NON_TEACHING', async () => {
+  const repo = createMemoryCalendarRepository();
+  const service = createAcademicCalendarService(repo);
+
+  const year = await service.createAcademicYear(adminAccess, {
+    name: '2026–27',
+    startDate: '2026-08-01',
+    endDate: '2027-07-31',
+  });
+
+  // Declare mid-term vacation for TEACHING staff only on 2026-10-15 (Thursday)
+  await service.createCalendarDay(adminAccess, {
+    date: '2026-10-15',
+    academicYearId: year.id,
+    dayType: 'VACATION',
+    title: 'Faculty Mid-Term Recess',
+    isWorkingDay: false,
+    appliesToEmployeeType: 'TEACHING',
+  });
+
+  // Check for Teaching staff: non-working
+  const teachingDay = await service.getDayClassification('2026-10-15', {
+    employeeType: 'TEACHING',
+  });
+  assert.equal(teachingDay.dayType, 'VACATION');
+  assert.equal(teachingDay.isWorkingDay, false);
+
+  // Check for Non-Teaching staff: regular working day (vacation does not blindly apply)
+  const nonTeachingDay = await service.getDayClassification('2026-10-15', {
+    employeeType: 'NON_TEACHING',
+  });
+  assert.equal(nonTeachingDay.dayType, 'WORKING_DAY');
+  assert.equal(nonTeachingDay.isWorkingDay, true);
+
+  // Working day count across 2026-10-12 (Mon) to 2026-10-17 (Sat) (6 days total)
+  // For teaching: 5 working days (Thursday is vacation)
+  const teachingWorkingDays = await service.getWorkingDaysBetween('2026-10-12', '2026-10-17', {
+    employeeType: 'TEACHING',
+  });
+  assert.equal(teachingWorkingDays, 5);
+
+  // For non-teaching: 6 working days (Thursday is normal working day)
+  const nonTeachingWorkingDays = await service.getWorkingDaysBetween('2026-10-12', '2026-10-17', {
+    employeeType: 'NON_TEACHING',
+  });
+  assert.equal(nonTeachingWorkingDays, 6);
+});
+
+test('RBAC: Super Admin and HR Admin can manage; HOD and Faculty are restricted to read', () => {
+  const superAdminGrants: string[] = defaultGrants('Super Admin');
+  const hrAdminGrants: string[] = defaultGrants('HR Admin');
+  const principalGrants: string[] = defaultGrants('Principal');
+  const hodGrants: string[] = defaultGrants('HOD');
+  const facultyGrants: string[] = defaultGrants('Faculty');
+  const nonTeachingGrants: string[] = defaultGrants('Non-Teaching Staff');
+
+  // Super Admin & HR Admin have manage
+  assert.ok(superAdminGrants.includes('academic_calendar.manage.all'));
+  assert.ok(superAdminGrants.includes('academic_calendar.read.all'));
+  assert.ok(hrAdminGrants.includes('academic_calendar.manage.all'));
+  assert.ok(hrAdminGrants.includes('academic_calendar.read.all'));
+
+  // Principal, HOD, Faculty, Non-Teaching have institutional read
+  assert.ok(principalGrants.includes('academic_calendar.read.all'));
+  assert.ok(hodGrants.includes('academic_calendar.read.all'));
+  assert.ok(facultyGrants.includes('academic_calendar.read.all'));
+  assert.ok(nonTeachingGrants.includes('academic_calendar.read.all'));
+
+  // Principal, HOD, Faculty, Non-Teaching do NOT have manage permission
+  assert.equal(principalGrants.some((g) => g.startsWith('academic_calendar.manage')), false);
+  assert.equal(hodGrants.some((g) => g.startsWith('academic_calendar.manage')), false);
+  assert.equal(facultyGrants.some((g) => g.startsWith('academic_calendar.manage')), false);
+  assert.equal(nonTeachingGrants.some((g) => g.startsWith('academic_calendar.manage')), false);
 });

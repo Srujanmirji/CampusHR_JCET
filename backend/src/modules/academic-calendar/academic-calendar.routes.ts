@@ -1,6 +1,7 @@
 import { Router, type Response } from 'express';
 import { requirePermission } from '../../middleware/auth.js';
 import type { Access, AuthService } from '../auth/auth.service.js';
+import type { QueryCalendarInput } from './academic-calendar.schema.js';
 import type { AcademicCalendarService } from './academic-calendar.service.js';
 
 const access = (res: Response) => res.locals.access as Access;
@@ -81,7 +82,7 @@ export function createAcademicCalendarRouter(
   // Calendar Days CRUD
   router.get('/', ...canRead, async (req, res, next) => {
     try {
-      const result = await service.listCalendarDays(access(res), req.query as any);
+      const result = await service.listCalendarDays(access(res), req.query as unknown as QueryCalendarInput);
       res.json(result);
     } catch (err) {
       next(err);

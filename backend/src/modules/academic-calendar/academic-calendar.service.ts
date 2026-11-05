@@ -56,6 +56,12 @@ export interface DayClassification {
   source: string;
 }
 
+export interface CalendarContext {
+  employeeId?: string | null;
+  departmentId?: number | null;
+  employeeType?: string | null;
+}
+
 export interface AcademicCalendarService {
   // Academic Years
   listAcademicYears(access: Access): Promise<AcademicYearRecord[]>;
@@ -100,21 +106,21 @@ export interface AcademicCalendarService {
   // Reusable Integration Service methods
   isWorkingDay(
     date: Date | string,
-    context?: { departmentId?: number | null; employeeType?: string | null },
+    context?: CalendarContext,
   ): Promise<boolean>;
   getDayClassification(
     date: Date | string,
-    context?: { departmentId?: number | null; employeeType?: string | null },
+    context?: CalendarContext,
   ): Promise<DayClassification>;
   getWorkingDaysBetween(
     startDate: Date | string,
     endDate: Date | string,
-    context?: { departmentId?: number | null; employeeType?: string | null },
+    context?: CalendarContext,
   ): Promise<number>;
   getNonWorkingDaysBetween(
     startDate: Date | string,
     endDate: Date | string,
-    context?: { departmentId?: number | null; employeeType?: string | null },
+    context?: CalendarContext,
   ): Promise<number>;
   getRestrictedHolidays(
     year?: string | number,
@@ -160,12 +166,12 @@ export function createAcademicCalendarService(
   }
 
   return {
-    async listAcademicYears(access) {
+    async listAcademicYears(_access) {
       
       return repository.findAcademicYears();
     },
 
-    async getAcademicYearById(access, id) {
+    async getAcademicYearById(_access, id) {
       
       const year = await repository.findAcademicYearById(id);
       if (!year) throw new HttpError(404, 'NOT_FOUND', 'Academic year not found.');
@@ -185,10 +191,24 @@ export function createAcademicCalendarService(
         throw new HttpError(409, 'CONFLICT', `Academic year "${input.name}" already exists.`);
       }
 
+      const start = new Date(`${input.startDate}T00:00:00.000Z`);
+      const end = new Date(`${input.endDate}T00:00:00.000Z`);
+
+      // Verify no invalid overlapping ranges with existing academic years
+      const allYears = await repository.findAcademicYears();
+      const overlap = allYears.find((y) => start <= y.endDate && end >= y.startDate);
+      if (overlap) {
+        throw new HttpError(
+          400,
+          'VALIDATION_ERROR',
+          `Academic year date range (${input.startDate} to ${input.endDate}) overlaps with existing academic year "${overlap.name}" (${overlap.startDate.toISOString().split('T')[0]} to ${overlap.endDate.toISOString().split('T')[0]}).`,
+        );
+      }
+
       return repository.createAcademicYear({
         name: input.name,
-        startDate: new Date(`${input.startDate}T00:00:00.000Z`),
-        endDate: new Date(`${input.endDate}T00:00:00.000Z`),
+        startDate: start,
+        endDate: end,
         isCurrent: input.isCurrent,
         status: input.status,
       });
@@ -208,13 +228,32 @@ export function createAcademicCalendarService(
         }
       }
 
+      const start = input.startDate !== undefined ? new Date(`${input.startDate}T00:00:00.000Z`) : existing.startDate;
+      const end = input.endDate !== undefined ? new Date(`${input.endDate}T00:00:00.000Z`) : existing.endDate;
+
+      if (start > end) {
+        throw new HttpError(400, 'VALIDATION_ERROR', 'Start date cannot be after end date.');
+      }
+
+      if (input.startDate !== undefined || input.endDate !== undefined) {
+        const allYears = await repository.findAcademicYears();
+        const overlap = allYears.find((y) => y.id !== id && start <= y.endDate && end >= y.startDate);
+        if (overlap) {
+          throw new HttpError(
+            400,
+            'VALIDATION_ERROR',
+            `Academic year date range overlaps with existing academic year "${overlap.name}".`,
+          );
+        }
+      }
+
       const updateData: Prisma.AcademicYearUpdateInput = {};
       if (input.name !== undefined) updateData.name = input.name;
       if (input.startDate !== undefined) {
-        updateData.startDate = new Date(`${input.startDate}T00:00:00.000Z`);
+        updateData.startDate = start;
       }
       if (input.endDate !== undefined) {
-        updateData.endDate = new Date(`${input.endDate}T00:00:00.000Z`);
+        updateData.endDate = end;
       }
       if (input.isCurrent !== undefined) updateData.isCurrent = input.isCurrent;
       if (input.status !== undefined) updateData.status = input.status;
@@ -264,6 +303,43 @@ export function createAcademicCalendarService(
         );
       }
 
+      // Teaching dates validation
+      if (input.teachingStartDate && input.teachingEndDate) {
+        if (new Date(input.teachingStartDate) > new Date(input.teachingEndDate)) {
+          throw new HttpError(400, 'VALIDATION_ERROR', 'Teaching start date cannot be after teaching end date.');
+        }
+      }
+      if (input.teachingStartDate && (new Date(input.teachingStartDate) < semStart || new Date(input.teachingStartDate) > semEnd)) {
+        throw new HttpError(400, 'VALIDATION_ERROR', 'Teaching start date must fall within semester dates.');
+      }
+      if (input.teachingEndDate && (new Date(input.teachingEndDate) < semStart || new Date(input.teachingEndDate) > semEnd)) {
+        throw new HttpError(400, 'VALIDATION_ERROR', 'Teaching end date must fall within semester dates.');
+      }
+
+      // Exam dates validation
+      if (input.examStartDate && input.examEndDate) {
+        if (new Date(input.examStartDate) > new Date(input.examEndDate)) {
+          throw new HttpError(400, 'VALIDATION_ERROR', 'Exam start date cannot be after exam end date.');
+        }
+      }
+      if (input.examStartDate && (new Date(input.examStartDate) < semStart || new Date(input.examStartDate) > semEnd)) {
+        throw new HttpError(400, 'VALIDATION_ERROR', 'Exam start date must fall within semester dates.');
+      }
+      if (input.examEndDate && (new Date(input.examEndDate) < semStart || new Date(input.examEndDate) > semEnd)) {
+        throw new HttpError(400, 'VALIDATION_ERROR', 'Exam end date must fall within semester dates.');
+      }
+
+      // Prevent overlapping semester ranges within the same academic year
+      const existingSemesters = await repository.findSemesters(input.academicYearId);
+      const semOverlap = existingSemesters.find((s) => semStart <= s.endDate && semEnd >= s.startDate);
+      if (semOverlap) {
+        throw new HttpError(
+          400,
+          'VALIDATION_ERROR',
+          `Semester date range (${input.startDate} to ${input.endDate}) overlaps with existing semester "${semOverlap.name}".`,
+        );
+      }
+
       return repository.createSemester({
         academicYear: { connect: { id: input.academicYearId } },
         name: input.name,
@@ -294,14 +370,33 @@ export function createAcademicCalendarService(
       const existing = await repository.findSemesterById(id);
       if (!existing) throw new HttpError(404, 'NOT_FOUND', 'Semester not found.');
 
+      const semStart = input.startDate !== undefined ? new Date(`${input.startDate}T00:00:00.000Z`) : existing.startDate;
+      const semEnd = input.endDate !== undefined ? new Date(`${input.endDate}T00:00:00.000Z`) : existing.endDate;
+
+      if (semStart > semEnd) {
+        throw new HttpError(400, 'VALIDATION_ERROR', 'Start date cannot be after end date.');
+      }
+
+      if (input.startDate !== undefined || input.endDate !== undefined) {
+        const existingSemesters = await repository.findSemesters(existing.academicYearId);
+        const semOverlap = existingSemesters.find((s) => s.id !== id && semStart <= s.endDate && semEnd >= s.startDate);
+        if (semOverlap) {
+          throw new HttpError(
+            400,
+            'VALIDATION_ERROR',
+            `Semester date range overlaps with existing semester "${semOverlap.name}".`,
+          );
+        }
+      }
+
       const updateData: Prisma.SemesterUpdateInput = {};
       if (input.name !== undefined) updateData.name = input.name;
       if (input.type !== undefined) updateData.type = input.type;
       if (input.startDate !== undefined) {
-        updateData.startDate = new Date(`${input.startDate}T00:00:00.000Z`);
+        updateData.startDate = semStart;
       }
       if (input.endDate !== undefined) {
-        updateData.endDate = new Date(`${input.endDate}T00:00:00.000Z`);
+        updateData.endDate = semEnd;
       }
       if (input.teachingStartDate !== undefined) {
         updateData.teachingStartDate = input.teachingStartDate
@@ -618,7 +713,7 @@ export function createAcademicCalendarService(
       return updated;
     },
 
-    async getOverview(access) {
+    async getOverview(_access) {
       
 
       const currentAcademicYear = await repository.findCurrentAcademicYear();
@@ -800,6 +895,14 @@ export function createAcademicCalendarService(
 
       const dayMap = new Map<string, CalendarDayRecord>();
       for (const d of explicitDays) {
+        if (
+          context?.employeeType &&
+          d.appliesToEmployeeType &&
+          d.appliesToEmployeeType !== 'ALL' &&
+          d.appliesToEmployeeType.toUpperCase() !== context.employeeType.toUpperCase()
+        ) {
+          continue;
+        }
         const key = d.date.toISOString().split('T')[0]!;
         if (!dayMap.has(key) || (context?.departmentId && d.departmentId === context.departmentId)) {
           dayMap.set(key, d);
