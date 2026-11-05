@@ -69,6 +69,7 @@ model User {
   issuedAppointmentLetters OnboardingCandidate[] @relation("AppointmentLetterIssuer")
   onDutyHodReviews      OnDutyRequest[]        @relation("OnDutyHodReview")
   onDutyFinalApprovals  OnDutyRequest[]        @relation("OnDutyFinalApproval")
+  calendarDaysCreated   CalendarDay[]          @relation("CalendarDayCreatedBy")
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt             DateTime         @updatedAt @map("updated_at")
   passwordResets        PasswordResetChallenge[]
@@ -137,6 +138,7 @@ model Department {
   leaveRequests LeaveRequest[]
   circulars     Circular[]       @relation("DepartmentCirculars")
   onboardingCandidates OnboardingCandidate[]
+  calendarDays  CalendarDay[]    @relation("DepartmentCalendarDays")
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
@@ -1009,6 +1011,130 @@ model OnDutyRequest {
   @@index([category])
   @@map("on_duty_requests")
 }
+
+// ----------------------------------------------------
+// Academic Calendar & Holiday Master Module
+// ----------------------------------------------------
+
+enum SemesterType {
+  ODD
+  EVEN
+
+  @@map("semester_type")
+}
+
+enum CalendarDayType {
+  WORKING_DAY
+  WEEKLY_OFF
+  PUBLIC_HOLIDAY
+  RESTRICTED_HOLIDAY
+  VACATION
+  EXAMINATION
+  INSTITUTIONAL_EVENT
+  ACADEMIC_EVENT
+  SPECIAL_WORKING_DAY
+
+  @@map("calendar_day_type")
+}
+
+model AcademicYear {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String        @unique
+  startDate    DateTime      @map("start_date") @db.Date
+  endDate      DateTime      @map("end_date") @db.Date
+  isCurrent    Boolean       @default(false) @map("is_current")
+  status       String        @default("ACTIVE")
+  semesters    Semester[]
+  calendarDays CalendarDay[]
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  @@index([isCurrent])
+  @@map("academic_years")
+}
+
+model Semester {
+  id                String          @id @default(uuid()) @db.Uuid
+  academicYearId    String          @map("academic_year_id") @db.Uuid
+  academicYear      AcademicYear    @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  name              String
+  type              SemesterType    @default(ODD)
+  startDate         DateTime        @map("start_date") @db.Date
+  endDate           DateTime        @map("end_date") @db.Date
+  teachingStartDate DateTime?       @map("teaching_start_date") @db.Date
+  teachingEndDate   DateTime?       @map("teaching_end_date") @db.Date
+  examStartDate     DateTime?       @map("exam_start_date") @db.Date
+  examEndDate       DateTime?       @map("exam_end_date") @db.Date
+  isCurrent         Boolean         @default(false) @map("is_current")
+  status            String          @default("ACTIVE")
+  calendarDays      CalendarDay[]
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  @@index([academicYearId])
+  @@index([isCurrent])
+  @@map("semesters")
+}
+
+model CalendarDay {
+  id                    String             @id @default(uuid()) @db.Uuid
+  date                  DateTime           @map("date") @db.Date
+  academicYearId        String             @map("academic_year_id") @db.Uuid
+  academicYear          AcademicYear       @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  semesterId            String?            @map("semester_id") @db.Uuid
+  semester              Semester?          @relation(fields: [semesterId], references: [id], onDelete: SetNull)
+  dayType               CalendarDayType    @map("day_type")
+  title                 String?
+  description           String?            @db.Text
+  isWorkingDay          Boolean            @map("is_working_day")
+  departmentId          Int?               @map("department_id")
+  department            Department?        @relation("DepartmentCalendarDays", fields: [departmentId], references: [id], onDelete: SetNull)
+  appliesToEmployeeType String?            @map("applies_to_employee_type")
+  source                String?            @default("MANUAL")
+  createdById           String?            @map("created_by_id") @db.Uuid
+  createdBy             User?              @relation("CalendarDayCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  restrictedHoliday     RestrictedHoliday?
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+
+  @@index([date])
+  @@index([academicYearId])
+  @@index([semesterId])
+  @@index([dayType])
+  @@index([departmentId])
+  @@map("calendar_days")
+}
+
+model RestrictedHoliday {
+  id                    String       @id @default(uuid()) @db.Uuid
+  calendarDayId         String?      @unique @map("calendar_day_id") @db.Uuid
+  calendarDay           CalendarDay? @relation(fields: [calendarDayId], references: [id], onDelete: SetNull)
+  name                  String
+  date                  DateTime     @map("date") @db.Date
+  active                Boolean      @default(true)
+  annualYear            String       @map("annual_year")
+  eligibleEmployeeTypes String?      @default("ALL") @map("eligible_employee_types")
+  description           String?      @db.Text
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+
+  @@index([date])
+  @@index([annualYear])
+  @@index([active])
+  @@map("restricted_holidays")
+}
+
+model WeeklyWorkingPattern {
+  id           String   @id @default(uuid()) @db.Uuid
+  dayOfWeek    Int      @unique @map("day_of_week")
+  dayName      String   @map("day_name")
+  isWorkingDay Boolean  @default(true) @map("is_working_day")
+  description  String?  @db.Text
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("weekly_working_patterns")
+}
+
 
 
 

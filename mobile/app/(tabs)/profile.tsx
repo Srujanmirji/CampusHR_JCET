@@ -170,6 +170,12 @@ export default function ProfileTab() {
             onPress={() => router.push('/profile/details?section=academic')}
           />
           <ProfileListRow
+            label="Academic calendar & holidays"
+            detail="Institutional events, exam dates & RH list"
+            icon="timetable"
+            onPress={() => router.push('/calendar' as any)}
+          />
+          <ProfileListRow
             label="Documents"
             detail="Verified, pending & expiring records"
             icon="document"

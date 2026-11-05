@@ -49,6 +49,12 @@ export const router = createBrowserRouter([
         lazy: page(() => import('@/features/on-duty/pages/OnDutyPage')),
       },
       {
+        path: '/academic-calendar',
+        lazy: page(
+          () => import('@/features/academic-calendar/pages/AcademicCalendarPage'),
+        ),
+      },
+      {
         path: '/timetable',
         lazy: page(() => import('@/features/timetable/pages/TimetablePage')),
       },

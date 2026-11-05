@@ -139,6 +139,13 @@ export const navigation: {
     group: 'Administration',
   },
   {
+    path: '/academic-calendar',
+    permission: 'academic_calendar.read',
+    label: 'Academic Calendar',
+    icon: CalendarDays,
+    group: 'Administration',
+  },
+  {
     path: '/settings',
     permission: 'settings.manage',
     label: 'Settings',
@@ -179,6 +186,13 @@ export const facultyNavigation: {
     permission: 'exam_duty.read',
     label: 'My Exam Duties',
     icon: GraduationCap,
+    group: 'My Academics',
+  },
+  {
+    path: '/academic-calendar',
+    permission: 'academic_calendar.read',
+    label: 'Academic Calendar',
+    icon: CalendarDays,
     group: 'My Academics',
   },
   {

@@ -69,6 +69,15 @@ import { createOnboardingRouter } from './modules/onboarding/onboarding.routes.j
 import { createOnDutyRepository } from './modules/on-duty/on-duty.repository.js';
 import { createOnDutyService } from './modules/on-duty/on-duty.service.js';
 import { createOnDutyRouter } from './modules/on-duty/on-duty.routes.js';
+import { createAcademicCalendarRepository } from './modules/academic-calendar/academic-calendar.repository.js';
+import { createAcademicCalendarService } from './modules/academic-calendar/academic-calendar.service.js';
+import {
+  createAcademicCalendarRouter,
+  createAcademicYearsRouter,
+  createSemestersRouter,
+  createHolidaysRouter,
+  createRestrictedHolidaysRouter,
+} from './modules/academic-calendar/academic-calendar.routes.js';
 
 // The built web app (`npm run build --workspace @campushr/web`). In production
 // the API serves it from the same address, so the SameSite=Strict refresh
@@ -296,6 +305,28 @@ export function createApp(
         notifications.notifier,
       ),
     ),
+  );
+  const academicCalendarRepo = createAcademicCalendarRepository(prisma);
+  const academicCalendarService = createAcademicCalendarService(academicCalendarRepo);
+  app.use(
+    '/api/v1/academic-calendar',
+    createAcademicCalendarRouter(auth, academicCalendarService),
+  );
+  app.use(
+    '/api/v1/academic-years',
+    createAcademicYearsRouter(auth, academicCalendarService),
+  );
+  app.use(
+    '/api/v1/semesters',
+    createSemestersRouter(auth, academicCalendarService),
+  );
+  app.use(
+    '/api/v1/holidays',
+    createHolidaysRouter(auth, academicCalendarService),
+  );
+  app.use(
+    '/api/v1/restricted-holidays',
+    createRestrictedHolidaysRouter(auth, academicCalendarService),
   );
   if (env.NODE_ENV === 'production' && existsSync(webDir)) {
     app.use(express.static(webDir, { index: false, maxAge: '1h' }));
