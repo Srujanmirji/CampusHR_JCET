@@ -18,12 +18,25 @@
 - **Approval:** every request goes Faculty → HOD → HR. Non-Teaching Staff → HR.
   An HOD's leave → Principal; the Principal's → Super Admin
   (`product/USER_ROLES.md`).
-- **Pending from JCET:** leave types, yearly quotas, half-day rules and what
-  happens to unused leave at year end. Built (15 October 2026) with these as
-  settings HR enters per leave type, so JCET's answers need no code change.
-- **Assumed until JCET confirms:** an HR Admin's leave goes to the Principal;
-  leave days count Monday–Saturday with no holiday calendar; quotas are not
-  pro-rated for staff who join mid-year.
+- **Standardized Institutional Leave Categories (JCET):**
+  - **CL — Casual Leave — 12**
+  - **EL — Earned Leave — 10**
+  - **SPL / ML — Special Leave / Medical Leave — configurable**
+    *(Important: Do not describe ML as Maternity Leave. If Maternity Leave is later required, it must be represented as a separate configurable leave policy unless institutional policy explicitly defines otherwise.)*
+  - **OOD — On Official Duty — 12**
+  - **ODE — Official / Examination Duty — 12**
+  - **RH — Restricted Holiday — configurable**
+  - **VL — Vacation Leave — configurable**
+- **On-Duty & Examination Duty Policy Integration:**
+  Current intended mapping for accredited duty credit:
+  - `UNIVERSITY_VALUATION` → **ODE**
+  - `EXTERNAL_EXAMINER` → **ODE**
+  - `CONFERENCE_SEMINAR` → **OOD**
+  - `FDP_WORKSHOP` → **OOD**
+  - `BOS_BOE_MEETING` → **OOD**
+  - `OFFICIAL_COLLEGE_DUTY` → **OOD**
+  - Internal Exam Duty remains an internal scheduling and invigilation feature.
+  - The future Leave Policy Engine will become the policy source of truth for dynamic evaluation, quotas, and rules-based overrides for this mapping.
 
 ## Validation
 

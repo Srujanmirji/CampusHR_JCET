@@ -34,6 +34,7 @@ export interface PublicUser {
 export interface Access {
   scope: Scope;
   userId: string;
+  role?: string;
   employeeId: string | null;
   departmentId: number | null;
 }
@@ -197,6 +198,7 @@ export function createAuthService(
       return {
         scope,
         userId,
+        role: user.role,
         employeeId: user.employeeId,
         departmentId: user.departmentId,
       };

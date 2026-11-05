@@ -44,6 +44,14 @@ export interface CalendarOverview {
   restrictedHolidaysCount: number;
 }
 
+export function getEmployeeCategoryFromRole(role?: string): 'TEACHING' | 'NON_TEACHING' | undefined {
+  if (!role) return undefined;
+  const normalized = role.toLowerCase().replace(/[-_\s]/g, '');
+  if (normalized.includes('nonteaching')) return 'NON_TEACHING';
+  if (normalized.includes('faculty') || normalized.includes('hod') || normalized.includes('teaching')) return 'TEACHING';
+  return undefined;
+}
+
 export interface DayClassification {
   date: string;
   dayOfWeek: number;
@@ -166,13 +174,13 @@ export function createAcademicCalendarService(
   }
 
   return {
-    async listAcademicYears(_access) {
-      
+    async listAcademicYears(access) {
+      void access;
       return repository.findAcademicYears();
     },
 
-    async getAcademicYearById(_access, id) {
-      
+    async getAcademicYearById(access, id) {
+      void access;
       const year = await repository.findAcademicYearById(id);
       if (!year) throw new HttpError(404, 'NOT_FOUND', 'Academic year not found.');
       return year;
@@ -269,12 +277,12 @@ export function createAcademicCalendarService(
     },
 
     async listSemesters(access, academicYearId) {
-      
+      void access;
       return repository.findSemesters(academicYearId);
     },
 
     async getSemesterById(access, id) {
-      
+      void access;
       const sem = await repository.findSemesterById(id);
       if (!sem) throw new HttpError(404, 'NOT_FOUND', 'Semester not found.');
       return sem;
@@ -432,8 +440,47 @@ export function createAcademicCalendarService(
     },
 
     async listCalendarDays(access, rawQuery) {
-      
       const query = queryCalendarSchema.parse(rawQuery);
+
+      let effectiveDepartmentId: number | null | undefined = query.departmentId;
+      let effectiveEmployeeType = query.appliesToEmployeeType;
+
+      const userCategory = getEmployeeCategoryFromRole(access.role);
+
+      if (access.scope === 'department') {
+        // Enforce department access
+        if (query.departmentId !== undefined && query.departmentId !== null) {
+          if (access.departmentId === null || query.departmentId !== access.departmentId) {
+            throw new HttpError(
+              403,
+              'FORBIDDEN',
+              'You do not have permission to view calendar records for another department.',
+            );
+          }
+        }
+        effectiveDepartmentId = access.departmentId !== null ? access.departmentId : null;
+
+        // Enforce employee category access
+        if (userCategory === 'NON_TEACHING') {
+          if (query.appliesToEmployeeType === 'TEACHING') {
+            throw new HttpError(
+              403,
+              'FORBIDDEN',
+              'You do not have permission to view teaching-only calendar records.',
+            );
+          }
+          effectiveEmployeeType = 'NON_TEACHING';
+        } else if (userCategory === 'TEACHING') {
+          if (query.appliesToEmployeeType === 'NON_TEACHING') {
+            throw new HttpError(
+              403,
+              'FORBIDDEN',
+              'You do not have permission to view non-teaching calendar records.',
+            );
+          }
+          effectiveEmployeeType = 'TEACHING';
+        }
+      }
 
       let startDate: Date | undefined;
       let endDate: Date | undefined;
@@ -456,8 +503,8 @@ export function createAcademicCalendarService(
         endDate,
         dayType: query.dayType,
         isWorkingDay: query.isWorkingDay,
-        departmentId: query.departmentId,
-        appliesToEmployeeType: query.appliesToEmployeeType,
+        departmentId: effectiveDepartmentId,
+        appliesToEmployeeType: effectiveEmployeeType,
         page: query.page,
         pageSize: query.pageSize,
       });
@@ -473,9 +520,34 @@ export function createAcademicCalendarService(
     },
 
     async getCalendarDayById(access, id) {
-      
       const day = await repository.findCalendarDayById(id);
       if (!day) throw new HttpError(404, 'NOT_FOUND', 'Calendar day entry not found.');
+
+      if (access.scope === 'department') {
+        if (day.departmentId !== null && day.departmentId !== access.departmentId) {
+          throw new HttpError(
+            403,
+            'FORBIDDEN',
+            'You do not have permission to view this department calendar record.',
+          );
+        }
+        const userCategory = getEmployeeCategoryFromRole(access.role);
+        if (userCategory === 'NON_TEACHING' && day.appliesToEmployeeType === 'TEACHING') {
+          throw new HttpError(
+            403,
+            'FORBIDDEN',
+            'You do not have permission to view teaching-only calendar records.',
+          );
+        }
+        if (userCategory === 'TEACHING' && day.appliesToEmployeeType === 'NON_TEACHING') {
+          throw new HttpError(
+            403,
+            'FORBIDDEN',
+            'You do not have permission to view non-teaching calendar records.',
+          );
+        }
+      }
+
       return day;
     },
 
@@ -638,9 +710,18 @@ export function createAcademicCalendarService(
     },
 
     async listHolidays(access, academicYearId) {
-      
+      let deptId: number | null | undefined = undefined;
+      let empType: string | undefined = undefined;
+
+      if (access.scope === 'department') {
+        deptId = access.departmentId !== null ? access.departmentId : null;
+        empType = getEmployeeCategoryFromRole(access.role);
+      }
+
       const { days } = await repository.findCalendarDays({
         academicYearId,
+        departmentId: deptId,
+        appliesToEmployeeType: empType,
         pageSize: 366,
       });
 
@@ -655,8 +736,8 @@ export function createAcademicCalendarService(
     },
 
     async listRestrictedHolidays(access, annualYear) {
-      
-      return repository.findRestrictedHolidays(annualYear);
+      const empType = access.scope === 'department' ? getEmployeeCategoryFromRole(access.role) : undefined;
+      return this.getRestrictedHolidays(annualYear, empType ? { employeeType: empType } : undefined);
     },
 
     async createRestrictedHoliday(access, rawInput) {
@@ -713,26 +794,30 @@ export function createAcademicCalendarService(
       return updated;
     },
 
-    async getOverview(_access) {
-      
-
+    async getOverview(access) {
       const currentAcademicYear = await repository.findCurrentAcademicYear();
       const currentSemester = await repository.findCurrentSemester();
 
       const today = new Date();
       today.setUTCHours(0, 0, 0, 0);
 
+      const deptId = access.scope === 'department' ? (access.departmentId !== null ? access.departmentId : null) : undefined;
+      const empType = access.scope === 'department' ? getEmployeeCategoryFromRole(access.role) : undefined;
+
       let semesterWorkingDays = 0;
       if (currentSemester) {
         semesterWorkingDays = await this.getWorkingDaysBetween(
           currentSemester.startDate,
           currentSemester.endDate,
+          { departmentId: deptId ?? undefined, employeeType: empType },
         );
       }
 
       // Fetch upcoming calendar entries
       const { days } = await repository.findCalendarDays({
         startDate: today,
+        departmentId: deptId,
+        appliesToEmployeeType: empType,
         pageSize: 100,
       });
 
@@ -750,7 +835,10 @@ export function createAcademicCalendarService(
         )
         .slice(0, 5);
 
-      const rhList = await repository.findRestrictedHolidays(currentAcademicYear?.name);
+      const rhList = await this.getRestrictedHolidays(
+        currentAcademicYear?.name,
+        empType ? { employeeType: empType } : undefined,
+      );
 
       return {
         currentAcademicYear,

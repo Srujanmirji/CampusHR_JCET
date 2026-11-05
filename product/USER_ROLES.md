@@ -96,7 +96,7 @@ The key is `resource.action.<scope>`, e.g. `leave.approve.department`.
 | `academic_profile.read`                         |      A      |    A     |     A     |  D  |    O    |         —          |
 | `academic_profile.update`                       |      A      |    A     |     —     |  O  |    O    |         —          |
 | **Academic calendar & holidays**                |             |          |           |     |         |                    |
-| `academic_calendar.read`                        |      A      |    A     |     A     |  A  |    A    |         A          |
+| `academic_calendar.read`                        |      A      |    A     |     A     |  D  |    D    |         D          |
 | `academic_calendar.manage`                      |      A      |    A     |     —     |  —  |    —    |         —          |
 | **Notifications**                               |             |          |           |     |         |                    |
 | `notification.read`                             |      O      |    O     |     O     |  O  |    O    |         O          |

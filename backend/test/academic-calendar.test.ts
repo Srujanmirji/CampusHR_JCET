@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
+import type { Prisma } from '../src/generated/prisma/client.js';
 import type {
   AcademicCalendarRepository,
   AcademicYearRecord,
@@ -9,9 +10,18 @@ import type {
   SemesterRecord,
   WeeklyWorkingPatternRecord,
 } from '../src/modules/academic-calendar/academic-calendar.repository.js';
+import {
+  CalendarDayType,
+  SemesterType,
+  AcademicYearStatus,
+} from '../src/modules/academic-calendar/academic-calendar.schema.js';
 import { createAcademicCalendarService } from '../src/modules/academic-calendar/academic-calendar.service.js';
 import type { Access } from '../src/modules/auth/auth.service.js';
 import { defaultGrants } from '../src/modules/auth/permissions.js';
+import {
+  resolveOnDutyLeaveType,
+  DEFAULT_ON_DUTY_LEAVE_MAPPING,
+} from '../src/modules/on-duty/on-duty.service.js';
 
 function createMemoryCalendarRepository(): AcademicCalendarRepository {
   const academicYears: AcademicYearRecord[] = [];
@@ -41,17 +51,17 @@ function createMemoryCalendarRepository(): AcademicCalendarRepository {
     async findCurrentAcademicYear() {
       return academicYears.find((y) => y.isCurrent) ?? null;
     },
-    async createAcademicYear(data: any) {
+    async createAcademicYear(data: Prisma.AcademicYearCreateInput) {
       if (data.isCurrent) {
         academicYears.forEach((y) => { y.isCurrent = false; });
       }
       const record: AcademicYearRecord = {
         id: randomUUID(),
         name: data.name,
-        startDate: data.startDate,
-        endDate: data.endDate,
+        startDate: data.startDate as Date,
+        endDate: data.endDate as Date,
         isCurrent: Boolean(data.isCurrent),
-        status: data.status ?? 'ACTIVE',
+        status: (data.status as AcademicYearStatus) ?? 'ACTIVE',
         createdAt: new Date(),
         updatedAt: new Date(),
         semesters: [],
@@ -59,13 +69,21 @@ function createMemoryCalendarRepository(): AcademicCalendarRepository {
       academicYears.push(record);
       return record;
     },
-    async updateAcademicYear(id, data: any) {
+    async updateAcademicYear(id, data: Prisma.AcademicYearUpdateInput) {
       const idx = academicYears.findIndex((y) => y.id === id);
       if (idx === -1) throw new Error('Not found');
       if (data.isCurrent) {
         academicYears.forEach((y) => { y.isCurrent = false; });
       }
-      const updated = { ...academicYears[idx]!, ...data, updatedAt: new Date() };
+      const updated = {
+        ...academicYears[idx]!,
+        ...(data.name !== undefined ? { name: data.name as string } : {}),
+        ...(data.startDate !== undefined ? { startDate: data.startDate as Date } : {}),
+        ...(data.endDate !== undefined ? { endDate: data.endDate as Date } : {}),
+        ...(data.isCurrent !== undefined ? { isCurrent: Boolean(data.isCurrent) } : {}),
+        ...(data.status !== undefined ? { status: data.status as AcademicYearStatus } : {}),
+        updatedAt: new Date(),
+      };
       academicYears[idx] = updated;
       return updated;
     },
@@ -85,36 +103,49 @@ function createMemoryCalendarRepository(): AcademicCalendarRepository {
     async findCurrentSemester() {
       return semesters.find((s) => s.isCurrent) ?? null;
     },
-    async createSemester(data: any) {
+    async createSemester(data: Prisma.SemesterCreateInput) {
       if (data.isCurrent) {
         semesters.forEach((s) => { s.isCurrent = false; });
       }
       const record: SemesterRecord = {
         id: randomUUID(),
-        academicYearId: data.academicYear.connect.id,
+        academicYearId: data.academicYear.connect!.id!,
         name: data.name,
-        type: data.type ?? 'ODD',
-        startDate: data.startDate,
-        endDate: data.endDate,
-        teachingStartDate: data.teachingStartDate ?? null,
-        teachingEndDate: data.teachingEndDate ?? null,
-        examStartDate: data.examStartDate ?? null,
-        examEndDate: data.examEndDate ?? null,
+        type: (data.type as SemesterType) ?? 'ODD',
+        startDate: data.startDate as Date,
+        endDate: data.endDate as Date,
+        teachingStartDate: (data.teachingStartDate as Date) ?? null,
+        teachingEndDate: (data.teachingEndDate as Date) ?? null,
+        examStartDate: (data.examStartDate as Date) ?? null,
+        examEndDate: (data.examEndDate as Date) ?? null,
         isCurrent: Boolean(data.isCurrent),
-        status: data.status ?? 'ACTIVE',
+        status: (data.status as string) ?? 'ACTIVE',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
       semesters.push(record);
       return record;
     },
-    async updateSemester(id, data: any) {
+    async updateSemester(id, data: Prisma.SemesterUpdateInput) {
       const idx = semesters.findIndex((s) => s.id === id);
       if (idx === -1) throw new Error('Not found');
       if (data.isCurrent) {
         semesters.forEach((s) => { s.isCurrent = false; });
       }
-      const updated = { ...semesters[idx]!, ...data, updatedAt: new Date() };
+      const updated: SemesterRecord = {
+        ...semesters[idx]!,
+        ...(data.name !== undefined ? { name: data.name as string } : {}),
+        ...(data.type !== undefined ? { type: data.type as SemesterType } : {}),
+        ...(data.startDate !== undefined ? { startDate: data.startDate as Date } : {}),
+        ...(data.endDate !== undefined ? { endDate: data.endDate as Date } : {}),
+        ...(data.teachingStartDate !== undefined ? { teachingStartDate: data.teachingStartDate as Date | null } : {}),
+        ...(data.teachingEndDate !== undefined ? { teachingEndDate: data.teachingEndDate as Date | null } : {}),
+        ...(data.examStartDate !== undefined ? { examStartDate: data.examStartDate as Date | null } : {}),
+        ...(data.examEndDate !== undefined ? { examEndDate: data.examEndDate as Date | null } : {}),
+        ...(data.isCurrent !== undefined ? { isCurrent: Boolean(data.isCurrent) } : {}),
+        ...(data.status !== undefined ? { status: data.status as string } : {}),
+        updatedAt: new Date(),
+      };
       semesters[idx] = updated;
       return updated;
     },
@@ -139,6 +170,23 @@ function createMemoryCalendarRepository(): AcademicCalendarRepository {
       }
       if (filter.isWorkingDay !== undefined) {
         filtered = filtered.filter((d) => d.isWorkingDay === filter.isWorkingDay);
+      }
+      if (filter.departmentId !== undefined) {
+        if (filter.departmentId === null) {
+          filtered = filtered.filter((d) => d.departmentId === null);
+        } else {
+          filtered = filtered.filter(
+            (d) => d.departmentId === filter.departmentId || d.departmentId === null,
+          );
+        }
+      }
+      if (filter.appliesToEmployeeType) {
+        filtered = filtered.filter(
+          (d) =>
+            !d.appliesToEmployeeType ||
+            d.appliesToEmployeeType === 'ALL' ||
+            d.appliesToEmployeeType.toUpperCase() === filter.appliesToEmployeeType!.toUpperCase(),
+        );
       }
       return { total: filtered.length, days: filtered };
     },
@@ -169,16 +217,30 @@ function createMemoryCalendarRepository(): AcademicCalendarRepository {
       }
       return applicableMatches.find((d) => d.departmentId === null) ?? applicableMatches[0]!;
     },
-    async findCalendarDaysByDateRange(startDate, endDate) {
-      return calendarDays.filter((d) => d.date >= startDate && d.date <= endDate);
+    async findCalendarDaysByDateRange(startDate, endDate, options) {
+      let matches = calendarDays.filter((d) => d.date >= startDate && d.date <= endDate);
+      if (options?.departmentId !== undefined && options?.departmentId !== null) {
+        matches = matches.filter(
+          (d) => d.departmentId === options.departmentId || d.departmentId === null,
+        );
+      }
+      if (options?.appliesToEmployeeType) {
+        matches = matches.filter(
+          (d) =>
+            !d.appliesToEmployeeType ||
+            d.appliesToEmployeeType === 'ALL' ||
+            d.appliesToEmployeeType.toUpperCase() === options.appliesToEmployeeType!.toUpperCase(),
+        );
+      }
+      return matches;
     },
-    async createCalendarDay(data: any) {
+    async createCalendarDay(data: Prisma.CalendarDayCreateInput) {
       const record: CalendarDayRecord = {
         id: randomUUID(),
-        date: data.date,
-        academicYearId: data.academicYear.connect.id,
+        date: data.date as Date,
+        academicYearId: data.academicYear.connect!.id!,
         semesterId: data.semester?.connect?.id ?? null,
-        dayType: data.dayType,
+        dayType: data.dayType as CalendarDayType,
         title: data.title ?? null,
         description: data.description ?? null,
         isWorkingDay: data.isWorkingDay,
@@ -199,7 +261,7 @@ function createMemoryCalendarRepository(): AcademicCalendarRepository {
           date: d.date as Date,
           academicYearId: d.academicYearId,
           semesterId: d.semesterId ?? null,
-          dayType: d.dayType as any,
+          dayType: d.dayType as CalendarDayType,
           title: d.title ?? null,
           description: d.description ?? null,
           isWorkingDay: d.isWorkingDay,
@@ -213,10 +275,25 @@ function createMemoryCalendarRepository(): AcademicCalendarRepository {
       }
       return daysData.length;
     },
-    async updateCalendarDay(id, data: any) {
+    async updateCalendarDay(id, data: Prisma.CalendarDayUpdateInput) {
       const idx = calendarDays.findIndex((d) => d.id === id);
       if (idx === -1) throw new Error('Not found');
-      const updated = { ...calendarDays[idx]!, ...data, updatedAt: new Date() };
+      const deptId =
+        data.department?.connect?.id !== undefined
+          ? data.department.connect.id
+          : data.department?.disconnect
+          ? null
+          : calendarDays[idx]!.departmentId;
+      const updated: CalendarDayRecord = {
+        ...calendarDays[idx]!,
+        ...(data.dayType !== undefined ? { dayType: data.dayType as CalendarDayType } : {}),
+        ...(data.title !== undefined ? { title: data.title as string | null } : {}),
+        ...(data.description !== undefined ? { description: data.description as string | null } : {}),
+        ...(data.isWorkingDay !== undefined ? { isWorkingDay: Boolean(data.isWorkingDay) } : {}),
+        departmentId: deptId,
+        ...(data.appliesToEmployeeType !== undefined ? { appliesToEmployeeType: data.appliesToEmployeeType as string | null } : {}),
+        updatedAt: new Date(),
+      };
       calendarDays[idx] = updated;
       return updated;
     },
@@ -235,12 +312,12 @@ function createMemoryCalendarRepository(): AcademicCalendarRepository {
     async findRestrictedHolidayById(id) {
       return restrictedHolidays.find((r) => r.id === id) ?? null;
     },
-    async createRestrictedHoliday(data: any) {
+    async createRestrictedHoliday(data: Prisma.RestrictedHolidayCreateInput) {
       const record: RestrictedHolidayRecord = {
         id: randomUUID(),
         calendarDayId: data.calendarDay?.connect?.id ?? null,
         name: data.name,
-        date: data.date,
+        date: data.date as Date,
         active: data.active ?? true,
         annualYear: data.annualYear,
         eligibleEmployeeTypes: data.eligibleEmployeeTypes ?? 'ALL',
@@ -251,10 +328,20 @@ function createMemoryCalendarRepository(): AcademicCalendarRepository {
       restrictedHolidays.push(record);
       return record;
     },
-    async updateRestrictedHoliday(id, data: any) {
+    async updateRestrictedHoliday(id, data: Prisma.RestrictedHolidayUpdateInput) {
       const idx = restrictedHolidays.findIndex((r) => r.id === id);
       if (idx === -1) throw new Error('Not found');
-      const updated = { ...restrictedHolidays[idx]!, ...data, updatedAt: new Date() };
+      const updated: RestrictedHolidayRecord = {
+        ...restrictedHolidays[idx]!,
+        ...(data.name !== undefined ? { name: data.name as string } : {}),
+        ...(data.date !== undefined ? { date: data.date as Date } : {}),
+        ...(data.annualYear !== undefined ? { annualYear: data.annualYear as string } : {}),
+        ...(data.eligibleEmployeeTypes !== undefined ? { eligibleEmployeeTypes: data.eligibleEmployeeTypes as string | null } : {}),
+        ...(data.description !== undefined ? { description: data.description as string | null } : {}),
+        updatedAt: new Date(),
+      };
+      restrictedHolidays[idx] = updated;
+      return updated;
       restrictedHolidays[idx] = updated;
       return updated;
     },
@@ -821,7 +908,7 @@ test('Vacation & Scope: Vacation scoped to TEACHING does not make date non-worki
   assert.equal(nonTeachingWorkingDays, 6);
 });
 
-test('RBAC: Super Admin and HR Admin can manage; HOD and Faculty are restricted to read', () => {
+test('RBAC: Super Admin and HR Admin can manage; HOD, Faculty, and Non-Teaching have department-scoped read', () => {
   const superAdminGrants: string[] = defaultGrants('Super Admin');
   const hrAdminGrants: string[] = defaultGrants('HR Admin');
   const principalGrants: string[] = defaultGrants('Principal');
@@ -835,15 +922,334 @@ test('RBAC: Super Admin and HR Admin can manage; HOD and Faculty are restricted 
   assert.ok(hrAdminGrants.includes('academic_calendar.manage.all'));
   assert.ok(hrAdminGrants.includes('academic_calendar.read.all'));
 
-  // Principal, HOD, Faculty, Non-Teaching have institutional read
+  // Principal has institutional read
   assert.ok(principalGrants.includes('academic_calendar.read.all'));
-  assert.ok(hodGrants.includes('academic_calendar.read.all'));
-  assert.ok(facultyGrants.includes('academic_calendar.read.all'));
-  assert.ok(nonTeachingGrants.includes('academic_calendar.read.all'));
+
+  // HOD, Faculty, and Non-Teaching have department-scoped read
+  assert.ok(hodGrants.includes('academic_calendar.read.department'));
+  assert.ok(facultyGrants.includes('academic_calendar.read.department'));
+  assert.ok(nonTeachingGrants.includes('academic_calendar.read.department'));
 
   // Principal, HOD, Faculty, Non-Teaching do NOT have manage permission
   assert.equal(principalGrants.some((g) => g.startsWith('academic_calendar.manage')), false);
   assert.equal(hodGrants.some((g) => g.startsWith('academic_calendar.manage')), false);
   assert.equal(facultyGrants.some((g) => g.startsWith('academic_calendar.manage')), false);
   assert.equal(nonTeachingGrants.some((g) => g.startsWith('academic_calendar.manage')), false);
+});
+
+test('Backend Scoping: Faculty cannot access unrelated department-only calendar records', async () => {
+  const repo = createMemoryCalendarRepository();
+  const service = createAcademicCalendarService(repo);
+  const adminAccess: Access = { scope: 'all', userId: 'admin', employeeId: null, departmentId: null };
+  const facultyDept1Access: Access = {
+    scope: 'department',
+    userId: 'fac-cse',
+    role: 'Faculty',
+    employeeId: 'emp-cse-1',
+    departmentId: 1, // CSE
+  };
+
+  const year = await service.createAcademicYear(adminAccess, {
+    name: '2026–27',
+    startDate: '2026-08-01',
+    endDate: '2027-07-31',
+  });
+
+  // Create an institution-wide public holiday
+  await service.createCalendarDay(adminAccess, {
+    date: '2026-08-15',
+    academicYearId: year.id,
+    dayType: 'PUBLIC_HOLIDAY',
+    title: 'Independence Day',
+    isWorkingDay: false,
+    departmentId: null,
+  });
+
+  // Create a CSE department-specific event (dept 1)
+  const cseEvent = await service.createCalendarDay(adminAccess, {
+    date: '2026-09-05',
+    academicYearId: year.id,
+    dayType: 'ACADEMIC_EVENT',
+    title: 'CSE Hackathon',
+    isWorkingDay: true,
+    departmentId: 1,
+  });
+
+  // Create an ECE department-specific event (dept 2)
+  const eceEvent = await service.createCalendarDay(adminAccess, {
+    date: '2026-09-10',
+    academicYearId: year.id,
+    dayType: 'ACADEMIC_EVENT',
+    title: 'ECE Robotics Workshop',
+    isWorkingDay: true,
+    departmentId: 2,
+  });
+
+  // 1. Faculty queries calendar without department parameter -> automatically scoped to Dept 1 + institution-wide
+  const facultyList = await service.listCalendarDays(facultyDept1Access, {});
+  const returnedIds = facultyList.data.map((d) => d.id);
+  assert.ok(returnedIds.includes(cseEvent.id), 'Faculty should receive own department records');
+  assert.equal(returnedIds.includes(eceEvent.id), false, 'Faculty must NOT receive unrelated department records');
+
+  // 2. Faculty explicitly queries another department (dept 2) -> 403 Forbidden
+  await assert.rejects(
+    async () => {
+      await service.listCalendarDays(facultyDept1Access, { departmentId: 2 });
+    },
+    (err: { status?: number; message?: string }) => err.status === 403 && /another department/i.test(err.message ?? ''),
+  );
+
+  // 3. Faculty queries single calendar day for Dept 2 -> 403 Forbidden
+  await assert.rejects(
+    async () => {
+      await service.getCalendarDayById(facultyDept1Access, eceEvent.id);
+    },
+    (err: { status?: number; message?: string }) => err.status === 403 && /department calendar record/i.test(err.message ?? ''),
+  );
+
+  // 4. Faculty queries single calendar day for Dept 1 -> Succeeds
+  const day = await service.getCalendarDayById(facultyDept1Access, cseEvent.id);
+  assert.equal(day.id, cseEvent.id);
+});
+
+test('Backend Scoping: HOD receives appropriate department-scoped records + institution-wide records', async () => {
+  const repo = createMemoryCalendarRepository();
+  const service = createAcademicCalendarService(repo);
+  const adminAccess: Access = { scope: 'all', userId: 'admin', employeeId: null, departmentId: null };
+  const hodEceAccess: Access = {
+    scope: 'department',
+    userId: 'hod-ece',
+    role: 'HOD',
+    employeeId: 'emp-ece-hod',
+    departmentId: 2, // ECE
+  };
+
+  const year = await service.createAcademicYear(adminAccess, {
+    name: '2026–27',
+    startDate: '2026-08-01',
+    endDate: '2027-07-31',
+  });
+
+  const instHoliday = await service.createCalendarDay(adminAccess, {
+    date: '2026-10-02',
+    academicYearId: year.id,
+    dayType: 'PUBLIC_HOLIDAY',
+    title: 'Gandhi Jayanti',
+    isWorkingDay: false,
+    departmentId: null,
+  });
+
+  const cseDay = await service.createCalendarDay(adminAccess, {
+    date: '2026-10-10',
+    academicYearId: year.id,
+    dayType: 'ACADEMIC_EVENT',
+    title: 'CSE Symposium',
+    isWorkingDay: true,
+    departmentId: 1,
+  });
+
+  const eceDay = await service.createCalendarDay(adminAccess, {
+    date: '2026-10-12',
+    academicYearId: year.id,
+    dayType: 'ACADEMIC_EVENT',
+    title: 'ECE Circuit Design Expo',
+    isWorkingDay: true,
+    departmentId: 2,
+  });
+
+  // HOD lists calendar days -> receives institution-wide + ECE days, excludes CSE days
+  const hodList = await service.listCalendarDays(hodEceAccess, {});
+  const hodDayIds = hodList.data.map((d) => d.id);
+  assert.ok(hodDayIds.includes(instHoliday.id));
+  assert.ok(hodDayIds.includes(eceDay.id));
+  assert.equal(hodDayIds.includes(cseDay.id), false);
+
+  // HOD accesses ECE day -> OK
+  const fetchedEce = await service.getCalendarDayById(hodEceAccess, eceDay.id);
+  assert.equal(fetchedEce.id, eceDay.id);
+
+  // HOD accesses CSE day -> 403 Forbidden
+  await assert.rejects(
+    async () => {
+      await service.getCalendarDayById(hodEceAccess, cseDay.id);
+    },
+    (err: { status?: number; message?: string }) => err.status === 403 && /department calendar record/i.test(err.message ?? ''),
+  );
+});
+
+test('Backend Scoping: Non-Teaching staff does not incorrectly receive Teaching-only vacation records', async () => {
+  const repo = createMemoryCalendarRepository();
+  const service = createAcademicCalendarService(repo);
+  const adminAccess: Access = { scope: 'all', userId: 'admin', employeeId: null, departmentId: null };
+  const nonTeachingAccess: Access = {
+    scope: 'department',
+    userId: 'staff-nt',
+    role: 'Non-Teaching Staff',
+    employeeId: 'emp-nt-1',
+    departmentId: null,
+  };
+
+  const year = await service.createAcademicYear(adminAccess, {
+    name: '2026–27',
+    startDate: '2026-08-01',
+    endDate: '2027-07-31',
+  });
+
+  // Teaching-only vacation
+  const teachingVacation = await service.createCalendarDay(adminAccess, {
+    date: '2026-12-24',
+    academicYearId: year.id,
+    dayType: 'VACATION',
+    title: 'Faculty Winter Vacation',
+    isWorkingDay: false,
+    appliesToEmployeeType: 'TEACHING',
+  });
+
+  // All-staff holiday
+  const allStaffVacation = await service.createCalendarDay(adminAccess, {
+    date: '2026-12-25',
+    academicYearId: year.id,
+    dayType: 'PUBLIC_HOLIDAY',
+    title: 'Christmas',
+    isWorkingDay: false,
+    appliesToEmployeeType: 'ALL',
+  });
+
+  // Non-teaching special training day
+  const nonTeachingTraining = await service.createCalendarDay(adminAccess, {
+    date: '2026-12-26',
+    academicYearId: year.id,
+    dayType: 'SPECIAL_WORKING_DAY',
+    title: 'Lab Staff Safety Audit',
+    isWorkingDay: true,
+    appliesToEmployeeType: 'NON_TEACHING',
+  });
+
+  // Restricted holiday for Teaching staff only
+  await service.createRestrictedHoliday(adminAccess, {
+    name: 'Special Teaching Commemoration',
+    date: '2026-09-08',
+    annualYear: '2026–27',
+    eligibleEmployeeTypes: 'TEACHING',
+  });
+
+  // Restricted holiday for All staff
+  const generalRh = await service.createRestrictedHoliday(adminAccess, {
+    name: 'Varamahalakshmi Vrata',
+    date: '2026-08-28',
+    annualYear: '2026–27',
+    eligibleEmployeeTypes: 'ALL',
+  });
+
+  // 1. Non-Teaching lists calendar days -> does not see Teaching-only vacation
+  const list = await service.listCalendarDays(nonTeachingAccess, {});
+  const returnedIds = list.data.map((d) => d.id);
+  assert.equal(returnedIds.includes(teachingVacation.id), false, 'Non-Teaching staff must not receive Teaching-only vacation');
+  assert.ok(returnedIds.includes(allStaffVacation.id));
+  assert.ok(returnedIds.includes(nonTeachingTraining.id));
+
+  // 2. Non-Teaching explicitly requests teaching-only records -> 403 Forbidden
+  await assert.rejects(
+    async () => {
+      await service.listCalendarDays(nonTeachingAccess, { appliesToEmployeeType: 'TEACHING' });
+    },
+    (err: { status?: number; message?: string }) => err.status === 403 && /teaching-only/i.test(err.message ?? ''),
+  );
+
+  // 3. Non-Teaching queries single teaching-only calendar day by id -> 403 Forbidden
+  await assert.rejects(
+    async () => {
+      await service.getCalendarDayById(nonTeachingAccess, teachingVacation.id);
+    },
+    (err: { status?: number; message?: string }) => err.status === 403 && /teaching-only/i.test(err.message ?? ''),
+  );
+
+  // 4. Non-Teaching lists restricted holidays -> Teaching-only RH is filtered out
+  const rhList = await service.listRestrictedHolidays(nonTeachingAccess, '2026–27');
+  assert.equal(rhList.some((r) => r.name === 'Special Teaching Commemoration'), false);
+  assert.ok(rhList.some((r) => r.id === generalRh.id));
+});
+
+test('Backend Scoping: Principal, HR Admin, and Super Admin can query across all departments and categories', async () => {
+  const repo = createMemoryCalendarRepository();
+  const service = createAcademicCalendarService(repo);
+  const superAdminAccess: Access = { scope: 'all', userId: 'sa', employeeId: null, departmentId: null };
+  const principalAccess: Access = { scope: 'all', userId: 'princ', employeeId: 'emp-p', departmentId: null };
+  const hrAdminAccess: Access = { scope: 'all', userId: 'hr', employeeId: 'emp-hr', departmentId: null };
+
+  const year = await service.createAcademicYear(superAdminAccess, {
+    name: '2026–27',
+    startDate: '2026-08-01',
+    endDate: '2027-07-31',
+  });
+
+  const cseDay = await service.createCalendarDay(superAdminAccess, {
+    date: '2026-09-01',
+    academicYearId: year.id,
+    dayType: 'ACADEMIC_EVENT',
+    title: 'CSE Orientation',
+    isWorkingDay: true,
+    departmentId: 1,
+  });
+
+  const eceDay = await service.createCalendarDay(superAdminAccess, {
+    date: '2026-09-02',
+    academicYearId: year.id,
+    dayType: 'ACADEMIC_EVENT',
+    title: 'ECE Orientation',
+    isWorkingDay: true,
+    departmentId: 2,
+  });
+
+  const teachingDay = await service.createCalendarDay(superAdminAccess, {
+    date: '2026-09-03',
+    academicYearId: year.id,
+    dayType: 'VACATION',
+    title: 'Faculty Research Break',
+    isWorkingDay: false,
+    appliesToEmployeeType: 'TEACHING',
+  });
+
+  for (const access of [superAdminAccess, principalAccess, hrAdminAccess]) {
+    // 1. Lists all days across departments
+    const allDays = await service.listCalendarDays(access, {});
+    const ids = allDays.data.map((d) => d.id);
+    assert.ok(ids.includes(cseDay.id));
+    assert.ok(ids.includes(eceDay.id));
+    assert.ok(ids.includes(teachingDay.id));
+
+    // 2. Can filter by department 2 without 403
+    const dept2Days = await service.listCalendarDays(access, { departmentId: 2 });
+    assert.ok(dept2Days.data.some((d) => d.id === eceDay.id));
+
+    // 3. Can fetch single calendar day by id for any department
+    const day = await service.getCalendarDayById(access, eceDay.id);
+    assert.equal(day.id, eceDay.id);
+  }
+});
+
+test('Leave OOD/ODE Integration Mapping: correctly maps On-Duty categories to OOD and ODE', () => {
+  // Official / Examination Duty (ODE)
+  assert.equal(resolveOnDutyLeaveType('UNIVERSITY_VALUATION'), 'ODE');
+  assert.equal(resolveOnDutyLeaveType('EXTERNAL_EXAMINER'), 'ODE');
+
+  // On Official Duty (OOD)
+  assert.equal(resolveOnDutyLeaveType('CONFERENCE_SEMINAR'), 'OOD');
+  assert.equal(resolveOnDutyLeaveType('FDP_WORKSHOP'), 'OOD');
+  assert.equal(resolveOnDutyLeaveType('BOS_BOE_MEETING'), 'OOD');
+  assert.equal(resolveOnDutyLeaveType('OFFICIAL_COLLEGE_DUTY'), 'OOD');
+  assert.equal(resolveOnDutyLeaveType('OTHER'), 'OOD');
+
+  // Verify configurable override capability
+  const overridden = resolveOnDutyLeaveType('UNIVERSITY_VALUATION', {
+    UNIVERSITY_VALUATION: 'OOD',
+  });
+  assert.equal(overridden, 'OOD');
+
+  assert.equal(DEFAULT_ON_DUTY_LEAVE_MAPPING.UNIVERSITY_VALUATION, 'ODE');
+  assert.equal(DEFAULT_ON_DUTY_LEAVE_MAPPING.EXTERNAL_EXAMINER, 'ODE');
+  assert.equal(DEFAULT_ON_DUTY_LEAVE_MAPPING.CONFERENCE_SEMINAR, 'OOD');
+  assert.equal(DEFAULT_ON_DUTY_LEAVE_MAPPING.FDP_WORKSHOP, 'OOD');
+  assert.equal(DEFAULT_ON_DUTY_LEAVE_MAPPING.BOS_BOE_MEETING, 'OOD');
+  assert.equal(DEFAULT_ON_DUTY_LEAVE_MAPPING.OFFICIAL_COLLEGE_DUTY, 'OOD');
 });

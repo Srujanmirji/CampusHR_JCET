@@ -20,9 +20,16 @@ The Academic Calendar & Holiday Master serves as the central, authoritative sour
 
 This module is designed so that future CampusHR modules can call its integration interfaces for:
 - **Leave-Day Calculation** (accurate deduction excluding non-working days)
-- **Leave Processing** (CL / EL / RH / VL)
+- **Leave Processing & Quotas** (standardized JCET leave types: `CL — Casual Leave — 12`, `EL — Earned Leave — 10`, `SPL / ML — Special Leave / Medical Leave — configurable` (note: ML is Medical Leave, NOT Maternity Leave), `OOD — On Official Duty — 12`, `ODE — Official / Examination Duty — 12`, `RH — Restricted Holiday — configurable`, `VL — Vacation Leave — configurable`)
 - **Attendance Calculation** (marking holidays, weekly offs, special working days)
-- **On-Duty (OD / ODE)** (accredited duty day calculations)
+- **On-Duty & Examination Duty (OOD / ODE)**:
+  - `UNIVERSITY_VALUATION` → ODE
+  - `EXTERNAL_EXAMINER` → ODE
+  - `CONFERENCE_SEMINAR` → OOD
+  - `FDP_WORKSHOP` → OOD
+  - `BOS_BOE_MEETING` → OOD
+  - `OFFICIAL_COLLEGE_DUTY` → OOD
+  - (Internal Exam Duty remains a scheduling/invigilation feature; the future Leave Policy Engine will be policy source of truth)
 - **Timetable Validation & Class Coverage**
 - **Annual Leave Rollover**
 - **Statutory & Institutional Reports**

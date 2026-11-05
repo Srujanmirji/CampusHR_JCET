@@ -49,7 +49,7 @@ export const MATRIX: Record<string, [Cell, Cell, Cell, Cell, Cell, Cell]> = {
   'document.verify': ['A', 'A', '-', '-', '-', '-'],
   'academic_profile.read': ['A', 'A', 'A', 'D', 'O', '-'],
   'academic_profile.update': ['A', 'A', '-', 'O', 'O', '-'],
-  'academic_calendar.read': ['A', 'A', 'A', 'A', 'A', 'A'],
+  'academic_calendar.read': ['A', 'A', 'A', 'D', 'D', 'D'],
   'academic_calendar.manage': ['A', 'A', '-', '-', '-', '-'],
   'notification.read': ['O', 'O', 'O', 'O', 'O', 'O'],
   'announcement.send': ['A', 'A', 'A', 'D', '-', '-'],

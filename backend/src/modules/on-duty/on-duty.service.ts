@@ -7,11 +7,14 @@ import {
   queryOnDutySchema,
   reviewOnDutySchema,
   uploadCertificateSchema,
+  resolveOnDutyLeaveType,
+  DEFAULT_ON_DUTY_LEAVE_MAPPING,
   type CreateOnDutyInput,
   type QueryOnDutyInput,
   type ReviewOnDutyInput,
   type UploadCertificateInput,
 } from './on-duty.schema.js';
+export { resolveOnDutyLeaveType, DEFAULT_ON_DUTY_LEAVE_MAPPING };
 import type {
   OnDutyMetrics,
   OnDutyRecord,
@@ -178,7 +181,7 @@ export function createOnDutyService(
         throw new HttpError(404, 'NOT_FOUND', 'Employee record not found.');
       }
 
-      const { totalDays, dates } = calculateWorkingDays(input.startDate, input.endDate);
+      const { totalDays } = calculateWorkingDays(input.startDate, input.endDate);
       if (totalDays === 0) {
         throw new HttpError(400, 'VALIDATION_ERROR', 'The selected dates fall only on non-working days.');
       }
