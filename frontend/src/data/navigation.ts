@@ -15,6 +15,7 @@ import {
   ScrollText,
   ClipboardList,
   UserPlus,
+  Briefcase,
 } from 'lucide-react';
 
 // `permission` (product/USER_ROLES.md) decides who sees each page; the
@@ -72,6 +73,13 @@ export const navigation: {
     permission: 'leave.read',
     label: 'Leave',
     icon: CalendarDays,
+    group: 'People & academics',
+  },
+  {
+    path: '/on-duty',
+    permission: 'on_duty.read',
+    label: 'On-Duty (OD)',
+    icon: Briefcase,
     group: 'People & academics',
   },
   {
@@ -188,6 +196,13 @@ export const facultyNavigation: {
     group: 'My Services',
   },
   {
+    path: '/on-duty',
+    permission: 'on_duty.read',
+    label: 'On-Duty (OD)',
+    icon: Briefcase,
+    group: 'My Services',
+  },
+  {
     path: '/documents',
     permission: 'document.read',
     label: 'My Documents',
@@ -284,6 +299,13 @@ export const hodNavigation: {
     permission: 'leave.read',
     label: 'Leave Approvals',
     icon: CalendarDays,
+    group: 'Department Staff',
+  },
+  {
+    path: '/on-duty',
+    permission: 'on_duty.read',
+    label: 'On-Duty Approvals',
+    icon: Briefcase,
     group: 'Department Staff',
   },
   {
@@ -400,6 +422,13 @@ export const principalNavigation: {
     group: 'Institutional People',
   },
   {
+    path: '/on-duty',
+    permission: 'on_duty.read',
+    label: 'On-Duty Sanctions',
+    icon: Briefcase,
+    group: 'Institutional People',
+  },
+  {
     path: '/reports',
     permission: 'report.read',
     label: 'Executive Reports',
@@ -447,6 +476,13 @@ export const nonTeachingNavigation: {
     permission: 'leave.read',
     label: 'Leave Applications',
     icon: CalendarDays,
+    group: 'My Services & Duties',
+  },
+  {
+    path: '/on-duty',
+    permission: 'on_duty.read',
+    label: 'On-Duty (OD)',
+    icon: Briefcase,
     group: 'My Services & Duties',
   },
   {

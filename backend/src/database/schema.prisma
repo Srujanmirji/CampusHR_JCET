@@ -67,6 +67,8 @@ model User {
   circularReceipts      CircularReadReceipt[]
   workAssignedBy        WorkAssignment[]       @relation("WorkAssignedBy")
   issuedAppointmentLetters OnboardingCandidate[] @relation("AppointmentLetterIssuer")
+  onDutyHodReviews      OnDutyRequest[]        @relation("OnDutyHodReview")
+  onDutyFinalApprovals  OnDutyRequest[]        @relation("OnDutyFinalApproval")
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt             DateTime         @updatedAt @map("updated_at")
   passwordResets        PasswordResetChallenge[]
@@ -187,6 +189,7 @@ model Employee {
   examDutySwapTarget    ExamDuty[]             @relation("ExamDutySwapTarget")
   workAssignedTo        WorkAssignment[]       @relation("WorkAssignedTo")
   onboardingRecord      OnboardingCandidate?   @relation("OnboardedCandidate")
+  onDutyRequests        OnDutyRequest[]
 
   @@index([departmentId])
   @@index([status])
@@ -468,6 +471,7 @@ enum AttendanceStatus {
   HALF_DAY
   ON_LEAVE
   LATE
+  ON_DUTY
 
   @@map("attendance_status")
 }
@@ -942,5 +946,69 @@ model OnboardingCandidate {
   @@index([appointmentRefNo])
   @@map("onboarding_candidates")
 }
+
+// ----------------------------------------------------
+// Official On-Duty (OD) & Valuation Management Module
+// ----------------------------------------------------
+
+enum OnDutyCategory {
+  UNIVERSITY_VALUATION
+  EXTERNAL_EXAMINER
+  CONFERENCE_SEMINAR
+  FDP_WORKSHOP
+  BOS_BOE_MEETING
+  OFFICIAL_COLLEGE_DUTY
+  OTHER
+
+  @@map("on_duty_category")
+}
+
+enum OnDutyStatus {
+  PENDING
+  RECOMMENDED
+  APPROVED
+  REJECTED
+  CANCELLED
+
+  @@map("on_duty_status")
+}
+
+model OnDutyRequest {
+  id                       String         @id @default(uuid()) @db.Uuid
+  employeeId               String         @map("employee_id") @db.Uuid
+  employee                 Employee       @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  category                 OnDutyCategory @default(UNIVERSITY_VALUATION)
+  title                    String
+  description              String         @db.Text
+  venue                    String
+  startDate                DateTime       @map("start_date") @db.Date
+  endDate                  DateTime       @map("end_date") @db.Date
+  totalDays                Float          @map("total_days")
+  status                   OnDutyStatus   @default(PENDING)
+  attachmentUrl            String?        @map("attachment_url")
+  attachmentName           String?        @map("attachment_name")
+  attendanceCertificateUrl String?        @map("attendance_certificate_url")
+
+  // HOD review / recommendation
+  hodReviewedById          String?        @map("hod_reviewed_by_id") @db.Uuid
+  hodReviewedBy            User?          @relation("OnDutyHodReview", fields: [hodReviewedById], references: [id], onDelete: SetNull)
+  hodReviewedAt            DateTime?      @map("hod_reviewed_at")
+  hodNote                  String?        @map("hod_note")
+
+  // Principal / Executive final approval
+  finalApprovedById        String?        @map("final_approved_by_id") @db.Uuid
+  finalApprovedBy          User?          @relation("OnDutyFinalApproval", fields: [finalApprovedById], references: [id], onDelete: SetNull)
+  finalApprovedAt          DateTime?      @map("final_approved_at")
+  finalNote                String?        @map("final_note")
+
+  createdAt                DateTime       @default(now()) @map("created_at")
+  updatedAt                DateTime       @updatedAt @map("updated_at")
+
+  @@index([employeeId, startDate])
+  @@index([status])
+  @@index([category])
+  @@map("on_duty_requests")
+}
+
 
 

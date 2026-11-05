@@ -72,6 +72,10 @@ The key is `resource.action.<scope>`, e.g. `leave.approve.department`.
 | `leave.cancel` (own pending requests)           |      —      |    O     |     O     |  O  |    O    |         O          |
 | `leave.approve` ²                               |      A      |    A     |     A     |  D  |    —    |         —          |
 | `leave_type.manage` (types, balances, policy)   |      A      |    A     |     —     |  —  |    —    |         —          |
+| **On-duty (OD)**                                |             |          |           |     |         |                    |
+| `on_duty.apply`                                 |      —      |    O     |     O     |  O  |    O    |         O          |
+| `on_duty.read`                                  |      A      |    A     |     A     |  D  |    O    |         O          |
+| `on_duty.approve`                               |      A      |    A     |     A     |  D  |    —    |         —          |
 | **Timetable**                                   |             |          |           |     |         |                    |
 | `timetable.read`                                |      A      |    A     |     A     |  D  |    O    |         —          |
 | `timetable.manage`                              |      A      |    —     |     —     |  D  |    —    |         —          |
