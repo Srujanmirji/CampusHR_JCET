@@ -72,6 +72,8 @@ The key is `resource.action.<scope>`, e.g. `leave.approve.department`.
 | `leave.cancel` (own pending requests)           |      —      |    O     |     O     |  O  |    O    |         O          |
 | `leave.approve` ²                               |      A      |    A     |     A     |  D  |    —    |         —          |
 | `leave_type.manage` (types, balances, policy)   |      A      |    A     |     —     |  —  |    —    |         —          |
+| `leave_policy.read`                             |      A      |    A     |     A     |  D  |    O    |         O          |
+| `leave_policy.manage`                           |      A      |    A     |     —     |  —  |    —    |         —          |
 | **On-duty (OD)**                                |             |          |           |     |         |                    |
 | `on_duty.apply`                                 |      —      |    O     |     O     |  O  |    O    |         O          |
 | `on_duty.read`                                  |      A      |    A     |     A     |  D  |    O    |         O          |
@@ -96,7 +98,7 @@ The key is `resource.action.<scope>`, e.g. `leave.approve.department`.
 | `academic_profile.read`                         |      A      |    A     |     A     |  D  |    O    |         —          |
 | `academic_profile.update`                       |      A      |    A     |     —     |  O  |    O    |         —          |
 | **Academic calendar & holidays**                |             |          |           |     |         |                    |
-| `academic_calendar.read`                        |      A      |    A     |     A     |  A  |    A    |         A          |
+| `academic_calendar.read`                        |      A      |    A     |     A     |  D  |    D    |         D          |
 | `academic_calendar.manage`                      |      A      |    A     |     —     |  —  |    —    |         —          |
 | **Notifications**                               |             |          |           |     |         |                    |
 | `notification.read`                             |      O      |    O     |     O     |  O  |    O    |         O          |

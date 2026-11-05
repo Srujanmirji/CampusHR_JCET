@@ -85,7 +85,6 @@ export function getLeaveBadgeTheme(code: string) {
 
 export function LeaveTypeBadge({
   code,
-  name,
 }: {
   code: string;
   name?: string;

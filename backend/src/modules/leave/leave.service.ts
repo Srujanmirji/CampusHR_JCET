@@ -3,6 +3,8 @@ import type { Prisma } from '../../generated/prisma/client.js';
 import type { Access } from '../auth/auth.service.js';
 import type { RoleName } from '../auth/permissions.js';
 import type { Notifier } from '../notifications/notifications.service.js';
+import type { AcademicCalendarService } from '../academic-calendar/academic-calendar.service.js';
+import type { LeavePolicyService } from './leave-policy.service.js';
 import { APPROVER_CHAIN, countLeaveDays, yearBalance } from './leave.rules.js';
 import type {
   LeaveRepository,
@@ -170,7 +172,12 @@ type RequestDto = ReturnType<typeof toRequestDto>;
 const summary = (request: RequestDto) =>
   `${request.leaveType.name} · ${request.startDate === request.endDate ? request.startDate : `${request.startDate} to ${request.endDate}`} · ${formatDays(request.days)}`;
 
-export function createLeaveService(repo: LeaveRepository, notifier?: Notifier) {
+export function createLeaveService(
+  repo: LeaveRepository,
+  notifier?: Notifier,
+  calendarService?: AcademicCalendarService,
+  policyService?: LeavePolicyService,
+) {
   /** Tells whoever acts next that a request waits for them. */
   const notifyApprovers = (request: RequestDto) =>
     request.pendingRole && notifier
@@ -257,6 +264,7 @@ export function createLeaveService(repo: LeaveRepository, notifier?: Notifier) {
       if (!employee || employee.status !== 'ACTIVE') {
         throw forbidden('Your login is not linked to an active employee.');
       }
+      const category = (employee as { designation?: { category?: string } }).designation?.category ?? 'TEACHING';
       const chain = APPROVER_CHAIN[user.role.name as RoleName];
       if (!chain) throw forbidden('Your role does not apply for leave.');
       const type = await repo.findType(input.leaveTypeId);
@@ -266,9 +274,74 @@ export function createLeaveService(repo: LeaveRepository, notifier?: Notifier) {
       }
       const start = toDate(input.startDate);
       const end = toDate(input.endDate);
-      const days = countLeaveDays(start, end, input.halfDay !== null);
-      if (days === 0) throw invalid('Those dates are all Sundays.');
       const year = start.getUTCFullYear();
+
+      let days = 0;
+      if (calendarService) {
+        if (input.halfDay !== null && input.halfDay !== undefined) {
+          const isWorking = await calendarService.isWorkingDay(start, {
+            departmentId: employee.departmentId,
+            employeeType: category,
+          });
+          days = isWorking ? 0.5 : 0;
+        } else {
+          days = await calendarService.getWorkingDaysBetween(start, end, {
+            departmentId: employee.departmentId,
+            employeeType: category,
+          });
+        }
+      } else {
+        days = countLeaveDays(start, end, input.halfDay !== null);
+      }
+      if (days === 0) throw invalid('Those dates are all Sundays or non-working days.');
+
+      // Policy checks
+      let resolvedPolicyId: string | null = null;
+      let coverageRequired = input.coverageRequired ?? true;
+
+      if (policyService) {
+        const policies = await policyService.getApplicablePolicies(access, employee.id, String(year));
+        const policy = policies.find((p) => p.code === type.code);
+        if (policy) {
+          resolvedPolicyId = policy.id;
+          if (!policy.active) {
+            throw invalid(`${policy.name} is currently inactive for your role.`);
+          }
+          if (input.halfDay && !policy.halfDayAllowed) {
+            throw invalid(`${policy.name} cannot be taken as a half day.`);
+          }
+          if (policy.minimumNoticeDays > 0) {
+            const today = new Date();
+            today.setUTCHours(0, 0, 0, 0);
+            const noticeDays = Math.floor((start.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+            if (noticeDays < policy.minimumNoticeDays) {
+              throw invalid(`${policy.name} requires at least ${policy.minimumNoticeDays} days of advance notice.`);
+            }
+          }
+          if (policy.maximumConsecutiveDays !== null && days > policy.maximumConsecutiveDays) {
+            throw invalid(`${policy.name} allows at most ${policy.maximumConsecutiveDays} consecutive days.`);
+          }
+          if (policy.attachmentRequired && !input.attachmentName && !input.attachmentUrl) {
+            throw invalid(`Supporting document/attachment is mandatory for ${policy.name}.`);
+          }
+          if (policy.code === 'RH' && calendarService) {
+            const rhs = await calendarService.getRestrictedHolidays(year, { employeeType: category });
+            const sIso = isoDate(start);
+            const isRh = rhs.some((rh) => {
+              const dStr = typeof rh.date === 'string' ? rh.date : (rh.date as Date).toISOString().slice(0, 10);
+              return dStr === sIso && rh.active;
+            });
+            if (!isRh) {
+              throw invalid(`${sIso} is not an approved restricted holiday for ${year}.`);
+            }
+          }
+          if (category === 'TEACHING') {
+            coverageRequired = policy.requiresAcademicCoverage;
+          } else {
+            coverageRequired = policy.requiresOperationalCoverage;
+          }
+        }
+      }
 
       try {
         const created = await repo.submit(
@@ -276,6 +349,7 @@ export function createLeaveService(repo: LeaveRepository, notifier?: Notifier) {
             employeeId: employee.id,
             departmentId: employee.departmentId,
             leaveTypeId: type.id,
+            policyId: resolvedPolicyId,
             startDate: start,
             endDate: end,
             halfDay: input.halfDay,
@@ -291,9 +365,10 @@ export function createLeaveService(repo: LeaveRepository, notifier?: Notifier) {
             attachmentUrl: input.attachmentUrl,
             restrictedHolidayId: input.restrictedHolidayId,
             vacationPeriodId: input.vacationPeriodId,
-            coverageRequired: input.coverageRequired ?? true,
+            coverageRequired,
+            operationalCoverageRole: category === 'NON_TEACHING' ? (user.role.name || 'Staff') : null,
           } as Parameters<typeof repo.submit>[0],
-          (taken) => {
+          async (taken) => {
             const overlap = taken.find(
               (other) => other.startDate <= end && start <= other.endDate,
             );
@@ -304,18 +379,34 @@ export function createLeaveService(repo: LeaveRepository, notifier?: Notifier) {
                 `You already have leave from ${isoDate(overlap.startDate)} to ${isoDate(overlap.endDate)}.`,
               );
             }
-            const balance = yearBalance(
-              type,
-              daysByYear(taken, type.id),
-              year,
-              employee.joiningDate.getUTCFullYear(),
-            );
-            if (balance.remaining !== null && days > balance.remaining) {
-              throw new HttpError(
-                400,
-                'INSUFFICIENT_BALANCE',
-                `Only ${formatDays(balance.remaining)} of ${type.name} left in ${year}; this request needs ${formatDays(days)}.`,
+            if (policyService && resolvedPolicyId) {
+              const balance = await policyService.calculateEmployeeBalance(
+                access,
+                employee.id,
+                type.code,
+                String(year),
               );
+              if (balance.remaining !== null && days > balance.remaining) {
+                throw new HttpError(
+                  400,
+                  'INSUFFICIENT_BALANCE',
+                  `Only ${formatDays(balance.remaining)} of ${type.name} left in ${year}; this request needs ${formatDays(days)}.`,
+                );
+              }
+            } else {
+              const balance = yearBalance(
+                type,
+                daysByYear(taken, type.id),
+                year,
+                employee.joiningDate.getUTCFullYear(),
+              );
+              if (balance.remaining !== null && days > balance.remaining) {
+                throw new HttpError(
+                  400,
+                  'INSUFFICIENT_BALANCE',
+                  `Only ${formatDays(balance.remaining)} of ${type.name} left in ${year}; this request needs ${formatDays(days)}.`,
+                );
+              }
             }
           },
           { actorUserId: access.userId, action: 'leave.apply', ip },
@@ -472,6 +563,43 @@ export function createLeaveService(repo: LeaveRepository, notifier?: Notifier) {
       if (!visible)
         throw new HttpError(404, 'NOT_FOUND', 'Employee not found.');
       const year = query.year ?? new Date().getUTCFullYear();
+
+      if (policyService) {
+        const computedBalances = await policyService.calculateAllBalances(
+          access,
+          employee.id,
+          String(year),
+        );
+        const types = await repo.types();
+        return computedBalances.map((cb) => {
+          const type = types.find((t) => t.code === cb.leaveCode) ?? {
+            id: 0,
+            code: cb.leaveCode,
+            name: cb.leaveName,
+            active: true,
+          };
+          return {
+            leaveType: { id: type.id, code: cb.leaveCode, name: cb.leaveName },
+            active: true,
+            year,
+            entitled: cb.entitled,
+            carriedIn: cb.carriedIn,
+            used: cb.used,
+            pending: cb.pending,
+            remaining: cb.remaining,
+            adjustments: cb.adjustments,
+            allowHalfDay: cb.allowHalfDay,
+            attachmentRequired: cb.attachmentRequired,
+            requiresAcademicCoverage: cb.requiresAcademicCoverage,
+            requiresOperationalCoverage: cb.requiresOperationalCoverage,
+            attendanceStatus: cb.attendanceStatus,
+            employeeCategory: cb.employeeCategory,
+            policyId: cb.policyId,
+            isPolicyBased: cb.isPolicyBased,
+          };
+        });
+      }
+
       const taken = await repo.taken(employee.id);
       const firstYear = employee.joiningDate.getUTCFullYear();
       return (await repo.types())
@@ -548,57 +676,133 @@ export function createLeaveService(repo: LeaveRepository, notifier?: Notifier) {
       const records: EmployeeRolloverRecord[] = [];
 
       for (const emp of employees) {
-        const empTaken = takenByEmp.get(emp.id) ?? [];
-        const firstYear = emp.joiningDate.getUTCFullYear();
+        let balances: EmployeeRolloverRecord['balances'];
 
-        const balances = types
-          .filter((t) => t.active)
-          .map((type) => {
-            const takenDays = daysByYear(empTaken, type.id);
-            const balFrom = yearBalance(type, takenDays, fromYear, firstYear);
-            const balTo = yearBalance(type, takenDays, toYear, firstYear);
+        if (policyService) {
+          const policiesFrom = await policyService.getApplicablePolicies(
+            access,
+            emp.id,
+            String(fromYear),
+          );
+          const policiesTo = await policyService.getApplicablePolicies(
+            access,
+            emp.id,
+            String(toYear),
+          );
 
-            let closingBalance: number | null = null;
-            let carriedForward = 0;
-            let lapsed = 0;
-            let encashed = 0;
-            let nextYearOpening: number | null = null;
+          balances = await Promise.all(
+            policiesFrom.map(async (polFrom) => {
+              const polTo = policiesTo.find((p) => p.code === polFrom.code);
+              const type = types.find((t) => t.code === polFrom.code);
 
-            if (type.yearlyQuota !== null && type.yearlyQuota !== undefined) {
-              closingBalance = Math.max(
-                0,
-                balFrom.entitled !== null ? balFrom.entitled - balFrom.used : 0,
-              );
-              carriedForward = balTo.carriedIn;
-              const surplus = Math.max(0, closingBalance - carriedForward);
+              let closingBalance: number | null = null;
+              let carriedForward = 0;
+              let lapsed = 0;
+              let encashed = 0;
+              let nextYearOpening: number | null = null;
 
-              if (encashSurplusEL && type.code === 'EL') {
-                encashed = surplus;
-                lapsed = 0;
-              } else {
-                encashed = 0;
-                lapsed = surplus;
+              if (polFrom.annualEntitlement !== null) {
+                const balFrom = await policyService.calculateEmployeeBalance(
+                  access,
+                  emp.id,
+                  polFrom.code,
+                  String(fromYear),
+                );
+
+                closingBalance = Math.max(
+                  0,
+                  balFrom.entitled !== null ? balFrom.entitled - balFrom.used : 0,
+                );
+
+                const carryForwardAllowed = polTo ? polTo.carryForwardAllowed : polFrom.carryForwardAllowed;
+                const carryForwardCap = (polTo ? polTo.carryForwardLimit : polFrom.carryForwardLimit) ?? 0;
+                carriedForward = carryForwardAllowed ? Math.min(carryForwardCap, closingBalance) : 0;
+                const surplus = Math.max(0, closingBalance - carriedForward);
+
+                if (encashSurplusEL && polFrom.code === 'EL') {
+                  encashed = surplus;
+                  lapsed = 0;
+                } else {
+                  encashed = 0;
+                  const lapseAtYearEnd = polTo ? polTo.lapseAtYearEnd : polFrom.lapseAtYearEnd;
+                  lapsed = (lapseAtYearEnd || carryForwardAllowed) ? surplus : 0;
+                }
+
+                const toEntitlement = polTo?.annualEntitlement ?? polFrom.annualEntitlement;
+                nextYearOpening = toEntitlement !== null ? toEntitlement + carriedForward : null;
               }
-              nextYearOpening = balTo.entitled;
-            }
 
-            totalDaysCarriedForward += carriedForward;
-            totalDaysLapsed += lapsed;
-            totalDaysEncashed += encashed;
+              totalDaysCarriedForward += carriedForward;
+              totalDaysLapsed += lapsed;
+              totalDaysEncashed += encashed;
 
-            return {
-              leaveTypeId: type.id,
-              leaveTypeCode: type.code,
-              leaveTypeName: type.name,
-              yearlyQuota: type.yearlyQuota,
-              carryForwardMax: type.carryForwardMax,
-              closingBalance,
-              carriedForward,
-              lapsed,
-              encashed,
-              nextYearOpening,
-            };
-          });
+              return {
+                leaveTypeId: type?.id ?? 0,
+                leaveTypeCode: polFrom.code,
+                leaveTypeName: polFrom.name,
+                yearlyQuota: polFrom.annualEntitlement,
+                carryForwardMax: polFrom.carryForwardLimit ?? 0,
+                closingBalance,
+                carriedForward,
+                lapsed,
+                encashed,
+                nextYearOpening,
+              };
+            }),
+          );
+        } else {
+          const empTaken = takenByEmp.get(emp.id) ?? [];
+          const firstYear = emp.joiningDate.getUTCFullYear();
+
+          balances = types
+            .filter((t) => t.active)
+            .map((type) => {
+              const takenDays = daysByYear(empTaken, type.id);
+              const balFrom = yearBalance(type, takenDays, fromYear, firstYear);
+              const balTo = yearBalance(type, takenDays, toYear, firstYear);
+
+              let closingBalance: number | null = null;
+              let carriedForward = 0;
+              let lapsed = 0;
+              let encashed = 0;
+              let nextYearOpening: number | null = null;
+
+              if (type.yearlyQuota !== null && type.yearlyQuota !== undefined) {
+                closingBalance = Math.max(
+                  0,
+                  balFrom.entitled !== null ? balFrom.entitled - balFrom.used : 0,
+                );
+                carriedForward = balTo.carriedIn;
+                const surplus = Math.max(0, closingBalance - carriedForward);
+
+                if (encashSurplusEL && type.code === 'EL') {
+                  encashed = surplus;
+                  lapsed = 0;
+                } else {
+                  encashed = 0;
+                  lapsed = surplus;
+                }
+                nextYearOpening = balTo.entitled;
+              }
+
+              totalDaysCarriedForward += carriedForward;
+              totalDaysLapsed += lapsed;
+              totalDaysEncashed += encashed;
+
+              return {
+                leaveTypeId: type.id,
+                leaveTypeCode: type.code,
+                leaveTypeName: type.name,
+                yearlyQuota: type.yearlyQuota,
+                carryForwardMax: type.carryForwardMax,
+                closingBalance,
+                carriedForward,
+                lapsed,
+                encashed,
+                nextYearOpening,
+              };
+            });
+        }
 
         const empCarried = balances.reduce(
           (sum, b) => sum + b.carriedForward,
@@ -654,10 +858,28 @@ export function createLeaveService(repo: LeaveRepository, notifier?: Notifier) {
       input: RolloverExecuteInput,
       _ip?: string,
     ) {
+      void _ip;
       if (access.scope !== 'all') {
         throw forbidden(
           'Only institutional HR Administrators can execute year-end leave rollover.',
         );
+      }
+
+      if (policyService) {
+        const rolloverTag = `[ANNUAL_ROLLOVER_${input.fromYear}_${input.toYear}]`;
+        const existingAdjustments = await policyService.listAdjustments(access, {
+          policyYear: String(input.toYear),
+        });
+        const alreadyExecuted = existingAdjustments.some((adj) =>
+          adj.reason.startsWith(rolloverTag),
+        );
+        if (alreadyExecuted) {
+          throw new HttpError(
+            409,
+            'ROLLOVER_ALREADY_EXECUTED',
+            `Annual leave rollover from ${input.fromYear} to ${input.toYear} has already been executed.`,
+          );
+        }
       }
 
       const summary = await this.previewRollover(access, {
@@ -666,6 +888,34 @@ export function createLeaveService(repo: LeaveRepository, notifier?: Notifier) {
         departmentId: input.departmentId,
         encashSurplusEL: input.encashSurplusEL,
       });
+
+      if (policyService) {
+        const rolloverTag = `[ANNUAL_ROLLOVER_${input.fromYear}_${input.toYear}]`;
+        for (const record of summary.records) {
+          for (const b of record.balances) {
+            if (b.carriedForward > 0) {
+              await policyService.createAdjustment(access, {
+                employeeId: record.employeeId,
+                leaveCode: b.leaveTypeCode,
+                policyYear: String(input.toYear),
+                adjustmentType: 'CARRY_FORWARD_CORRECTION',
+                days: b.carriedForward,
+                reason: `${rolloverTag} Carried forward ${b.carriedForward} days from ${input.fromYear}`,
+              });
+            }
+            if (b.lapsed > 0) {
+              await policyService.createAdjustment(access, {
+                employeeId: record.employeeId,
+                leaveCode: b.leaveTypeCode,
+                policyYear: String(input.toYear),
+                adjustmentType: 'LAPSE',
+                days: b.lapsed,
+                reason: `${rolloverTag} Lapsed ${b.lapsed} unused days from ${input.fromYear}`,
+              });
+            }
+          }
+        }
+      }
 
       if (notifier) {
         await notifier.notifyRole('HOD', null, {

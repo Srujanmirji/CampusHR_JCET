@@ -31,6 +31,13 @@ import { createEmployeeService } from './modules/employees/employee.service.js';
 import { createLeaveRepository } from './modules/leave/leave.repository.js';
 import { createLeaveRouter } from './modules/leave/leave.routes.js';
 import { createLeaveService } from './modules/leave/leave.service.js';
+import { createLeavePolicyRepository } from './modules/leave/leave-policy.repository.js';
+import { createLeavePolicyService } from './modules/leave/leave-policy.service.js';
+import {
+  createLeavePolicyRouter,
+  createLeaveBalancesRouter,
+  createLeaveAdjustmentsRouter,
+} from './modules/leave/leave-policy.routes.js';
 import {
   createPushRepository,
   createPushRouter,
@@ -203,12 +210,29 @@ export function createApp(
   );
   app.use('/api/v1/departments', createDepartmentRouter(auth, departments));
   app.use('/api/v1/designations', createDesignationRouter(auth, departments));
+
+  const academicCalendarRepo = createAcademicCalendarRepository(prisma);
+  const academicCalendarService = createAcademicCalendarService(academicCalendarRepo);
+  const leaveRepo = createLeaveRepository(prisma);
+  const leavePolicyRepo = createLeavePolicyRepository(prisma);
+  const leavePolicyService = createLeavePolicyService(leavePolicyRepo, leaveRepo, academicCalendarService);
+  const leaveService = createLeaveService(leaveRepo, notifications.notifier, academicCalendarService, leavePolicyService);
+
   app.use(
     '/api/v1/leave',
-    createLeaveRouter(
-      auth,
-      createLeaveService(createLeaveRepository(prisma), notifications.notifier),
-    ),
+    createLeaveRouter(auth, leaveService),
+  );
+  app.use(
+    '/api/v1/leave-policies',
+    createLeavePolicyRouter(auth, leavePolicyService),
+  );
+  app.use(
+    '/api/v1/leave-balances',
+    createLeaveBalancesRouter(auth, leavePolicyService),
+  );
+  app.use(
+    '/api/v1/leave-adjustments',
+    createLeaveAdjustmentsRouter(auth, leavePolicyService),
   );
   app.use(
     '/api/v1/notifications/push',
@@ -306,8 +330,6 @@ export function createApp(
       ),
     ),
   );
-  const academicCalendarRepo = createAcademicCalendarRepository(prisma);
-  const academicCalendarService = createAcademicCalendarService(academicCalendarRepo);
   app.use(
     '/api/v1/academic-calendar',
     createAcademicCalendarRouter(auth, academicCalendarService),

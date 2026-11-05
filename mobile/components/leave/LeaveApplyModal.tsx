@@ -46,8 +46,6 @@ import {
   leaveDates,
   LeaveStatus,
   LeaveTypeBadge,
-  OfficialDutyBadge,
-  getLeaveBadgeTheme,
 } from './LeavePresentation';
 import {
   findRecordedLeaveIntent,
@@ -130,15 +128,16 @@ export function LeaveApplyModal({
   const isMedical = code === 'SPL_ML';
   const isRestrictedHoliday = code === 'RH';
   const isVacation = code === 'VL';
+  const isNonTeaching = currentUser.role === 'Non-Teaching Staff';
 
   const timetableQuery = useQuery({
     queryKey: ['timetable', currentUser.id, 'entries'],
     queryFn: () => getTimetableEntries(token, { facultyId: currentUser.id }),
-    enabled: !!token && !!currentUser.id,
+    enabled: !!token && !!currentUser.id && !isNonTeaching,
   });
 
   const affectedClasses = useMemo(() => {
-    if (!timetableQuery.data || !startDate || !endDate || endDate < startDate)
+    if (isNonTeaching || !timetableQuery.data || !startDate || !endDate || endDate < startDate)
       return [];
     const classes: {
       date: string;
@@ -181,7 +180,7 @@ export function LeaveApplyModal({
       }
     }
     return classes;
-  }, [timetableQuery.data, startDate, endDate]);
+  }, [timetableQuery.data, startDate, endDate, isNonTeaching]);
 
   const busy = useRef(false);
   const [blockedIntents, setBlockedIntents] = useState<ReadonlySet<string>>(
@@ -893,12 +892,28 @@ export function LeaveApplyModal({
                 helperText="At least 3 characters. Your reason is recorded with the request."
               />
 
-              {/* Real-time Academic Impact Detection */}
+              {/* Real-time Workforce Impact Detection */}
               <View style={styles.impact}>
-                <Icon name="school" color={theme.colors.primary} />
+                <Icon name={isNonTeaching ? 'coverage' : 'school'} color={theme.colors.primary} />
                 <View style={styles.grow}>
-                  <Text style={styles.impactTitle}>Academic Impact</Text>
-                  {affectedClasses.length > 0 ? (
+                  <Text style={styles.impactTitle}>
+                    {isNonTeaching ? 'Operational Coverage Impact' : 'Academic Impact'}
+                  </Text>
+                  {isNonTeaching ? (
+                    <>
+                      <Text style={styles.impactCount}>
+                        Non-teaching operational coverage
+                      </Text>
+                      <Text style={styles.affectedMeta}>
+                        Does not affect teaching classes. Operational responsibilities routed to HR Admin.
+                      </Text>
+                      <View style={styles.coverageBadge}>
+                        <Text style={styles.coverageBadgeText}>
+                          Operational coverage active
+                        </Text>
+                      </View>
+                    </>
+                  ) : affectedClasses.length > 0 ? (
                     <>
                       <Text style={styles.impactCount}>
                         {affectedClasses.length} scheduled{' '}

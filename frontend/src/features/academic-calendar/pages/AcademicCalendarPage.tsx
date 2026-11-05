@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   CalendarDays,
   Plus,
@@ -192,9 +192,7 @@ export default function AcademicCalendarPage() {
     description: '',
   });
 
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
+  const loadData = useCallback(async () => {
     try {
       const [ov, years, sems, rh, wp] = await Promise.all([
         fetchCalendarOverview().catch(() => null),
@@ -217,14 +215,14 @@ export default function AcademicCalendarPage() {
         setSemesterForm((prev) => ({ ...prev, academicYearId: curYear.id }));
         setRhForm((prev) => ({ ...prev, annualYear: curYear.name }));
       }
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load calendar data');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load calendar data');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadMonthDays = async (targetDate: Date) => {
+  const loadMonthDays = useCallback(async (targetDate: Date) => {
     const y = targetDate.getFullYear();
     const m = String(targetDate.getMonth() + 1).padStart(2, '0');
     const monthStr = `${y}-${m}`;
@@ -234,14 +232,56 @@ export default function AcademicCalendarPage() {
     } catch (err) {
       console.error(err);
     }
-  };
-
-  useEffect(() => {
-    loadData();
   }, []);
 
   useEffect(() => {
-    loadMonthDays(currentDate);
+    let active = true;
+    Promise.all([
+      fetchCalendarOverview().catch(() => null),
+      fetchAcademicYears().catch(() => []),
+      fetchSemesters().catch(() => []),
+      fetchRestrictedHolidays().catch(() => []),
+      fetchWeeklyPatterns().catch(() => []),
+    ]).then(([ov, years, sems, rh, wp]) => {
+      if (!active) return;
+      setOverview(ov);
+      setAcademicYears(years);
+      setSemesters(sems);
+      setRestrictedHolidays(rh);
+      setWeeklyPatterns(wp);
+      if (years.length > 0) {
+        const curYear = years.find((y) => y.isCurrent) || years[0]!;
+        setSingleForm((prev) => ({ ...prev, academicYearId: curYear.id }));
+        setRangeForm((prev) => ({ ...prev, academicYearId: curYear.id }));
+        setSemesterForm((prev) => ({ ...prev, academicYearId: curYear.id }));
+        setRhForm((prev) => ({ ...prev, annualYear: curYear.name }));
+      }
+      setLoading(false);
+    }).catch((err: unknown) => {
+      if (!active) return;
+      setError(err instanceof Error ? err.message : 'Failed to load calendar data');
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const y = currentDate.getFullYear();
+    const m = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const monthStr = `${y}-${m}`;
+    fetchCalendarDays({ month: monthStr, pageSize: 200 })
+      .then((res) => {
+        if (active) setCalendarDays(res.data);
+      })
+      .catch((err) => {
+        console.error(err);
+      });
+    return () => {
+      active = false;
+    };
   }, [currentDate]);
 
   // Calendar calculations
@@ -280,8 +320,8 @@ export default function AcademicCalendarPage() {
       setSingleForm((prev) => ({ ...prev, title: '', description: '' }));
       await loadData();
       await loadMonthDays(currentDate);
-    } catch (err: any) {
-      alert(err?.message || 'Failed to create calendar entry');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to create calendar entry');
     }
   };
 
@@ -293,8 +333,8 @@ export default function AcademicCalendarPage() {
       setRangeForm((prev) => ({ ...prev, title: '', description: '', startDate: '', endDate: '' }));
       await loadData();
       await loadMonthDays(currentDate);
-    } catch (err: any) {
-      alert(err?.message || 'Failed to create date-range entry');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to create date-range entry');
     }
   };
 
@@ -304,8 +344,8 @@ export default function AcademicCalendarPage() {
       await createAcademicYear(yearForm);
       setShowAddYearModal(false);
       await loadData();
-    } catch (err: any) {
-      alert(err?.message || 'Failed to create academic year');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to create academic year');
     }
   };
 
@@ -315,8 +355,8 @@ export default function AcademicCalendarPage() {
       await createSemester(semesterForm);
       setShowAddSemesterModal(false);
       await loadData();
-    } catch (err: any) {
-      alert(err?.message || 'Failed to create semester');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to create semester');
     }
   };
 
@@ -327,8 +367,8 @@ export default function AcademicCalendarPage() {
       setShowAddRhModal(false);
       setRhForm((prev) => ({ ...prev, name: '', description: '' }));
       await loadData();
-    } catch (err: any) {
-      alert(err?.message || 'Failed to create restricted holiday');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to create restricted holiday');
     }
   };
 
@@ -339,8 +379,8 @@ export default function AcademicCalendarPage() {
       setSelectedDay(null);
       await loadData();
       await loadMonthDays(currentDate);
-    } catch (err: any) {
-      alert(err?.message || 'Failed to delete calendar day');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to delete calendar day');
     }
   };
 
@@ -353,8 +393,8 @@ export default function AcademicCalendarPage() {
       setWeeklyPatterns(res);
       await loadData();
       await loadMonthDays(currentDate);
-    } catch (err: any) {
-      alert(err?.message || 'Failed to update weekly pattern');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to update weekly pattern');
     }
   };
 
@@ -650,7 +690,7 @@ export default function AcademicCalendarPage() {
                 const isSunday = new Date(year, month, dayNum).getDay() === 0;
 
                 // Determine classification
-                let displayType: CalendarDayType = entry
+                const displayType: CalendarDayType = entry
                   ? entry.dayType
                   : isSunday
                   ? 'WEEKLY_OFF'

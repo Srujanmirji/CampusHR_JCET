@@ -45,7 +45,7 @@ export interface CalendarDayFilter {
   endDate?: Date;
   dayType?: CalendarDayType;
   isWorkingDay?: boolean;
-  departmentId?: number;
+  departmentId?: number | null;
   appliesToEmployeeType?: string;
   page?: number;
   pageSize?: number;
@@ -283,42 +283,53 @@ export function createAcademicCalendarRepository(prisma: PrismaClient): Academic
     },
 
     async findCalendarDays(filter: CalendarDayFilter) {
-      const where: Prisma.CalendarDayWhereInput = {};
+      const conditions: Prisma.CalendarDayWhereInput[] = [];
 
       if (filter.academicYearId) {
-        where.academicYearId = filter.academicYearId;
+        conditions.push({ academicYearId: filter.academicYearId });
       }
       if (filter.semesterId) {
-        where.semesterId = filter.semesterId;
+        conditions.push({ semesterId: filter.semesterId });
       }
       if (filter.dayType) {
-        where.dayType = filter.dayType;
+        conditions.push({ dayType: filter.dayType });
       }
       if (filter.isWorkingDay !== undefined) {
-        where.isWorkingDay = filter.isWorkingDay;
+        conditions.push({ isWorkingDay: filter.isWorkingDay });
       }
       if (filter.departmentId !== undefined) {
-        where.OR = [
-          { departmentId: filter.departmentId },
-          { departmentId: null },
-        ];
+        if (filter.departmentId === null) {
+          conditions.push({ departmentId: null });
+        } else {
+          conditions.push({
+            OR: [
+              { departmentId: filter.departmentId },
+              { departmentId: null },
+            ],
+          });
+        }
       }
       if (filter.appliesToEmployeeType) {
-        where.OR = [
-          { appliesToEmployeeType: filter.appliesToEmployeeType },
-          { appliesToEmployeeType: 'ALL' },
-          { appliesToEmployeeType: null },
-        ];
+        conditions.push({
+          OR: [
+            { appliesToEmployeeType: filter.appliesToEmployeeType },
+            { appliesToEmployeeType: 'ALL' },
+            { appliesToEmployeeType: null },
+          ],
+        });
       }
       if (filter.startDate || filter.endDate) {
-        where.date = {};
+        const dateFilter: Prisma.DateTimeFilter = {};
         if (filter.startDate) {
-          where.date.gte = filter.startDate;
+          dateFilter.gte = filter.startDate;
         }
         if (filter.endDate) {
-          where.date.lte = filter.endDate;
+          dateFilter.lte = filter.endDate;
         }
+        conditions.push({ date: dateFilter });
       }
+
+      const where: Prisma.CalendarDayWhereInput = conditions.length > 0 ? { AND: conditions } : {};
 
       const page = filter.page ?? 1;
       const pageSize = filter.pageSize ?? 50;
@@ -408,15 +419,38 @@ export function createAcademicCalendarRepository(prisma: PrismaClient): Academic
     async findCalendarDaysByDateRange(
       startDate: Date,
       endDate: Date,
-      _options?: { departmentId?: number | null; appliesToEmployeeType?: string | null },
+      options?: { departmentId?: number | null; appliesToEmployeeType?: string | null },
     ) {
-      return prisma.calendarDay.findMany({
-        where: {
+      const conditions: Prisma.CalendarDayWhereInput[] = [
+        {
           date: {
             gte: startDate,
             lte: endDate,
           },
         },
+      ];
+
+      if (options?.departmentId !== undefined && options?.departmentId !== null) {
+        conditions.push({
+          OR: [
+            { departmentId: options.departmentId },
+            { departmentId: null },
+          ],
+        });
+      }
+
+      if (options?.appliesToEmployeeType) {
+        conditions.push({
+          OR: [
+            { appliesToEmployeeType: options.appliesToEmployeeType },
+            { appliesToEmployeeType: 'ALL' },
+            { appliesToEmployeeType: null },
+          ],
+        });
+      }
+
+      return prisma.calendarDay.findMany({
+        where: { AND: conditions },
         orderBy: { date: 'asc' },
         include: {
           academicYear: true,

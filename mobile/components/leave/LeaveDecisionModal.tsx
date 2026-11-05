@@ -25,9 +25,6 @@ import {
   LeaveStatus,
   LeaveTypeBadge,
   OfficialDutyBadge,
-  formatEntitlement,
-  formatRemaining,
-  getLeaveBadgeTheme,
   leaveDates,
 } from './LeavePresentation';
 import {

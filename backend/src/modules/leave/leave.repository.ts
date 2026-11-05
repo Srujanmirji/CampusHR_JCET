@@ -117,6 +117,7 @@ export function createLeaveRepository(prisma: PrismaClient) {
               departmentId: true,
               joiningDate: true,
               status: true,
+              designation: { select: { category: true } },
             },
           },
         },
@@ -125,7 +126,12 @@ export function createLeaveRepository(prisma: PrismaClient) {
     employee(id: string) {
       return prisma.employee.findUnique({
         where: { id },
-        select: { id: true, departmentId: true, joiningDate: true },
+        select: {
+          id: true,
+          departmentId: true,
+          joiningDate: true,
+          designation: { select: { category: true } },
+        },
       });
     },
     taken(employeeId: string) {
