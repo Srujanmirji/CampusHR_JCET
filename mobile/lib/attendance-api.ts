@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ApiError, apiFetch, type AuthUser } from './session';
-import { attendanceSchema, homeUnavailable } from './home-api';
+import { attendanceSchema, homeUnavailable, canReadHome } from './home-api';
 
 export const statuses = [
   'PRESENT',
@@ -15,7 +15,17 @@ export const recordSchema = attendanceSchema.extend({
   source: z.enum(['WEB', 'MOBILE', 'BIOMETRIC', 'MANUAL']),
   notes: z.string().nullable(),
 });
-const correctionSchema = z.object({
+const employeeSummarySchema = z.object({
+  id: z.uuid(),
+  employeeCode: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+  departmentId: z.number().int().optional(),
+  department: z
+    .object({ id: z.number().int(), code: z.string(), name: z.string() })
+    .optional(),
+});
+export const correctionSchema = z.object({
   id: z.uuid(),
   employeeId: z.uuid(),
   date: timestamp,
@@ -23,9 +33,11 @@ const correctionSchema = z.object({
   requestedCheckOut: timestamp.nullable(),
   requestedStatus: z.enum(statuses),
   reason: z.string(),
-  status: z.enum(['PENDING', 'APPROVED', 'REJECTED']),
-  reviewNote: z.string().nullable(),
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']),
+  reviewNote: z.string().nullable().optional(),
   createdAt: timestamp,
+  employee: employeeSummarySchema.optional(),
+  attendanceId: z.uuid().nullable().optional(),
 });
 const metaSchema = z.object({
   total: z.number().int().nonnegative(),
@@ -267,6 +279,83 @@ export async function requestAttendanceCorrection(
     throw new Error('The server did not confirm a pending correction request.');
   return data;
 }
+
+export async function cancelAttendanceCorrection(
+  user: AuthUser | null,
+  token: string | null,
+  id: string,
+) {
+  own(user, token, 'attendance_correction.request');
+  z.uuid().parse(id);
+  const response = await apiFetch(`/attendance/corrections/${id}/cancel`, {
+    method: 'POST',
+  });
+  const raw = await response.json();
+  const { data } = z.object({ data: correctionSchema }).parse(raw);
+  if (data.status !== 'CANCELLED')
+    throw new Error('The server did not confirm cancellation.');
+  return data;
+}
+
+export async function getDepartmentAttendanceCorrections(
+  user: AuthUser | null,
+  token: string | null,
+  filters: {
+    status?: 'PENDING' | 'APPROVED' | 'REJECTED';
+    page?: number;
+    limit?: number;
+  } = {},
+) {
+  if (!user || !token)
+    throw new Error('Sign in to view department corrections.');
+  if (
+    !canReadHome(user, 'attendance_correction.approve') &&
+    !canReadHome(user, 'attendance.read')
+  )
+    throw new Error(
+      'You do not have permission to view attendance corrections.',
+    );
+
+  const params = new URLSearchParams();
+  if (filters.status) params.set('status', filters.status);
+  if (filters.page) params.set('page', String(filters.page));
+  if (filters.limit) params.set('limit', String(filters.limit));
+
+  const queryStr = params.toString() ? `?${params.toString()}` : '';
+  const response = await apiFetch(`/attendance/corrections${queryStr}`);
+  const result = z
+    .object({ data: z.array(correctionSchema), meta: metaSchema })
+    .parse(await response.json());
+  return result;
+}
+
+export async function reviewAttendanceCorrection(
+  user: AuthUser | null,
+  token: string | null,
+  id: string,
+  input: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string | null },
+) {
+  if (!user || !token)
+    throw new Error('Sign in to review attendance corrections.');
+  if (!canReadHome(user, 'attendance_correction.approve'))
+    throw new Error(
+      'You do not have permission to review attendance corrections.',
+    );
+  z.uuid().parse(id);
+  z.enum(['APPROVED', 'REJECTED']).parse(input.status);
+
+  const response = await apiFetch(`/attendance/corrections/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const raw = await response.json();
+  const { data } = z.object({ data: correctionSchema }).parse(raw);
+  if (data.status !== input.status)
+    throw new Error('The server did not confirm the review status.');
+  return data;
+}
+
 export const uncertainWrite = (error: unknown) =>
   !(
     error instanceof ApiError &&

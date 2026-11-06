@@ -42,6 +42,11 @@ import {
   uncertainLeaveWrite,
   type LeaveRequestDto,
 } from '../../lib/leave-api';
+import {
+  getDepartmentAttendanceCorrections,
+  reviewAttendanceCorrection,
+  type Correction,
+} from '../../lib/attendance-api';
 import { CoveragePanel } from '../../components/substitution/CoveragePanel';
 import { coverageUnavailable } from '../../lib/substitution-api';
 import { WebTopbar } from '../../components/layout/WebTopbar';
@@ -91,29 +96,9 @@ function LeaveRecords({
     'LEAVE' | 'ATTENDANCE' | 'OOD'
   >('LEAVE');
   const [approvalFilter, setApprovalFilter] = useState('PENDING');
-  const [attendanceCorrections, setAttendanceCorrections] = useState([
-    {
-      id: 'att-corr-1',
-      faculty: 'Prof. Asha Patil',
-      employeeCode: 'JCET-CSE-021',
-      date: '2026-10-22',
-      currentRecord: '09:12 AM – Not recorded',
-      requestedCorrection: '09:12 AM – 04:45 PM · Present',
-      reason:
-        'Evening DBMS lab session extended for VTU internal assessment viva.',
-      status: 'PENDING' as 'PENDING' | 'APPROVED' | 'REJECTED',
-    },
-    {
-      id: 'att-corr-2',
-      faculty: 'Dr. Rahul Deshpande',
-      employeeCode: 'JCET-CSE-014',
-      date: '2026-10-19',
-      currentRecord: 'Not recorded',
-      requestedCorrection: '09:00 AM – 04:30 PM · Official Duty',
-      reason: 'Deputed for VTU BoS syllabus review meeting at Belagavi.',
-      status: 'APPROVED' as 'PENDING' | 'APPROVED' | 'REJECTED',
-    },
-  ]);
+  const [reviewingCorrectionId, setReviewingCorrectionId] = useState<
+    string | null
+  >(null);
   const [year, setYear] = useState(String(campusClock().year));
   const validYear = /^20\d{2}$/.test(year) || year === '2100';
   const [filter, setFilter] = useState('ALL');
@@ -177,14 +162,57 @@ function LeaveRecords({
     enabled: approvals,
   });
 
+  const departmentCorrections = useQuery({
+    queryKey: [
+      'attendance',
+      'department-corrections',
+      user?.id,
+      approvalFilter,
+    ],
+    queryFn: () =>
+      getDepartmentAttendanceCorrections(user, token, {
+        status: approvalFilter as 'PENDING' | 'APPROVED' | 'REJECTED',
+      }),
+    enabled: approvals && approvalCategory === 'ATTENDANCE',
+    staleTime: 30_000,
+  });
+
   const refresh = useCallback(
     () =>
       Promise.all([
         client.invalidateQueries({ queryKey: ['leave', user?.id] }),
         client.invalidateQueries({ queryKey: ['coverage', user?.id] }),
+        client.invalidateQueries({
+          queryKey: ['attendance', 'department-corrections'],
+        }),
       ]),
     [client, user?.id],
   );
+
+  async function handleReviewCorrection(
+    corr: Correction,
+    status: 'APPROVED' | 'REJECTED',
+  ) {
+    if (reviewingCorrectionId) return;
+    setReviewingCorrectionId(corr.id);
+    setNotice('');
+    try {
+      await reviewAttendanceCorrection(user, token, corr.id, { status });
+      const empName = corr.employee
+        ? `${corr.employee.firstName} ${corr.employee.lastName}`.trim()
+        : 'Faculty';
+      setNotice(
+        `${status === 'APPROVED' ? 'Approved' : 'Rejected'} attendance correction for ${empName}.`,
+      );
+      void client.invalidateQueries({
+        queryKey: ['attendance', 'department-corrections'],
+      });
+    } catch (err: any) {
+      setNotice(err?.message || `Failed to ${status.toLowerCase()} correction.`);
+    } finally {
+      setReviewingCorrectionId(null);
+    }
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -309,14 +337,18 @@ function LeaveRecords({
     );
   });
 
-  const visibleCorrections = attendanceCorrections.filter((corr) => {
-    if (corr.status !== approvalFilter) return false;
+  const visibleCorrections = (
+    departmentCorrections.data?.data ?? []
+  ).filter((corr) => {
     const needle = search.trim().toLocaleLowerCase();
-    return (
-      !needle ||
-      [corr.faculty, corr.employeeCode, corr.reason, corr.date].some((val) =>
-        val.toLocaleLowerCase().includes(needle),
-      )
+    if (!needle) return true;
+    const facultyName = corr.employee
+      ? `${corr.employee.firstName} ${corr.employee.lastName}`
+      : '';
+    const empCode = corr.employee?.employeeCode ?? '';
+    const deptCode = corr.employee?.department?.code ?? '';
+    return [facultyName, empCode, deptCode, corr.reason, corr.date].some(
+      (val) => val.toLocaleLowerCase().includes(needle),
     );
   });
 
@@ -644,7 +676,29 @@ function LeaveRecords({
           {/* Request List */}
           {!personal && approvals && approvalCategory === 'ATTENDANCE' ? (
             <View style={styles.requestList}>
-              {visibleCorrections.length === 0 ? (
+              {departmentCorrections.isPending ? (
+                <View style={styles.empty}>
+                  <Text style={styles.subtitle}>
+                    Loading attendance corrections…
+                  </Text>
+                </View>
+              ) : departmentCorrections.isError ? (
+                <View style={styles.empty}>
+                  <Text
+                    style={[styles.subtitle, { color: theme.colors.coralInk }]}
+                  >
+                    {departmentCorrections.error?.message ||
+                      'Could not load attendance corrections.'}
+                  </Text>
+                  <Button
+                    variant="outline"
+                    onPress={() => void departmentCorrections.refetch()}
+                    style={{ marginTop: theme.spacing.sm }}
+                  >
+                    Retry
+                  </Button>
+                </View>
+              ) : visibleCorrections.length === 0 ? (
                 <View style={styles.empty}>
                   <Icon
                     name="attendance"
@@ -657,67 +711,80 @@ function LeaveRecords({
                   </Text>
                 </View>
               ) : (
-                visibleCorrections.map((corr) => (
-                  <View key={corr.id} style={styles.requestRow}>
-                    <FacultyInitials name={corr.faculty} />
-                    <View style={styles.requestBody}>
-                      <View style={styles.requestMeta}>
-                        <Text style={[styles.requestTitle, styles.grow]}>
-                          {corr.faculty}
-                        </Text>
-                        <LeaveStatus status={corr.status} />
-                      </View>
-                      <Text style={styles.caption}>
-                        CSE · {corr.employeeCode} · {corr.date}
-                      </Text>
-                      <Text style={styles.text}>
-                        Current record: {corr.currentRecord}
-                      </Text>
-                      <Text style={[styles.text, { fontWeight: '600' }]}>
-                        Requested correction: {corr.requestedCorrection}
-                      </Text>
-                      <Text style={styles.caption}>{corr.reason}</Text>
-                      {corr.status === 'PENDING' && (
-                        <View style={styles.rowActions}>
-                          <Button
-                            variant="primary"
-                            onPress={() => {
-                              setAttendanceCorrections((prev) =>
-                                prev.map((item) =>
-                                  item.id === corr.id
-                                    ? { ...item, status: 'APPROVED' }
-                                    : item,
-                                ),
-                              );
-                              setNotice(
-                                `Approved attendance correction for ${corr.faculty}.`,
-                              );
-                            }}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onPress={() => {
-                              setAttendanceCorrections((prev) =>
-                                prev.map((item) =>
-                                  item.id === corr.id
-                                    ? { ...item, status: 'REJECTED' }
-                                    : item,
-                                ),
-                              );
-                              setNotice(
-                                `Rejected attendance correction for ${corr.faculty}.`,
-                              );
-                            }}
-                          >
-                            Reject
-                          </Button>
+                visibleCorrections.map((corr) => {
+                  const facultyName = corr.employee
+                    ? `${corr.employee.firstName} ${corr.employee.lastName}`.trim()
+                    : 'Faculty Member';
+                  const empCode = corr.employee?.employeeCode ?? '—';
+                  const deptCode = corr.employee?.department?.code ?? 'JCET';
+                  const dateStr = corr.date.slice(0, 10);
+                  const inTime = corr.requestedCheckIn
+                    ? new Date(corr.requestedCheckIn).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        timeZone: 'UTC',
+                      })
+                    : 'None';
+                  const outTime = corr.requestedCheckOut
+                    ? new Date(corr.requestedCheckOut).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        timeZone: 'UTC',
+                      })
+                    : 'None';
+                  const reqDesc = `${inTime} – ${outTime} · ${corr.requestedStatus.replaceAll('_', ' ')}`;
+                  const isBusy = reviewingCorrectionId === corr.id;
+
+                  return (
+                    <View key={corr.id} style={styles.requestRow}>
+                      <FacultyInitials name={facultyName} />
+                      <View style={styles.requestBody}>
+                        <View style={styles.requestMeta}>
+                          <Text style={[styles.requestTitle, styles.grow]}>
+                            {facultyName}
+                          </Text>
+                          <LeaveStatus status={corr.status} />
                         </View>
-                      )}
+                        <Text style={styles.caption}>
+                          {deptCode} · {empCode} · {dateStr}
+                        </Text>
+                        <Text style={[styles.text, { fontWeight: '600' }]}>
+                          Requested correction: {reqDesc}
+                        </Text>
+                        <Text style={styles.caption}>{corr.reason}</Text>
+                        {corr.reviewNote && (
+                          <Text style={styles.caption}>
+                            HR/HOD note: {corr.reviewNote}
+                          </Text>
+                        )}
+                        {corr.status === 'PENDING' && (
+                          <View style={styles.rowActions}>
+                            <Button
+                              variant="primary"
+                              disabled={!!reviewingCorrectionId}
+                              loading={isBusy}
+                              onPress={() =>
+                                void handleReviewCorrection(corr, 'APPROVED')
+                              }
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              variant="outline"
+                              disabled={!!reviewingCorrectionId}
+                              loading={isBusy}
+                              onPress={() =>
+                                void handleReviewCorrection(corr, 'REJECTED')
+                              }
+                            >
+                              Reject
+                            </Button>
+                          </View>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                ))
+                  );
+                })
               )}
             </View>
           ) : (

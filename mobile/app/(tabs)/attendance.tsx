@@ -25,10 +25,11 @@ import {
 } from '../../components/attendance/correction-recovery';
 import { ScreenContainer } from '../../components/ui/ScreenContainer';
 import { useAuth } from '../../lib/auth-context';
-import { getSession } from '../../lib/session';
+import { ApiError, getSession } from '../../lib/session';
 import { homeUnavailable } from '../../lib/home-api';
 import {
   attendanceDay,
+  cancelAttendanceCorrection,
   correctionInputSchema,
   getAttendanceCorrections,
   getAttendanceHistory,
@@ -58,12 +59,25 @@ const displayTime = (iso: string | null) =>
       })
     : 'Not recorded';
 
-const messageOf = (error: unknown) =>
-  error instanceof Error
+const messageOf = (error: unknown) => {
+  if (error instanceof ApiError) {
+    if (error.code === 'ALREADY_REQUESTED') {
+      return 'A pending correction request already exists for this date. Check your requests list below.';
+    }
+    if (error.code === 'CONFLICTING_SCHEDULE') {
+      return (
+        error.message ||
+        'Cannot request attendance regularisation on a date with an approved leave or On-Duty schedule.'
+      );
+    }
+    return error.message;
+  }
+  return error instanceof Error
     ? error.name === 'ZodError'
       ? 'The server returned an unexpected response. Refresh or contact HR.'
       : error.message
     : 'Unable to finish. Check your connection.';
+};
 
 function ReadState({
   pending,
@@ -130,6 +144,9 @@ export default function AttendanceTab() {
   const [correctionRecovery, setCorrectionRecovery] = useState<string | null>(
     null,
   );
+  const [cancellingCorrectionId, setCancellingCorrectionId] = useState<
+    string | null
+  >(null);
   const blockedCorrectionFingerprints = useRef(new Set<string>());
   const ownUncertainCorrection =
     uncertainCorrection?.employeeId === user?.employeeId
@@ -379,6 +396,23 @@ export default function AttendanceTab() {
     } finally {
       sending.current = false;
       setPending(null);
+    }
+  }
+
+  async function handleCancelCorrection(id: string) {
+    if (cancellingCorrectionId || sending.current) return;
+    setCancellingCorrectionId(id);
+    setFeedback(null);
+    setWriteError(null);
+    try {
+      await cancelAttendanceCorrection(user, accessToken, id);
+      committedFeedback();
+      setFeedback('Attendance correction request cancelled.');
+      void client.invalidateQueries({ queryKey: [...key, 'corrections'] });
+    } catch (error) {
+      setWriteError(messageOf(error));
+    } finally {
+      setCancellingCorrectionId(null);
     }
   }
 
@@ -1069,7 +1103,9 @@ export default function AttendanceTab() {
                             ? styles.success
                             : item.status === 'REJECTED'
                               ? styles.error
-                              : styles.pending,
+                              : item.status === 'CANCELLED'
+                                ? styles.cancelled
+                                : styles.pending,
                         ]}
                       >
                         {item.status}
@@ -1085,6 +1121,23 @@ export default function AttendanceTab() {
                       <Text style={styles.supporting}>
                         Review: {item.reviewNote}
                       </Text>
+                    )}
+                    {item.status === 'PENDING' && (
+                      <View
+                        style={{
+                          marginTop: theme.spacing.sm,
+                          alignItems: 'flex-start',
+                        }}
+                      >
+                        <Button
+                          variant="outline"
+                          loading={cancellingCorrectionId === item.id}
+                          disabled={!!cancellingCorrectionId}
+                          onPress={() => void handleCancelCorrection(item.id)}
+                        >
+                          Cancel request
+                        </Button>
+                      </View>
                     )}
                   </View>
                 ))}
@@ -1261,6 +1314,9 @@ const styles = StyleSheet.create({
   },
   pending: {
     color: theme.colors.amberInk,
+  },
+  cancelled: {
+    color: theme.colors.mutedForeground,
   },
   readState: {
     gap: 8,
