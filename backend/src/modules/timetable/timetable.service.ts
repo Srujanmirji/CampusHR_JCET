@@ -1,6 +1,7 @@
 import { HttpError } from '../../common/http-error.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 import type { Access } from '../auth/auth.service.js';
+import type { AcademicCalendarService } from '../academic-calendar/academic-calendar.service.js';
 import { findClashes, type ClashKind } from './timetable.clash.js';
 import type {
   EntryRecord,
@@ -103,7 +104,19 @@ const isWriteConflict = (error: unknown) =>
   ((error as { code?: string }).code === 'P2034' ||
     /could not serialize|40001/.test(String(error)));
 
-export function createTimetableService(repo: TimetableRepository) {
+const WEEKDAY_TO_DAY_OF_WEEK: Record<string, number> = {
+  MON: 1,
+  TUE: 2,
+  WED: 3,
+  THU: 4,
+  FRI: 5,
+  SAT: 6,
+};
+
+export function createTimetableService(
+  repo: TimetableRepository,
+  calendarService?: AcademicCalendarService,
+) {
   function assertManages(access: Access, departmentId: number) {
     if (access.scope !== 'all' && access.departmentId !== departmentId) {
       throw outsideDepartment();
@@ -111,6 +124,18 @@ export function createTimetableService(repo: TimetableRepository) {
   }
 
   async function assertValid(input: EntryInput) {
+    if (calendarService) {
+      const patterns = await calendarService.getWeeklyWorkingPatterns();
+      const dayNum = WEEKDAY_TO_DAY_OF_WEEK[input.day];
+      const pattern = patterns.find((p) => p.dayOfWeek === dayNum);
+      if (pattern && !pattern.isWorkingDay) {
+        throw new HttpError(
+          400,
+          'NON_WORKING_DAY',
+          `Cannot schedule regular lectures on ${DAY_NAMES[input.day] ?? input.day} as it is configured as a non-working day in the Academic Calendar.`,
+        );
+      }
+    }
     if (!(await repo.findDepartment(input.departmentId))) {
       throw invalid('Choose a valid department.');
     }

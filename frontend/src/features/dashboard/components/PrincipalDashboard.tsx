@@ -34,6 +34,7 @@ import { PunchCard } from '@/features/attendance/components/PunchCard';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { useReportsSummary } from '@/features/reports/api/reports';
 import { useLeaveWaiting } from '@/features/leave/hooks/useLeaveWaiting';
+import { fetchOnDutyRequests } from '@/features/on-duty/api/onDuty';
 import { listWorkload } from '@/features/workload/api/workload';
 import { listDepartments } from '@/features/departments/api/departments';
 
@@ -45,6 +46,12 @@ export function PrincipalDashboard() {
   const summary = executiveSummaryQuery.data;
   const leaveWaitingQuery = useLeaveWaiting();
   const pendingLeaves = leaveWaitingQuery.data ?? [];
+  const onDutyWaitingQuery = useQuery({
+    queryKey: ['on-duty', 'waiting-approval'],
+    queryFn: () =>
+      fetchOnDutyRequests({ status: 'RECOMMENDED', view: 'approval' }),
+  });
+  const pendingOnDuty = onDutyWaitingQuery.data?.data ?? [];
   const departmentsQuery = useQuery({
     queryKey: ['departments'],
     queryFn: listDepartments,
@@ -300,20 +307,19 @@ export function PrincipalDashboard() {
                     Executive Governance & Sign-Offs
                   </CardTitle>
                   <CardDescription>
-                    Leaves requiring Principal sanction & institutional
-                    compliance
+                    Leave & On-Duty requests requiring Principal sanction
                   </CardDescription>
                 </div>
               </div>
               <Badge variant="secondary" className="text-xs">
-                {pendingLeaves.length} Awaiting
+                {pendingLeaves.length + pendingOnDuty.length} Awaiting
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
-            {pendingLeaves.length > 0 ? (
+            {pendingLeaves.length > 0 || pendingOnDuty.length > 0 ? (
               <div className="space-y-2.5">
-                {pendingLeaves.slice(0, 3).map((leave) => (
+                {pendingLeaves.slice(0, 2).map((leave) => (
                   <div
                     key={leave.id}
                     className="p-3 rounded-lg border border-border/60 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3"
@@ -343,7 +349,39 @@ export function PrincipalDashboard() {
                       asChild
                       className="text-xs gap-1 shrink-0"
                     >
-                      <Link to="/leave">Review</Link>
+                      <Link to="/leave">Review Leave</Link>
+                    </Button>
+                  </div>
+                ))}
+
+                {pendingOnDuty.slice(0, 2).map((od) => (
+                  <div
+                    key={od.id}
+                    className="p-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-between gap-3"
+                  >
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-foreground truncate">
+                          {od.employee.firstName} {od.employee.lastName}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className="text-xs uppercase font-mono border-primary/30 text-primary"
+                        >
+                          On-Duty (HOD Rec.)
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {od.title} ({od.venue}) • {od.startDate} to {od.endDate} ({od.totalDays}d)
+                      </p>
+                    </div>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      asChild
+                      className="text-xs gap-1 shrink-0"
+                    >
+                      <Link to="/on-duty">Sanction OD</Link>
                     </Button>
                   </div>
                 ))}
@@ -352,10 +390,10 @@ export function PrincipalDashboard() {
               <div className="p-4 rounded-lg border border-dashed border-border/80 text-center space-y-1.5">
                 <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
                 <p className="text-sm font-medium text-foreground">
-                  All Executive Leaves Up to Date
+                  All Executive Approvals Up to Date
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  No pending institutional leave requests currently awaiting
+                  No pending institutional leave or on-duty requests currently awaiting
                   Principal review.
                 </p>
               </div>

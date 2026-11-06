@@ -150,6 +150,23 @@ export function createAttendanceRouter(
         res.json({ data: updated });
       })
 
+      // 7b. Corrections - Cancel
+      .post('/corrections/:id/cancel', ...canRequestCorrection, async (req, res) => {
+        const id = z.string().uuid().safeParse(req.params.id);
+        if (!id.success) {
+          throw new HttpError(
+            404,
+            'NOT_FOUND',
+            'Correction request not found.',
+          );
+        }
+        const cancelled = await attendance.cancelCorrection(
+          access(res),
+          id.data,
+        );
+        res.json({ data: cancelled });
+      })
+
       // 8. Attendance Policy Settings
       .get('/settings', ...canRead, async (_req, res) => {
         res.json({ data: await attendance.getSettings() });

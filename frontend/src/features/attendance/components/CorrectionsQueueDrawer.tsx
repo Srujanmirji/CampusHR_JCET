@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, X, Clock, Calendar } from 'lucide-react';
+import { Check, X, Clock, Calendar, Ban } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,9 +12,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { useSession } from '@/features/auth/hooks/useSession';
 import {
   listAttendanceCorrections,
   reviewAttendanceCorrection,
+  cancelAttendanceCorrection,
   type AttendanceCorrection,
 } from '../api/attendance';
 
@@ -57,6 +59,25 @@ export function CorrectionsQueueDrawer({
         err instanceof Error
           ? err.message
           : 'Failed to review correction request.',
+      );
+    },
+  });
+
+  const session = useSession();
+  const currentEmployeeId =
+    session.status === 'signedIn' ? session.user.employeeId : null;
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => cancelAttendanceCorrection(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      toast.success('Correction request cancelled.');
+    },
+    onError: (err: unknown) => {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Failed to cancel correction request.',
       );
     },
   });
@@ -177,6 +198,18 @@ export function CorrectionsQueueDrawer({
                     className="h-8 text-xs mb-3"
                   />
                   <div className="flex items-center gap-2 justify-end">
+                    {item.employee.id === currentEmployeeId && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="mr-auto h-8 text-xs text-muted-foreground hover:text-destructive"
+                        disabled={cancelMutation.isPending}
+                        onClick={() => cancelMutation.mutate(item.id)}
+                      >
+                        <Ban className="mr-1 h-3.5 w-3.5" />
+                        Cancel My Request
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"

@@ -26,6 +26,7 @@ import {
   XCircle,
   FilterX,
   ShieldCheck,
+  Bell,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCan } from '@/features/auth/hooks/useCan';
@@ -35,6 +36,7 @@ import {
   useDocuments,
   usePendingDocumentsCount,
   useDeleteDocument,
+  useTriggerExpiryReminders,
   type DocumentCategoryKey,
   type DocumentItem,
   type DocumentStatusKey,
@@ -79,6 +81,7 @@ export default function DocumentsPage() {
 
   const { data: pendingCount = 0 } = usePendingDocumentsCount();
   const deleteMutation = useDeleteDocument();
+  const reminderMutation = useTriggerExpiryReminders();
 
   const documents = useMemo(
     () => documentsData?.data ?? [],
@@ -140,6 +143,34 @@ export default function DocumentsPage() {
           description="Institutional repository for faculty credentials, degrees, experience letters, and accreditation records."
           action={
             <div className="flex items-center gap-2">
+              {canVerify && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    reminderMutation.mutate(undefined, {
+                      onSuccess: (data) => {
+                        toast.success(
+                          `Expiry check complete: ${data.notifiedCount} reminders dispatched (${data.checkedCount - data.notifiedCount} already notified within 7 days).`,
+                        );
+                      },
+                      onError: (err: unknown) => {
+                        toast.error(
+                          err instanceof Error
+                            ? err.message
+                            : 'Failed to dispatch reminders.',
+                        );
+                      },
+                    });
+                  }}
+                  disabled={reminderMutation.isPending}
+                  className="gap-2 shadow-sm"
+                >
+                  <Bell className="h-4 w-4" />
+                  {reminderMutation.isPending
+                    ? 'Checking Expiries…'
+                    : 'Send Expiry Reminders'}
+                </Button>
+              )}
               {canUpload && (
                 <Button
                   onClick={() => setUploadOpen(true)}

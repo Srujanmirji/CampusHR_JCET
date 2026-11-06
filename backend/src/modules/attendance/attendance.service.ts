@@ -105,6 +105,7 @@ export interface AttendanceService {
     id: string,
     input: ReviewCorrectionInput,
   ): Promise<CorrectionRecord>;
+  cancelCorrection(access: Access, id: string): Promise<CorrectionRecord>;
   getSettings(): Promise<AttendanceSettingsData>;
   updateSettings(
     access: Access,
@@ -310,6 +311,42 @@ export function createAttendanceService(
       }
 
       const date = startOfDate(input.date);
+
+      if (repo.findPendingCorrection) {
+        const pending = await repo.findPendingCorrection(
+          access.employeeId,
+          date,
+        );
+        if (pending) {
+          throw new HttpError(
+            409,
+            'ALREADY_REQUESTED',
+            'A pending correction request already exists for this date.',
+          );
+        }
+      }
+
+      if (repo.hasConflictingLeaveOrOnDuty) {
+        const conflicts = await repo.hasConflictingLeaveOrOnDuty(
+          access.employeeId,
+          date,
+        );
+        if (conflicts.conflictingLeave) {
+          throw new HttpError(
+            409,
+            'CONFLICTING_SCHEDULE',
+            'Cannot request attendance regularisation on a date with an approved full-day leave.',
+          );
+        }
+        if (conflicts.conflictingOnDuty) {
+          throw new HttpError(
+            409,
+            'CONFLICTING_SCHEDULE',
+            'Cannot request attendance regularisation on a date with an approved On-Duty.',
+          );
+        }
+      }
+
       const existing = await repo.findByEmployeeAndDate(
         access.employeeId,
         date,
@@ -441,6 +478,36 @@ export function createAttendanceService(
       }
 
       return updated;
+    },
+
+    async cancelCorrection(access: Access, id: string) {
+      const correction = await repo.findCorrectionById(id);
+      if (!correction) {
+        throw new HttpError(404, 'NOT_FOUND', 'Correction request not found.');
+      }
+
+      if (
+        access.scope === 'own' &&
+        correction.employeeId !== access.employeeId
+      ) {
+        throw new HttpError(
+          403,
+          'FORBIDDEN',
+          'You can only cancel your own correction requests.',
+        );
+      }
+
+      if (correction.status !== 'PENDING') {
+        throw new HttpError(
+          400,
+          'CANNOT_CANCEL',
+          `Cannot cancel a correction request that is already ${correction.status.toLowerCase()}.`,
+        );
+      }
+
+      return repo.updateCorrection(id, {
+        status: 'CANCELLED',
+      });
     },
 
     async getSettings() {

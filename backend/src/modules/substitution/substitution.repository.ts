@@ -134,6 +134,29 @@ export function createSubstitutionRepository(prisma: PrismaClient) {
       });
       return new Set(rows.map((row) => row.employeeId));
     },
+    /** Faculty assigned to active Exam Duty on `date`. */
+    async onExamDuty(date: Date) {
+      const rows = await prisma.examDuty.findMany({
+        where: {
+          date,
+          status: { in: ['ASSIGNED', 'CONFIRMED', 'SWAP_REQUESTED'] },
+        },
+        select: { facultyId: true },
+      });
+      return new Set(rows.map((row) => row.facultyId));
+    },
+    /** Faculty on approved Official On-Duty on `date`. */
+    async onApprovedOnDuty(date: Date) {
+      const rows = await prisma.onDutyRequest.findMany({
+        where: {
+          status: 'APPROVED',
+          startDate: { lte: date },
+          endDate: { gte: date },
+        },
+        select: { employeeId: true },
+      });
+      return new Set(rows.map((row) => row.employeeId));
+    },
     /** Substitute assignments between two dates, with the class periods. */
     assignmentsBetween(from: Date, to: Date) {
       return prisma.substitution.findMany({

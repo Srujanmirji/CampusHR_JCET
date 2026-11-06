@@ -117,6 +117,14 @@ export interface AttendanceRepository {
     reason: string;
   }): Promise<CorrectionRecord>;
   findCorrectionById(id: string): Promise<CorrectionRecord | null>;
+  findPendingCorrection(
+    employeeId: string,
+    date: Date,
+  ): Promise<CorrectionRecord | null>;
+  hasConflictingLeaveOrOnDuty(
+    employeeId: string,
+    date: Date,
+  ): Promise<{ conflictingLeave: boolean; conflictingOnDuty: boolean }>;
   listCorrections(params: {
     employeeId?: string;
     departmentId?: number;
@@ -128,8 +136,8 @@ export interface AttendanceRepository {
     id: string,
     data: {
       status: CorrectionStatus;
-      reviewedByUserId: string;
-      reviewedAt: Date;
+      reviewedByUserId?: string | null;
+      reviewedAt?: Date | null;
       reviewNote?: string | null;
     },
   ): Promise<CorrectionRecord>;
@@ -357,6 +365,45 @@ export function createAttendanceRepository(
         where: { id },
         select: correctionSelect,
       });
+    },
+
+    async findPendingCorrection(employeeId: string, date: Date) {
+      return prisma.attendanceCorrection.findFirst({
+        where: {
+          employeeId,
+          date,
+          status: 'PENDING',
+        },
+        select: correctionSelect,
+      });
+    },
+
+    async hasConflictingLeaveOrOnDuty(employeeId: string, date: Date) {
+      const [leave, onDuty] = await Promise.all([
+        prisma.leaveRequest.findFirst({
+          where: {
+            employeeId,
+            status: 'APPROVED',
+            startDate: { lte: date },
+            endDate: { gte: date },
+            halfDay: null,
+          },
+          select: { id: true },
+        }),
+        prisma.onDutyRequest.findFirst({
+          where: {
+            employeeId,
+            status: 'APPROVED',
+            startDate: { lte: date },
+            endDate: { gte: date },
+          },
+          select: { id: true },
+        }),
+      ]);
+      return {
+        conflictingLeave: Boolean(leave),
+        conflictingOnDuty: Boolean(onDuty),
+      };
     },
 
     async listCorrections(params) {

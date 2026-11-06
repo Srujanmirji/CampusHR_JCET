@@ -232,6 +232,13 @@ export async function reviewAttendanceCorrection(
   return oneCorrection.parse(res).data;
 }
 
+export async function cancelAttendanceCorrection(id: string) {
+  const res = await apiRequest(`/attendance/corrections/${id}/cancel`, {
+    method: 'POST',
+  });
+  return oneCorrection.parse(res).data;
+}
+
 export async function getAttendanceSettings(): Promise<AttendanceSettings> {
   const res = await apiRequest('/attendance/settings');
   return (res as { data: AttendanceSettings }).data;

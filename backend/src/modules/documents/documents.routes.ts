@@ -185,5 +185,15 @@ export function createDocumentsRouter(
           next(err);
         }
       })
+
+      // 7. Bulk expiry reminders (HR Admin)
+      .post('/check-expirations', ...canVerify, async (_req, res, next) => {
+        try {
+          const result = await documents.triggerExpiryReminders(access(res));
+          res.json({ data: result });
+        } catch (err) {
+          next(err);
+        }
+      })
   );
 }

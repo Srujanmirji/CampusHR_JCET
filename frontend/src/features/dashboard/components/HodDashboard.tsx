@@ -48,6 +48,7 @@ import {
 } from '@/features/workload/api/workload';
 import { listEntries, listPeriods } from '@/features/timetable/api/timetable';
 import { leaveDates } from '@/features/leave/utils/leave';
+import { fetchWorkAssignments } from '@/features/work-assignments/api/workAssignments';
 
 import { NotificationsPreview } from './NotificationsPreview';
 import { PunchCard } from '@/features/attendance/components/PunchCard';
@@ -99,6 +100,13 @@ export function HodDashboard() {
     queryFn: () => listAttendance({ date: todayISO }),
   });
   const attendanceList = attendanceQuery.data?.data ?? [];
+
+  // 7. Department Work Assignments awaiting review
+  const workAssignmentsQuery = useQuery({
+    queryKey: ['work-assignments', 'submitted'],
+    queryFn: () => fetchWorkAssignments({ status: 'SUBMITTED' }),
+  });
+  const pendingSubmissions = workAssignmentsQuery.data?.data ?? [];
 
   // HOD display name
   const matchingFaculty = workloadList.find(
@@ -429,11 +437,13 @@ export function HodDashboard() {
           <CardHeader>
             <SectionHeader
               title="Pending approvals & action queue"
-              description="Leaves & corrections requiring your sign-off"
+              description="Leaves, corrections & task submissions requiring your review"
             />
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
-            {pendingLeaves.length > 0 || pendingCorrections.length > 0 ? (
+            {pendingLeaves.length > 0 ||
+            pendingCorrections.length > 0 ||
+            pendingSubmissions.length > 0 ? (
               <div className="space-y-3">
                 {/* Pending Leaves */}
                 {pendingLeaves.map((req) => (
@@ -506,6 +516,48 @@ export function HodDashboard() {
                     </Button>
                   </div>
                 ))}
+
+                {/* Pending Department Work Assignments */}
+                {pendingSubmissions.map((task) => (
+                  <div
+                    key={task.id}
+                    className="flex items-center justify-between p-3 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-foreground">
+                          {task.assignedTo
+                            ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
+                            : 'Faculty Member'}
+                        </span>
+                        <StatusBadge
+                          status="Pending"
+                          label={`Work: ${task.priority}`}
+                        />
+                      </div>
+                      <p className="text-xs text-foreground font-medium truncate">
+                        {task.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Due: {task.dueDate} · Submitted:{' '}
+                        {task.submittedAt
+                          ? new Date(task.submittedAt).toLocaleDateString()
+                          : 'Recently'}
+                      </p>
+                    </div>
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="default"
+                      className="shrink-0 text-xs"
+                    >
+                      <Link to="/work-assignments">
+                        Review
+                        <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-border p-4 text-center space-y-1.5">
@@ -514,8 +566,8 @@ export function HodDashboard() {
                   All caught up!
                 </h4>
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  No pending leave requests or punch corrections awaiting HOD
-                  review for your department.
+                  No pending leave requests, punch corrections, or work task
+                  submissions awaiting HOD review for your department.
                 </p>
               </div>
             )}

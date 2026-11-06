@@ -2,8 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { documentFormat } from './documents.files.js';
 import { HttpError } from '../../common/http-error.js';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { Access } from '../auth/auth.service.js';
 import type { Notifier } from '../notifications/notifications.service.js';
+import {
+  checkDocumentExpirations,
+  type ExpiryCheckResult,
+} from './documents.expiry.js';
 import type {
   DocumentsRepository,
   DocumentWithRelations,
@@ -43,11 +48,13 @@ export interface DocumentsService {
   deleteDocument(access: Access, id: string): Promise<{ success: boolean }>;
 
   getPendingCount(access: Access): Promise<{ count: number }>;
+  triggerExpiryReminders(access: Access): Promise<ExpiryCheckResult>;
 }
 
 export function createDocumentsService(
   repo: DocumentsRepository,
   notifier?: Notifier,
+  prisma?: PrismaClient,
 ): DocumentsService {
   return {
     async uploadDocument(access, metadata, file) {
@@ -308,6 +315,24 @@ export function createDocumentsService(
         hasAllScope ? undefined : (access.employeeId ?? undefined),
       );
       return { count };
+    },
+
+    async triggerExpiryReminders(access) {
+      if (access.scope !== 'all') {
+        throw new HttpError(
+          403,
+          'FORBIDDEN',
+          'Only HR Administrators can trigger bulk document expiry reminders.',
+        );
+      }
+      if (!prisma) {
+        throw new HttpError(
+          500,
+          'INTERNAL_ERROR',
+          'Database client is unavailable for expiry checks.',
+        );
+      }
+      return checkDocumentExpirations(prisma, notifier, new Date());
     },
   };
 }

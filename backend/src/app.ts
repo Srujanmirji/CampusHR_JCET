@@ -196,6 +196,7 @@ export function createApp(
       createDocumentsService(
         createDocumentsRepository(prisma),
         notifications.notifier,
+        prisma,
       ),
       env.DOCUMENTS_DIR,
     ),
@@ -259,6 +260,7 @@ export function createApp(
       createSubstitutionService(
         createSubstitutionRepository(prisma),
         notifications.notifier,
+        academicCalendarService,
       ),
     ),
   );
@@ -266,7 +268,10 @@ export function createApp(
     '/api/v1/timetable',
     createTimetableRouter(
       auth,
-      createTimetableService(createTimetableRepository(prisma)),
+      createTimetableService(
+        createTimetableRepository(prisma),
+        academicCalendarService,
+      ),
     ),
   );
   app.use(

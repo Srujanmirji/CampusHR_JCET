@@ -1,6 +1,7 @@
 import { HttpError } from '../../common/http-error.js';
 import type { Access } from '../auth/auth.service.js';
 import type { Notifier } from '../notifications/notifications.service.js';
+import type { AcademicCalendarService } from '../academic-calendar/academic-calendar.service.js';
 import type { EntryRecord } from '../timetable/timetable.repository.js';
 import { toEntryDto } from '../timetable/timetable.service.js';
 import { weeklyHours } from '../workload/workload.calc.js';
@@ -75,14 +76,27 @@ function inScope(access: Access, entry: EntryRecord) {
 export function createSubstitutionService(
   repo: SubstitutionRepository,
   notifier: Notifier,
+  calendarService?: AcademicCalendarService,
 ) {
   /** Each class the leave takes the faculty member away from, by date. */
-  function affected(
+  async function affected(
     leave: LeaveRecord,
     classes: EntryRecord[],
     periodStarts: Map<number, string>,
   ) {
-    return leaveDates(leave.startDate, leave.endDate).flatMap((date) =>
+    const dates = leaveDates(leave.startDate, leave.endDate);
+    const workingDates = calendarService
+      ? (
+          await Promise.all(
+            dates.map(async (d) => {
+              const working = await calendarService.isWorkingDay(d);
+              return working ? d : null;
+            }),
+          )
+        ).filter((d): d is string => d !== null)
+      : dates;
+
+    return workingDates.flatMap((date) =>
       classes
         .filter(
           (entry) =>
@@ -102,7 +116,8 @@ export function createSubstitutionService(
       repo.classesOf([leave.employeeId]),
       repo.periodStarts(),
     ]);
-    const visible = affected(leave, classes, periodStarts).filter(({ entry }) =>
+    const aff = await affected(leave, classes, periodStarts);
+    const visible = aff.filter(({ entry }) =>
       inScope(access, entry),
     );
     if (visible.length === 0) throw notFound();
@@ -127,16 +142,28 @@ export function createSubstitutionService(
   async function rank(leave: LeaveRecord, entry: EntryRecord, date: string) {
     const day = toDate(date);
     const { monday, sunday } = weekOf(day);
-    const [staff, onLeave, assigned] = await Promise.all([
-      repo.teachingStaff(),
-      repo.onLeave(day),
-      repo.assignmentsBetween(monday, sunday),
-    ]);
+    const [staff, onLeave, assigned, examDutyFaculty, onDutyFaculty] =
+      await Promise.all([
+        repo.teachingStaff(),
+        repo.onLeave(day),
+        repo.assignmentsBetween(monday, sunday),
+        repo.onExamDuty
+          ? repo.onExamDuty(day)
+          : Promise.resolve(new Set<string>()),
+        repo.onApprovedOnDuty
+          ? repo.onApprovedOnDuty(day)
+          : Promise.resolve(new Set<string>()),
+      ]);
     const weekday = weekdayOf(day);
     const hours = hoursOf(entry);
 
     const candidates = staff.flatMap((person: StaffRecord) => {
-      if (person.id === leave.employeeId || onLeave.has(person.id)) return [];
+      if (person.id === leave.employeeId) return [];
+
+      const onLeaveToday = onLeave.has(person.id);
+      const onExamDutyToday = examDutyFaculty.has(person.id);
+      const onDutyToday = onDutyFaculty.has(person.id);
+
       const today = person.timetable.filter((own) => own.day === weekday);
       const mine = assigned.filter((item) => item.substituteId === person.id);
       const busy =
@@ -145,7 +172,6 @@ export function createSubstitutionService(
           (item) =>
             isoDate(item.date) === date && overlaps(item.timetableEntry, entry),
         );
-      if (busy) return [];
 
       const hoursAfter =
         weeklyHours(
@@ -158,6 +184,28 @@ export function createSubstitutionService(
         mine.reduce((sum, item) => sum + hoursOf(item.timetableEntry), 0) +
         hours;
       const maxHours = person.designation.workload?.maxHours ?? null;
+      const overloaded = maxHours !== null && hoursAfter > maxHours;
+
+      let eligible = true;
+      let reason: string | null = null;
+
+      if (onLeaveToday) {
+        eligible = false;
+        reason = 'On approved leave on this date.';
+      } else if (onExamDutyToday) {
+        eligible = false;
+        reason = 'Assigned to Exam Duty on this date.';
+      } else if (onDutyToday) {
+        eligible = false;
+        reason = 'On approved Official On-Duty on this date.';
+      } else if (busy) {
+        eligible = false;
+        reason = 'Already has a class or substitution scheduled during this period.';
+      } else if (overloaded) {
+        eligible = false;
+        reason = `Would teach ${hoursAfter} hours that week, over the ${maxHours}-hour maximum.`;
+      }
+
       const { points, total } = scoreCandidate({
         teachesSubject: person.timetable.some(
           (own) => own.subjectId === entry.subject.id,
@@ -177,7 +225,7 @@ export function createSubstitutionService(
         maxHours,
         experienceYears: person.experienceYears,
       });
-      const overloaded = maxHours !== null && hoursAfter > maxHours;
+
       return [
         {
           faculty: {
@@ -189,10 +237,8 @@ export function createSubstitutionService(
           points,
           hoursAfter,
           maxHours,
-          eligible: !overloaded,
-          reason: overloaded
-            ? `Would teach ${hoursAfter} hours that week, over the ${maxHours}-hour maximum.`
-            : null,
+          eligible,
+          reason,
         },
       ];
     });
@@ -220,19 +266,21 @@ export function createSubstitutionService(
         repo.periodStarts(),
         repo.coverage(leaves.map((leave) => leave.id)),
       ]);
-      return leaves.flatMap((leave) => {
-        const visible = affected(leave, classes, periodStarts).filter(
-          ({ entry }) => inScope(access, entry),
-        );
-        if (visible.length === 0) return [];
-        const covered = visible.filter(({ entry, date }) =>
-          coverage.some(
-            (item) =>
-              item.timetableEntryId === entry.id && isoDate(item.date) === date,
-          ),
-        ).length;
-        return [{ leave: toLeaveDto(leave), classes: visible.length, covered }];
-      });
+      const results = await Promise.all(
+        leaves.map(async (leave) => {
+          const aff = await affected(leave, classes, periodStarts);
+          const visible = aff.filter(({ entry }) => inScope(access, entry));
+          if (visible.length === 0) return null;
+          const covered = visible.filter(({ entry, date }) =>
+            coverage.some(
+              (item) =>
+                item.timetableEntryId === entry.id && isoDate(item.date) === date,
+            ),
+          ).length;
+          return { leave: toLeaveDto(leave), classes: visible.length, covered };
+        }),
+      );
+      return results.filter((r): r is NonNullable<typeof r> => r !== null);
     },
 
     /** One leave's classes in scope, each with how it is covered. */
@@ -287,7 +335,7 @@ export function createSubstitutionService(
             400,
             'NOT_AVAILABLE',
             pick?.reason ??
-              'Choose someone free in this slot and not on leave that day.',
+              'Choose someone free in this slot and not on leave or conflicting duty that day.',
           );
         }
       }

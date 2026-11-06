@@ -200,3 +200,26 @@ export async function downloadDocument(document: DocumentItem) {
   link.click();
   URL.revokeObjectURL(url);
 }
+
+export interface ExpiryReminderResult {
+  checkedCount: number;
+  expiringCount: number;
+  notifiedCount: number;
+}
+
+export async function triggerDocumentExpiryReminders(): Promise<ExpiryReminderResult> {
+  const res = (await apiRequest('/documents/check-expirations', {
+    method: 'POST',
+  })) as { data: ExpiryReminderResult };
+  return res.data;
+}
+
+export function useTriggerExpiryReminders() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: triggerDocumentExpiryReminders,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+    },
+  });
+}

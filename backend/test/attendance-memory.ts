@@ -144,6 +144,20 @@ export function createMemoryAttendanceRepository(): AttendanceRepository {
     async findCorrectionById(id: string) {
       return corrections.find((c) => c.id === id) ?? null;
     },
+    async findPendingCorrection(employeeId: string, date: Date) {
+      const dStr = date.toISOString().split('T')[0];
+      return (
+        corrections.find(
+          (c) =>
+            c.employeeId === employeeId &&
+            c.status === 'PENDING' &&
+            new Date(c.date).toISOString().split('T')[0] === dStr,
+        ) ?? null
+      );
+    },
+    async hasConflictingLeaveOrOnDuty() {
+      return { conflictingLeave: false, conflictingOnDuty: false };
+    },
     async listCorrections(params) {
       let items = [...corrections];
       if (params.employeeId)

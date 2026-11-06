@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, DoorOpen } from 'lucide-react';
+import { BookOpen, CalendarDays, DoorOpen } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -17,6 +17,7 @@ import {
 import { useScope } from '@/features/auth/hooks/useCan';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { listDepartments } from '@/features/departments/api/departments';
+import { fetchCalendarOverview } from '@/features/academic-calendar/api/academicCalendar';
 import {
   getLeaveClasses,
   listApprovedLeave,
@@ -56,6 +57,10 @@ export default function TimetablePage() {
   const periods = useQuery({
     queryKey: ['timetable', 'periods'],
     queryFn: listPeriods,
+  });
+  const calendarOverview = useQuery({
+    queryKey: ['academic-calendar', 'overview'],
+    queryFn: fetchCalendarOverview,
   });
   const [chosenDepartment, setChosenDepartment] = useState<number>();
   const [semester, setSemester] = useState(1);
@@ -163,6 +168,30 @@ export default function TimetablePage() {
           ) : undefined
         }
       />
+
+      {calendarOverview.data?.currentSemester && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-xs">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-primary shrink-0" />
+            <span className="font-semibold text-primary">
+              Academic Calendar:
+            </span>
+            <span className="text-foreground">
+              {calendarOverview.data.currentAcademicYear?.name ?? ''} — {calendarOverview.data.currentSemester.name}
+            </span>
+          </div>
+          <div className="flex items-center gap-4 text-muted-foreground">
+            <span>
+              <strong>{calendarOverview.data.semesterWorkingDays}</strong> Working Days
+            </span>
+            {calendarOverview.data.upcomingHolidays.length > 0 && (
+              <span>
+                Upcoming: <strong>{calendarOverview.data.upcomingHolidays[0].title}</strong> ({calendarOverview.data.upcomingHolidays[0].date})
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {!ownView && (
         <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border bg-card p-4 shadow-xs sm:grid-cols-3 lg:flex">

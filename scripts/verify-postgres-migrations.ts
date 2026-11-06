@@ -26,6 +26,7 @@ async function runCliCmd(
       cwd: 'backend',
       env: { ...process.env, DATABASE_URL: databaseUrl },
       stdio: ['pipe', 'pipe', 'pipe'],
+      shell: true,
     });
 
     child.stdout?.on('data', (data) => {
@@ -490,13 +491,14 @@ async function testApplicationLevelRolloverConcurrency() {
     assert.equal(rejected.length, 1, 'Exactly one concurrent rollover request must be rejected');
 
     const rejectedReason = (rejected[0] as PromiseRejectedResult).reason as HttpError;
+    const errorStatus = rejectedReason.status ?? (rejectedReason as any).statusCode;
     console.log(`\nControlled error response received by losing request:`);
-    console.log(`  HTTP Status: ${rejectedReason.statusCode}`);
+    console.log(`  HTTP Status: ${errorStatus}`);
     console.log(`  Error Code:  ${rejectedReason.code}`);
     console.log(`  Message:     "${rejectedReason.message}"`);
 
     assert.equal(
-      rejectedReason.statusCode,
+      errorStatus,
       409,
       'Losing request must receive HTTP 409 Conflict'
     );
@@ -551,8 +553,9 @@ async function testApplicationLevelRolloverConcurrency() {
     }
 
     assert.ok(retryError !== null, 'Subsequent retry must be caught safely');
+    const retryStatus = retryError?.status ?? (retryError as any)?.statusCode;
     assert.equal(
-      retryError?.statusCode,
+      retryStatus,
       409,
       'Retry must return 409 Conflict'
     );
